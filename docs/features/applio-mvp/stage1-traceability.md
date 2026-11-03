@@ -113,8 +113,11 @@ This environment can't operate macOS dialogs (synthetic keystrokes and screen ca
 refused), so the manual steps were handed to the requester: build and start the app, then
 Settings → Change… (cancel, then choose a folder) and Profile → Replace (cancel). The requester
 reported back: "great, all are working and looks fine" and then "all remaining checks for me is
-checked". On that confirmation, electron-shell AC-8 and the picker parts of profile AC-1 and
-settings AC-6 are recorded as met, alongside their faked-OS unit tests.
+checked". Asked for each step individually — (1) Settings → Change… → Esc leaves the path
+unchanged, (2) Change… → pick a folder updates the path with a toast, (3) Profile → Replace → Esc
+leaves the card unchanged — the requester answered "yes". On that confirmation, electron-shell
+AC-8 and the picker parts of profile AC-1 and settings AC-6 are recorded as met, alongside their
+faked-OS unit tests.
 
 ## Found in that pass
 
