@@ -13,6 +13,7 @@ interface NavItem {
 /** Pages in the primary nav. Each page PR adds its entry here. */
 const NAV: NavItem[] = [
   { to: '/review', label: 'Review', icon: 'review' },
+  { to: '/applications', label: 'Applications', icon: 'applications' },
 ];
 
 /** True for the item's own path and anything beneath it (`/jobs/j1` keeps Review active). */
