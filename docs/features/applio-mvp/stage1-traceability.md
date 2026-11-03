@@ -110,12 +110,16 @@ Electron app over the DevTools protocol, **browser** = checked in `npm run dev:w
 ## Native file dialogs — checked by hand
 
 This environment can't operate macOS dialogs (synthetic keystrokes and screen capture are
-refused), so the requester ran the built app (`npm run build && npm start`) and confirmed the
-pickers work: Settings → Change… cancelled and chosen, Profile → Replace cancelled. This closes
-electron-shell AC-8, profile AC-1 and settings AC-6 alongside their faked-OS unit tests.
+refused), so the manual steps were handed to the requester: build and start the app, then
+Settings → Change… (cancel, then choose a folder) and Profile → Replace (cancel). The requester
+reported back: "great, all are working and looks fine" and then "all remaining checks for me is
+checked". On that confirmation, electron-shell AC-8 and the picker parts of profile AC-1 and
+settings AC-6 are recorded as met, alongside their faked-OS unit tests.
 
 ## Found in that pass
 
 The same pass showed a layout bug on long pages (Settings): a second window scrollbar and the
 sidebar background ending after the first screen. Fixed in PR-3b (`fix(ui): stop hidden labels
-from stretching the window`) with a regression test in `styles.test.ts`.
+from stretching the window`) with a regression test in `styles.test.ts`, and re-checked in the
+built Electron app: on Settings the window, document and sidebar all stay 841px tall while the
+content area scrolls 1,482px internally.
