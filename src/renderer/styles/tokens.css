@@ -1,0 +1,102 @@
+/*
+ * Design tokens from the Applio UI prototype. Every color, size and duration
+ * in the UI comes from here. Light theme only, matching the prototype.
+ */
+:root {
+  color-scheme: light;
+
+  /* Surfaces */
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --surface-subtle: #fbfbfc;
+  --surface-muted: #f1f2f5;
+  --surface-sunken: #f5f6f8;
+  --surface-selected: #eef3fc;
+  --track: #eceef2;
+
+  /* Borders */
+  --border: #e4e6eb;
+  --border-soft: #eceef2;
+  --border-strong: #d5d8df;
+  --border-dashed: #c9cdd5;
+  --border-focus: #b9c6e8;
+
+  /* Text */
+  --text: #15171c;
+  --text-body: #2a2e36;
+  --text-secondary: #3a3f4a;
+  --text-muted: #5f6672;
+  --text-subtle: #8a9099;
+  --text-disabled: #a3a8b1;
+
+  /* Accent (blue) */
+  --accent: #2b59c3;
+  --accent-strong: #1e428f;
+  --accent-soft: #e8eefa;
+  --accent-tint: #eaf0fc;
+  --accent-muted: #7d97d6;
+  --accent-light: #9db2e3;
+  --on-accent: #ffffff;
+
+  /* Ink: dark primary buttons and toasts */
+  --ink: #15171c;
+  --on-ink: #ffffff;
+
+  /* Status */
+  --success: #2e9b62;
+  --success-text: #1b5e3b;
+  --success-soft: #e7f4ec;
+  --warning: #c46a12;
+  --warning-icon: #b5620f;
+  --warning-text: #8a4b0c;
+  --warning-soft: #fdf1e4;
+  --warning-border: #e8c9a5;
+  --danger-text: #a33a1e;
+  --neutral-soft: #eef1f5;
+  --stop: #3a3f4a;
+
+  /* Spacing (4px grid) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+
+  /* Radii */
+  --radius-xs: 5px;
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+
+  /* Type */
+  --font: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --text-2xs: 11.5px;
+  --text-xs: 12px;
+  --text-sm: 12.5px;
+  --text-md: 13px;
+  --text-base: 14px;
+  --text-lg: 15px;
+  --text-xl: 17px;
+  --text-2xl: 20px;
+  --text-3xl: 22px;
+
+  --shadow-sm: 0 1px 2px rgb(20 23 28 / 0.08);
+  --shadow-toast: 0 6px 20px rgb(20 23 28 / 0.18);
+  --focus-ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent);
+
+  --control-h: 40px;
+  --control-h-sm: 36px;
+  --sidebar-width: 216px;
+  --duration: 150ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration: 0ms;
+  }
+}
