@@ -147,3 +147,11 @@ describe('seed data', () => {
     expect(closed.every((j) => j.history.some((e) => e.status === 'applied'))).toBe(true);
   });
 });
+
+describe('fact bank and drafts', () => {
+  it('keeps generated drafts unchanged when a cited fact is deleted', async () => {
+    const before = (await api.getDraft('j1'))!.coverLetter;
+    await api.deleteFact('f1');
+    expect((await api.getDraft('j1'))!.coverLetter).toBe(before);
+  });
+});
