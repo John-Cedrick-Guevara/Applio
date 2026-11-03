@@ -11,7 +11,9 @@ interface NavItem {
 }
 
 /** Pages in the primary nav. Each page PR adds its entry here. */
-const NAV: NavItem[] = [];
+const NAV: NavItem[] = [
+  { to: '/review', label: 'Review', icon: 'review' },
+];
 
 /** True for the item's own path and anything beneath it (`/jobs/j1` keeps Review active). */
 const isActive = (path: string, to: string) => path === to || path.startsWith(`${to}/`);
