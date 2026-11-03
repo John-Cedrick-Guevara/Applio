@@ -10,9 +10,12 @@ export interface RouteDef {
  * Route table. Views are lazy-loaded so startup only parses the shell and the
  * first page; each page module default-exports its view. Page PRs add entries.
  */
+// One view shared by both review routes, so selecting a draft only changes params.
+const ReviewView = lazy(() => import('./pages/review/review-page'));
+
 export const ROUTES: RouteDef[] = [
-  { pattern: '/review', view: lazy(() => import('./pages/review/review-page')) },
-  { pattern: '/review/:id', view: lazy(() => import('./pages/review/review-page')) },
+  { pattern: '/review', view: ReviewView },
+  { pattern: '/review/:id', view: ReviewView },
 ];
 
 export const DEFAULT_PATH = '/review';

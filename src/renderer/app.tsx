@@ -12,6 +12,12 @@ function resolve(path: string) {
   return null;
 }
 
+/**
+ * Remount key for a route: its path without params, so `/review` → `/review/j2`
+ * keeps the page (and its loaded data) while `/review` → `/applications` resets it.
+ */
+const pageKey = (pattern: string) => pattern.replace(/\/:.*$/, '');
+
 /** App frame: sidebar + the routed page. Unknown paths redirect to the pipeline. */
 export function App() {
   const path = usePath();
@@ -28,7 +34,7 @@ export function App() {
         <div className="app-content">
           {match ? (
             <Suspense fallback={<p className="muted">Loading…</p>}>
-              <match.route.view key={path} params={match.params} />
+              <match.route.view key={pageKey(match.route.pattern)} params={match.params} />
             </Suspense>
           ) : null}
         </div>
