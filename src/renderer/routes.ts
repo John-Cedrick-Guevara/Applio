@@ -16,6 +16,7 @@ const ReviewView = lazy(() => import('./pages/review/review-page'));
 export const ROUTES: RouteDef[] = [
   { pattern: '/review', view: ReviewView },
   { pattern: '/review/:id', view: ReviewView },
+  { pattern: '/handoff/:id', view: lazy(() => import('./pages/handoff/handoff-page')) },
 ];
 
 export const DEFAULT_PATH = '/review';
