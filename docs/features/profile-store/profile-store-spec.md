@@ -9,7 +9,7 @@ Make the operator's profile, sources and settings real and persistent, with cred
 - [ ] AC-5: First launch seeds default sources and settings (draft 75, auto 85, 10 per channel per day, 150k tokens per day, assisted fill off).
 
 ## Must not break
-- MNB-1: Profile, Settings and Add job screens behave as in PR-6/PR-7.
+- MNB-1: Profile, Settings and Add job screens behave as in PR-6a, PR-7a and PR-7b.
 - MNB-2: Secrets never appear in the database, logs or output folder.
 
 ## Known risks

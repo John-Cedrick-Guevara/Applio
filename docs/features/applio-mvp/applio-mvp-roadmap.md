@@ -1,6 +1,6 @@
 # Applio MVP — Roadmap
 
-Small PRs, in order. Each phase is one reviewable PR. Source of truth: [SPEC.md](../../../SPEC.md).
+Small PRs, in order. Each phase is one reviewable PR. PRs 4, 6 and 7 are split into a/b halves to stay near the ~1,000-line limit. Source of truth: [SPEC.md](../../../SPEC.md).
 
 **Every PR starts with a spec.** Before writing code, run `/spec-feature` to create
 `docs/features/<slug>/<slug>-spec.md`, where `<slug>` is the branch name without its type prefix
@@ -11,7 +11,7 @@ same PR and is what the review checks against. See CLAUDE.md §6.
 
 The UI is already built on `feat/renderer-ui` and follows the prototype
 (https://claude.ai/artifact/3T4Bs69qQWvxy9xKiND79T). These PRs re-slice that branch's final code into
-stacked, reviewable pieces, each based on the one before. No real backend: data comes from the
+stacked, reviewable pieces (components and styles land with the page that first uses them), each based on the one before. No real backend: data comes from the
 in-memory mock in `src/shared/mock/`.
 
 - [ ] **PR-1 — Toolchain and domain contract**  Project tooling, shared types, API contract, domain rules and the mock store.
@@ -48,42 +48,70 @@ in-memory mock in `src/shared/mock/`.
   - [ ] sidebar shows only nav items whose page exists; each page PR adds its own
   - [ ] tests: router, hooks, components, format
 
-- [ ] **PR-4 — Review queue and manual handoff**  The main daily screen and the platform handoff.
+- [ ] **PR-4a — Review queue**  The main daily screen: drafts waiting on the operator.
   - _branch:_ `feat/review-queue`
-  - _PR title:_ `feat: add review queue and manual handoff`
+  - _PR title:_ `feat: add review queue`
   - _why:_ reviewing and approving drafts is the core loop (SPEC F5, F6)
   - _depends on:_ PR-3
   - [ ] spec: `docs/features/review-queue/review-queue-spec.md`
-  - [ ] `pages/review/*`, `pages/handoff/*`, routes `/review`, `/review/:id`, `/handoff/:id`, nav item
-  - [ ] tests: review model, review page, handoff page
+  - [ ] `pages/review/*`, routes `/review`, `/review/:id`, nav item, score block, labels, page-test helper
+  - [ ] keep pages mounted when only route params change
+  - [ ] tests: review model, review page, app routing
+
+- [ ] **PR-4b — Manual handoff**  The walkthrough for channels Applio never submits on.
+  - _branch:_ `feat/manual-handoff`
+  - _PR title:_ `feat: add manual handoff`
+  - _why:_ platform and career-site jobs must stay operator-submitted (SPEC F5, principle 3)
+  - _depends on:_ PR-4a
+  - [ ] spec: `docs/features/manual-handoff/manual-handoff-spec.md`
+  - [ ] `pages/handoff/*`, route `/handoff/:id`, copy button
+  - [ ] tests: handoff page
 
 - [ ] **PR-5 — Applications log**  Everything sent, its timeline, prep and follow-ups.
   - _branch:_ `feat/applications-log`
   - _PR title:_ `feat: add applications log`
   - _why:_ the operator needs to see exactly what went out and what happened next (SPEC F7)
-  - _depends on:_ PR-4
+  - _depends on:_ PR-4b
   - [ ] spec: `docs/features/applications-log/applications-log-spec.md`
   - [ ] `pages/applications/*`, route `/applications`, nav item
   - [ ] tests: applications model, applications page
 
-- [ ] **PR-6 — Profile and usage**  Fact bank, answer bank, preferences; usage and free-limit guard.
-  - _branch:_ `feat/profile-usage`
-  - _PR title:_ `feat: add profile and usage pages`
-  - _why:_ the AI may only write from the profile (SPEC F1), and nothing may pass a free limit unseen (F10)
+- [ ] **PR-6a — Profile**  Reference resume, preferences, fact bank, answer bank.
+  - _branch:_ `feat/profile`
+  - _PR title:_ `feat: add profile page`
+  - _why:_ the AI may only write from the profile (SPEC F1)
   - _depends on:_ PR-5
-  - [ ] spec: `docs/features/profile-usage/profile-usage-spec.md`
-  - [ ] `pages/profile/*`, `pages/usage/*`, routes, nav items
-  - [ ] tests: preferences model, profile page, usage page
+  - [ ] spec: `docs/features/profile/profile-spec.md`
+  - [ ] `pages/profile/*`, page header, route, nav item
+  - [ ] tests: preferences model, profile page, drafts survive fact deletion
 
-- [ ] **PR-7 — Settings and add job**  Sources, channels, guardrails, folder, connections; paste-a-job flow.
-  - _branch:_ `feat/settings-add-job`
-  - _PR title:_ `feat: add settings and add-job pages`
-  - _why:_ every automation level and limit must be operator-controlled (SPEC F2, F5, F6), and any job can be pasted in
-  - _depends on:_ PR-6
-  - [ ] spec: `docs/features/settings-add-job/settings-add-job-spec.md`
-  - [ ] `pages/settings/*`, `pages/add-job/*`, routes, nav items
-  - [ ] tests: guardrails model, settings page, add-job model and page
-  - [ ] when merged, the tree matches `feat/renderer-ui`; delete that branch
+- [ ] **PR-6b — Usage and limits**  Spend against every free limit.
+  - _branch:_ `feat/usage-limits`
+  - _PR title:_ `feat: add usage and limits page`
+  - _why:_ nothing may pass a free limit unseen (SPEC F10)
+  - _depends on:_ PR-6a
+  - [ ] spec: `docs/features/usage-limits/usage-limits-spec.md`
+  - [ ] `pages/usage/*`, route, nav item
+  - [ ] tests: usage page
+
+- [ ] **PR-7a — Settings**  Sources, channels, guardrails, folder, connections.
+  - _branch:_ `feat/settings`
+  - _PR title:_ `feat: add settings page`
+  - _why:_ every automation level and limit must be operator-controlled (SPEC F2, F5, F6, F8)
+  - _depends on:_ PR-6b
+  - [ ] spec: `docs/features/settings/settings-spec.md`
+  - [ ] `pages/settings/*`, switch and card components, route, nav item
+  - [ ] tests: guardrails model, settings page, switch
+
+- [ ] **PR-7b — Add job**  Paste a job from anywhere and queue it.
+  - _branch:_ `feat/add-job`
+  - _PR title:_ `feat: add paste-a-job flow`
+  - _why:_ jobs found anywhere must be able to enter the pipeline (SPEC F2 Clip)
+  - _depends on:_ PR-7a
+  - [ ] spec: `docs/features/add-job/add-job-spec.md`
+  - [ ] `pages/add-job/*`, route
+  - [ ] tests: add-job model and page
+  - [ ] when merged, `main` matches `feat/renderer-ui` (plus fixes and tests); delete that branch
 
 ## Stage 2 — Backend
 
@@ -95,7 +123,7 @@ Wire real data behind the same `ApplioApi`. Each PR replaces part of the mock st
   - _branch:_ `feat/local-database`
   - _PR title:_ `feat: add sqlite storage and migrations`
   - _why:_ data must survive restarts and stay on the operator's machine (SPEC §2)
-  - _depends on:_ PR-7
+  - _depends on:_ PR-7b
   - [ ] spec: `docs/features/local-database/local-database-spec.md`
   - [ ] schema + migration runner (jobs, status events, drafts, facts, answers, sources, settings, usage)
   - [ ] repositories in `src/infra/db/`; WAL mode, indexes on dedup key / status / created_at
