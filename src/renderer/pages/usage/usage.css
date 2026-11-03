@@ -1,0 +1,139 @@
+/* Usage & limits: tiles, guard table, step bars, 7-day chart. */
+.period-toggle {
+  background: var(--track);
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-3);
+}
+
+.tile {
+  padding: var(--space-4) 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.tile-label {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.tile-value {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 6px 0 4px;
+}
+
+.tile-value .mono {
+  font-size: 24px;
+  font-weight: 500;
+}
+
+.tile-of {
+  color: var(--text-muted);
+  font-size: var(--text-md);
+}
+
+.edit-limits {
+  font-size: var(--text-md);
+  font-weight: 500;
+}
+
+.guard-table {
+  min-width: 640px;
+}
+
+.col-level {
+  width: 34%;
+}
+
+.quota-name {
+  font-weight: 500;
+}
+
+.quota-sub {
+  display: block;
+}
+
+.usage-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--space-4);
+}
+
+.usage-half {
+  flex: 1 1 380px;
+}
+
+.step-bars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.step-line {
+  margin-bottom: 6px;
+  font-size: var(--text-md);
+}
+
+.day-chart {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  min-height: 180px;
+  padding-top: var(--space-2);
+}
+
+.budget-line {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed #b5bac3;
+}
+
+.budget-label {
+  position: absolute;
+  top: -10px;
+  right: 0;
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+}
+
+.day-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  height: 100%;
+}
+
+.day-value {
+  color: var(--text-secondary);
+  font-size: var(--text-2xs);
+}
+
+.day-bar {
+  width: 100%;
+  max-width: 44px;
+  border-radius: 4px 4px 0 0;
+  background: var(--accent-light);
+}
+
+.day-bar-today {
+  background: var(--accent);
+}
+
+.day-label {
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+}
