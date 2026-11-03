@@ -17,6 +17,45 @@ describe('ReviewPage', () => {
     expect(first).toHaveAttribute('aria-current', 'true');
   });
 
+  it('shows the selected draft with fit, gaps and the cover letter', async () => {
+    open('j2');
+    const detail = await screen.findByRole('region', { name: 'Draft detail' });
+    expect(await within(detail).findByRole('heading', { name: 'Full-stack Engineer (TypeScript)' })).toBeInTheDocument();
+    expect(within(detail).getByText('GraphQL: one small project only')).toBeInTheDocument();
+    expect(within(detail).getByText(/Hi Fieldwork team/)).toBeInTheDocument();
+  });
+
+  it('switches between the letter, resume and original post', async () => {
+    open('j1');
+    await userEvent.click(await screen.findByRole('tab', { name: 'Resume' }));
+    expect(screen.getByText(/p95 query time dropped/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: 'Original post' }));
+    expect(screen.getByText(/Apply: email jobs@northwind-labs.example/)).toBeInTheDocument();
+  });
+
+  it('sends an email application on approval', async () => {
+    const { api } = open('j1');
+    await userEvent.click(await screen.findByRole('button', { name: 'Approve & send email' }));
+    expect(await screen.findByText(/Sent to jobs@northwind-labs.example/)).toBeInTheDocument();
+    expect((await api.getJob('j1')).status).toBe('applied');
+  });
+
+  it('routes platform jobs to the manual handoff', async () => {
+    open('j3');
+    expect(await screen.findByRole('link', { name: 'Open handoff' })).toHaveAttribute('href', '#/handoff/j3');
+  });
+
+  it('saves an edited cover letter and labels it', async () => {
+    const { api } = open('j1');
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    const box = screen.getByLabelText('Edit cover letter');
+    await userEvent.clear(box);
+    await userEvent.type(box, 'Short and sweet');
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(await screen.findByText('Edited by you')).toBeInTheDocument();
+    expect((await api.getDraft('j1'))?.coverLetter).toBe('Short and sweet');
+  });
+
   it('pauses automation and blocks manual runs', async () => {
     open();
     await userEvent.click(await screen.findByRole('button', { name: 'Pause automation' }));
