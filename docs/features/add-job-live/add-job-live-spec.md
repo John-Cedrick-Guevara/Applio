@@ -6,7 +6,7 @@ Let any job the operator finds anywhere enter the pipeline, and optionally pre-f
 - [ ] AC-2: Add to review queue saves the job, drafts it, and it appears in Review.
 - [ ] AC-3: A pasted job that duplicates an existing one is flagged instead of added twice.
 - [ ] AC-4: With assisted fill on for platform apply, the handoff opens the form in an Applio window using the operator's signed-in session and fills it; the operator clicks Submit; the job is logged when they confirm.
-- [ ] AC-5: With assisted fill off, the handoff stays manual as in PR-4b.
+- [ ] AC-5: With assisted fill off, the handoff stays manual as in PR-4c.
 - [ ] AC-6: Upwork handoffs show the Connects cost before the operator proceeds.
 
 ## Must not break

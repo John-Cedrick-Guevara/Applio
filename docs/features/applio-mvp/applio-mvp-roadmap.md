@@ -1,6 +1,6 @@
 # Applio MVP — Roadmap
 
-Small PRs, in order. Each phase is one reviewable PR. PRs 4, 6 and 7 are split into a/b halves to stay near the ~1,000-line limit. Source of truth: [SPEC.md](../../../SPEC.md).
+Small PRs, in order. Each phase is one reviewable PR. PRs 1, 3, 4, 6 and 7 are split into lettered parts so each stays within the ~1,000-line limit. Source of truth: [SPEC.md](../../../SPEC.md).
 
 **Every PR starts with a spec.** Before writing code, run `/spec-feature` to create
 `docs/features/<slug>/<slug>-spec.md`, where `<slug>` is the branch name without its type prefix
@@ -14,55 +14,76 @@ The UI is already built on `feat/renderer-ui` and follows the prototype
 stacked, reviewable pieces (components and styles land with the page that first uses them), each based on the one before. No real backend: data comes from the
 in-memory mock in `src/shared/mock/`.
 
-- [ ] **PR-1 — Toolchain and domain contract**  Project tooling, shared types, API contract, domain rules and the mock store.
+- [ ] **PR-1a — Toolchain and domain contract**  Project tooling, shared types, API contract and domain rules.
   - _branch:_ `feat/domain-contract`
-  - _PR title:_ `feat: add toolchain, domain contract and mock store`
+  - _PR title:_ `feat: add toolchain and domain contract`
   - _why:_ every later PR builds on one typed API surface and the same rules the real backend will enforce
   - _depends on:_ none
   - [ ] spec: `docs/features/domain-contract/domain-contract-spec.md`
-  - [ ] package.json, tsconfigs, Vite/Vitest/ESLint configs, `.gitignore`, test setup
-  - [ ] `src/shared/types.ts`, `src/shared/api.ts` (incl. `API_METHODS`), `src/shared/ipc.ts`
-  - [ ] rules: `autonomy.ts`, `quota.ts`, `status.ts`
-  - [ ] mock store: `src/shared/mock/` (fixtures, analyze, mock-api)
+  - [ ] package.json, tsconfigs, Vitest/ESLint configs
+  - [ ] `src/shared/types.ts`, `api.ts` (incl. `API_METHODS`), `ipc.ts`; rules: `autonomy.ts`, `quota.ts`, `status.ts`
   - [ ] tests for the above
+
+- [ ] **PR-1b — Mock store**  In-memory backend with prototype seed data.
+  - _branch:_ `feat/mock-store`
+  - _PR title:_ `feat: add in-memory mock store`
+  - _why:_ the UI and Electron shell need a backend that enforces the real rules before Stage 2 exists
+  - _depends on:_ PR-1a
+  - [ ] spec: `docs/features/mock-store/mock-store-spec.md`
+  - [ ] `src/shared/mock/` (fixtures, analyze, mock-api) and tests
 
 - [ ] **PR-2 — Electron shell**  Desktop window, locked-down preload bridge, IPC handlers.
   - _branch:_ `feat/electron-shell`
   - _PR title:_ `feat: add electron main process and preload bridge`
   - _why:_ Applio is a local desktop app; the renderer must only reach main through an allow-listed API
-  - _depends on:_ PR-1
+  - _depends on:_ PR-1b
   - [ ] spec: `docs/features/electron-shell/electron-shell-spec.md`
   - [ ] `src/main/` (index, ipc, security, backend over the mock store), `src/preload/`
   - [ ] `vite.electron.config.ts`, `scripts/dev.mjs`, `dev` / `build` scripts
-  - [ ] tests: `security.test.ts`
+  - [ ] tests: `security.test.ts`, window guards, OS integration in `backend.test.ts`
 
-- [ ] **PR-3 — App shell and design system**  Renderer entry, routing, sidebar, tokens and shared components.
-  - _branch:_ `feat/app-shell`
-  - _PR title:_ `feat: add renderer shell and prototype design system`
-  - _why:_ pages need one frame, one look and one way to load data and report errors
+- [ ] **PR-3a — Renderer core**  React toolchain, router, API context, data and action hooks, toasts.
+  - _branch:_ `feat/renderer-core`
+  - _PR title:_ `feat: add renderer core`
+  - _why:_ every page loads data, routes and reports errors the same way
   - _depends on:_ PR-2
-  - [ ] spec: `docs/features/app-shell/app-shell-spec.md`
-  - [ ] `index.html`, `main.tsx`, `app.tsx`, `routes.ts` (empty route table), `lib/router.ts`, `lib/format.ts`, `lib/labels.ts`
-  - [ ] `api/api-context.tsx`, `hooks/use-async.ts`, `hooks/use-action.ts`
-  - [ ] `components/*`, `styles/*` (IBM Plex, tokens), `layout/sidebar.tsx`, `layout/engine-card.tsx`
-  - [ ] sidebar shows only nav items whose page exists; each page PR adds its own
-  - [ ] tests: router, hooks, components, format
+  - [ ] spec: `docs/features/renderer-core/renderer-core-spec.md`
+  - [ ] React/Testing Library/fonts deps, Vite/Vitest/ESLint for React, test setup
+  - [ ] `lib/router.ts`, `lib/format.ts`, `api/api-context.tsx`, `hooks/*`, `components/toast.tsx`
+  - [ ] tests: router, format, hooks
 
-- [ ] **PR-4a — Review queue**  The main daily screen: drafts waiting on the operator.
+- [ ] **PR-3b — App shell and design system**  Prototype tokens, base components, app frame and sidebar.
+  - _branch:_ `feat/app-shell`
+  - _PR title:_ `feat: add app shell and prototype design system`
+  - _why:_ pages need one frame and one look
+  - _depends on:_ PR-3a
+  - [ ] spec: `docs/features/app-shell/app-shell-spec.md`
+  - [ ] `styles/*`, button, icons, states, AsyncView; `index.html`, `main.tsx`, `app.tsx`, `routes.ts`, sidebar, engine card
+  - [ ] tests: components
+
+- [ ] **PR-4a — Review queue**  Drafts waiting on the operator, run summary, pause and run now.
   - _branch:_ `feat/review-queue`
   - _PR title:_ `feat: add review queue`
-  - _why:_ reviewing and approving drafts is the core loop (SPEC F5, F6)
-  - _depends on:_ PR-3
+  - _why:_ reviewing drafts is the core loop (SPEC F5, F6)
+  - _depends on:_ PR-3b
   - [ ] spec: `docs/features/review-queue/review-queue-spec.md`
-  - [ ] `pages/review/*`, routes `/review`, `/review/:id`, nav item, score block, labels, page-test helper
-  - [ ] keep pages mounted when only route params change
-  - [ ] tests: review model, review page, app routing
+  - [ ] review model, labels, `review-page`, `review-header`, `review-queue`, routes `/review`, `/review/:id`, nav item
+  - [ ] tests: review model, queue and header
 
-- [ ] **PR-4b — Manual handoff**  The walkthrough for channels Applio never submits on.
+- [ ] **PR-4b — Draft review**  The selected draft: fit, documents, editing, approve or hand off.
+  - _branch:_ `feat/draft-review`
+  - _PR title:_ `feat: add draft review and approval`
+  - _why:_ nothing is sent that the operator didn't see (SPEC F4, F5)
+  - _depends on:_ PR-4a
+  - [ ] spec: `docs/features/draft-review/draft-review-spec.md`
+  - [ ] `draft-panel`, `draft-document`, score block; keep pages mounted when only route params change
+  - [ ] tests: draft detail, approve, edit, skip
+
+- [ ] **PR-4c — Manual handoff**  The walkthrough for channels Applio never submits on.
   - _branch:_ `feat/manual-handoff`
   - _PR title:_ `feat: add manual handoff`
   - _why:_ platform and career-site jobs must stay operator-submitted (SPEC F5, principle 3)
-  - _depends on:_ PR-4a
+  - _depends on:_ PR-4b
   - [ ] spec: `docs/features/manual-handoff/manual-handoff-spec.md`
   - [ ] `pages/handoff/*`, route `/handoff/:id`, copy button
   - [ ] tests: handoff page
@@ -71,7 +92,7 @@ in-memory mock in `src/shared/mock/`.
   - _branch:_ `feat/applications-log`
   - _PR title:_ `feat: add applications log`
   - _why:_ the operator needs to see exactly what went out and what happened next (SPEC F7)
-  - _depends on:_ PR-4b
+  - _depends on:_ PR-4c
   - [ ] spec: `docs/features/applications-log/applications-log-spec.md`
   - [ ] `pages/applications/*`, route `/applications`, nav item
   - [ ] tests: applications model, applications page
