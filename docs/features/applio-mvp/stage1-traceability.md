@@ -3,13 +3,12 @@
 The seven Stage 1 specs were written before the PRs were built. Building them pushed three PRs past
 the ~1,000-line limit, so the work ended up in 13 PRs (1a–7b) and the specs were split to match.
 This table checks every criterion of the **original** seven specs, worded as first written,
-against the final stack (`feat/add-job`). The "Proof" column says how each is shown. One item is
-**not yet fully proven**: the native file dialogs (electron-shell AC-8 and the picker parts of
-profile AC-1 and settings AC-6) — see the last section.
+against the final stack (`feat/add-job`). The "Proof" column says how each is shown. Every row is met; the native file dialogs were
+checked by hand by the requester (see the last section).
 
 Proof types: **test** = automated (`npm run check`), **built app** = checked in the packaged
 Electron app over the DevTools protocol, **browser** = checked in `npm run dev:web`,
-**faked OS** = unit test with a faked `electron` module.
+**faked OS** = unit test with a faked `electron` module, **by hand** = run in the built app by the requester.
 
 ## domain-contract (original) → PR-1a, PR-1b
 
@@ -38,7 +37,7 @@ Electron app over the DevTools protocol, **browser** = checked in `npm run dev:w
 | AC-5 readable error in page, detail logged in main | 2 | built app + main log `[ipc] approveDraft failed` |
 | AC-6 links leave the app, never a new window | 2 | built app: a real mouse click on an external `target=_blank` link made the default browser request it (seen in a local server's log), the app stayed on its page with one window; `window.open` returns `null`. Plus test (`denyAndOpenExternally`, `guardNavigation`) |
 | AC-7 only http(s) reaches the OS | 2 | test (`isSafeExternalUrl`, `backend.test.ts`); built app refuses `file:///etc/passwd` |
-| AC-8 native pickers; cancel isn't an error | 2 | faked OS (`backend.test.ts`: folder and resume, chosen and cancelled; folder paths, OS errors). **Native dialog not yet driven by hand** — see below |
+| AC-8 native pickers; cancel isn't an error | 2 | faked OS (`backend.test.ts`: folder and resume, chosen and cancelled; folder paths, OS errors). plus by hand in the built app — see below |
 | MNB-1 `dev:web` still works | 2 onward | browser |
 | MNB-2 preload requires only `electron` | 2 | inspected `dist/electron/preload.cjs` |
 
@@ -91,7 +90,7 @@ Electron app over the DevTools protocol, **browser** = checked in `npm run dev:w
 
 | Item | Where | Proof |
 |---|---|---|
-| AC-1 resume card, Replace, cancel | 6a (UI), 2 (OS) | faked OS (`importResume` chosen and cancelled); browser |
+| AC-1 resume card, Replace, cancel | 6a (UI), 2 (OS) | faked OS (`importResume` chosen and cancelled); browser; by hand (native picker) |
 | AC-2 – AC-7 | 6a | test (`profile-page.test.tsx`, `preferences-model.test.ts`); browser Cancel for AC-3 and AC-6 |
 | AC-8 – AC-10 | 6b | test (`usage-page.test.tsx`); browser visual |
 | MNB-1 deleting a fact leaves drafts | 6a | test (`mock-api.test.ts`) |
@@ -102,22 +101,21 @@ Electron app over the DevTools protocol, **browser** = checked in `npm run dev:w
 | Item | Where | Proof |
 |---|---|---|
 | AC-1 – AC-5, AC-7 | 7a | test (`settings-page.test.tsx`, `guardrails-model.test.ts`); browser Escape and duplicate for AC-5 |
-| AC-6 output folder picker and Open | 7a (UI), 2 (OS) | faked OS (`chooseFolder` chosen and cancelled) |
+| AC-6 output folder picker and Open | 7a (UI), 2 (OS) | faked OS (`chooseFolder` chosen and cancelled); by hand (native picker) |
 | AC-8 Gmail/Telegram setup → Connected | 7a | test (missing credentials); browser (address + app password → "Connected") |
 | AC-9 – AC-11 | 7b | test (`add-job-model.test.ts`, `add-job-page.test.tsx`); browser Discard and Add another |
 | MNB-1 secrets never shown | 7a | test; browser (`document.body` lacks the saved value) |
 | MNB-2 platform/career sites never autonomous | 1a, 7a | test (`autonomy.test.ts`); ChannelsSection offers only assisted fill for them |
 
-## Not yet fully proven: native file dialogs
+## Native file dialogs — checked by hand
 
-The built app opens the real macOS dialog when Settings → Change… is clicked, but this
-environment can't operate it: macOS refuses synthetic keystrokes ("osascript is not allowed to
-send keystrokes") and screen capture. The logic around the dialog is tested with a faked
-`electron` module; the dialog itself needs one manual pass, about a minute:
+This environment can't operate macOS dialogs (synthetic keystrokes and screen capture are
+refused), so the requester ran the built app (`npm run build && npm start`) and confirmed the
+pickers work: Settings → Change… cancelled and chosen, Profile → Replace cancelled. This closes
+electron-shell AC-8, profile AC-1 and settings AC-6 alongside their faked-OS unit tests.
 
-1. `npm run build && npm start`
-2. Settings → **Change…** → press Esc. The path stays `~/JobApps`, no error toast.
-3. **Change…** again → pick any folder → the path shows that folder and a "New applications will be saved to …" toast appears.
-4. Profile → **Replace** → press Esc. The resume card is unchanged, no error toast.
+## Found in that pass
 
-When these pass, electron-shell AC-8, profile AC-1 and settings AC-6 are fully met.
+The same pass showed a layout bug on long pages (Settings): a second window scrollbar and the
+sidebar background ending after the first screen. Fixed in PR-3b (`fix(ui): stop hidden labels
+from stretching the window`) with a regression test in `styles.test.ts`.
