@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Local-first job discovery, tailoring and apply assistant.",
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
