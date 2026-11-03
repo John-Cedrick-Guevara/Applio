@@ -75,6 +75,8 @@ button {
 }
 
 .app-main {
+  /* Positioned so absolutely placed helpers (e.g. .visually-hidden labels) stay inside the scroll area. */
+  position: relative;
   min-width: 0;
   overflow-y: auto;
   padding: 28px var(--space-7) 40px;
