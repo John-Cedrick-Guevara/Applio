@@ -4,7 +4,10 @@
   "private": true,
   "type": "module",
   "description": "Local-first job discovery, tailoring and apply assistant.",
+  "main": "dist/electron/main.cjs",
   "scripts": {
+    "build:electron": "vite build -c vite.electron.config.ts --mode main && vite build -c vite.electron.config.ts --mode preload",
+    "start": "electron .",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
@@ -14,6 +17,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^26.6.6",
+    "electron": "^45.2.1",
     "eslint": "^10.14.0",
     "globals": "^17.14.0",
     "typescript": "^6.0.3",
