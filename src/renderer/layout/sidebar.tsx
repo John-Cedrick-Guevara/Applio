@@ -16,6 +16,7 @@ const NAV: NavItem[] = [
   { to: '/applications', label: 'Applications', icon: 'applications' },
   { to: '/profile', label: 'Profile', icon: 'profile' },
   { to: '/usage', label: 'Usage & limits', icon: 'usage' },
+  { to: '/settings', label: 'Settings', icon: 'settings' },
 ];
 
 /** True for the item's own path and anything beneath it (`/jobs/j1` keeps Review active). */

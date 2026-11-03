@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { AsyncState } from '../hooks/use-async';
 import { AsyncView } from './async-view';
+import { Toggle } from './form';
 
 const state = <T,>(over: Partial<AsyncState<T>>): AsyncState<T> => ({
   data: null, error: null, loading: false, reload: vi.fn(), setData: vi.fn(), ...over,
@@ -25,5 +26,14 @@ describe('AsyncView', () => {
   it('renders children with data, even while refreshing', () => {
     render(<AsyncView state={state({ data: 5, loading: true })}>{(n) => <p>value {n}</p>}</AsyncView>);
     expect(screen.getByText('value 5')).toBeInTheDocument();
+  });
+});
+
+describe('form controls', () => {
+  it('exposes Toggle as an accessible switch', async () => {
+    const onChange = vi.fn();
+    render(<Toggle label="Assisted fill" checked={false} onChange={onChange} />);
+    await userEvent.click(screen.getByRole('switch', { name: 'Assisted fill' }));
+    expect(onChange).toHaveBeenCalledWith(true);
   });
 });

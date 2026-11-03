@@ -20,6 +20,7 @@ export const ROUTES: RouteDef[] = [
   { pattern: '/applications', view: lazy(() => import('./pages/applications/applications-page')) },
   { pattern: '/profile', view: lazy(() => import('./pages/profile/profile-page')) },
   { pattern: '/usage', view: lazy(() => import('./pages/usage/usage-page')) },
+  { pattern: '/settings', view: lazy(() => import('./pages/settings/settings-page')) },
 ];
 
 export const DEFAULT_PATH = '/review';
