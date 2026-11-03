@@ -2,7 +2,7 @@ import { app, BrowserWindow, shell } from 'electron';
 import { join } from 'node:path';
 import { createBackend } from './backend';
 import { registerApiHandlers } from './ipc';
-import { isAppUrl, isSafeExternalUrl } from './security';
+import { denyAndOpenExternally, guardNavigation } from './security';
 
 /** Set by scripts/dev.mjs; absent in a packaged build. */
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
@@ -32,19 +32,11 @@ function createWindow(): BrowserWindow {
 
   win.once('ready-to-show', () => win.show());
 
+  const openInBrowser = (url: string) => void shell.openExternal(url);
   // target=_blank / window.open → system browser; never a second app window.
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    if (isSafeExternalUrl(url)) void shell.openExternal(url);
-    return { action: 'deny' };
-  });
-
+  win.webContents.setWindowOpenHandler(denyAndOpenExternally(openInBrowser));
   // In-page navigation may only stay inside the app.
-  win.webContents.on('will-navigate', (event, url) => {
-    if (!isAppUrl(url, DEV_SERVER_URL)) {
-      event.preventDefault();
-      if (isSafeExternalUrl(url)) void shell.openExternal(url);
-    }
-  });
+  win.webContents.on('will-navigate', guardNavigation(DEV_SERVER_URL, openInBrowser));
 
   if (DEV_SERVER_URL) void win.loadURL(DEV_SERVER_URL);
   else void win.loadFile(join(__dirname, '../renderer/index.html'));

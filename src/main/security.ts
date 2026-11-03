@@ -21,3 +21,26 @@ export function isSafeExternalUrl(url: string): boolean {
     return false;
   }
 }
+
+/**
+ * Handler for `setWindowOpenHandler`: never opens a second app window;
+ * safe web links go to the system browser instead.
+ */
+export function denyAndOpenExternally(openExternal: (url: string) => void) {
+  return ({ url }: { url: string }): { action: 'deny' } => {
+    if (isSafeExternalUrl(url)) openExternal(url);
+    return { action: 'deny' };
+  };
+}
+
+/**
+ * Handler for `will-navigate`: in-app navigation proceeds; anything else is
+ * blocked, and if it's a web link it opens in the system browser instead.
+ */
+export function guardNavigation(devServerUrl: string | undefined, openExternal: (url: string) => void) {
+  return (event: { preventDefault(): void }, url: string): void => {
+    if (isAppUrl(url, devServerUrl)) return;
+    event.preventDefault();
+    if (isSafeExternalUrl(url)) openExternal(url);
+  };
+}
