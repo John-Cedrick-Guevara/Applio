@@ -133,18 +133,25 @@ Rules:
 - Never mix refactors with behavior changes in one commit. Never commit generated files, secrets, or `.env`.
 
 **Pull requests:**
+- **Every PR has a spec.** Before any code, run `/spec-feature` to write `docs/features/<slug>/<slug>-spec.md` (feature goal, `AC-n` acceptance criteria, `MNB-n` must-not-break items, risks, test plan, out of scope). The spec is the review reference: the PR is judged against it, not against its description.
+  - `<slug>` = branch name without its type prefix: `feat/review-queue` → `docs/features/review-queue/review-queue-spec.md`.
+  - The spec ships in the same PR. If the branch prefix isn't `feat/`, put `Spec: docs/features/<slug>/<slug>-spec.md` on its own line in the PR body.
+  - Every `AC-n` appears in at least one test-plan line. A spec that fails this isn't ready for review.
+  - Pure refactors and dependency bumps may skip the spec only if the PR body says why and lists what must not break.
 - **Max ~1,000 changed lines per PR** (excluding lockfiles, fixtures, generated code). Bigger work is split into stacked phases, each shippable and reviewable on its own.
 - One PR = one purpose. Title follows the commit format.
-- Description: what & why, how to test, screenshots for UI, risks/rollback, and the SPEC section it implements.
-- Branch from `main`: `<type>/<short-description>` (e.g. `feat/remoteok-source`).
+- Description (template in `.github/pull_request_template.md`): spec link, which `AC-n` / `MNB-n` it covers and where each is proven (test name or manual check), how to test, screenshots for UI, risks/rollback.
+- Branch from `main` (or the previous PR's branch when stacked): `<type>/<slug>` (e.g. `feat/remoteok-source`).
+- The plan of PRs lives in `docs/features/<feature>/<feature>-roadmap.md` (`/the-planner`); use its branch name, PR title and why verbatim, and tick its boxes when the PR merges.
 
 ---
 
 ## 7. How to work in this repo
 
-1. Read the relevant SPEC section and the code it touches before writing anything.
-2. Reuse what exists (helpers, types, patterns) before adding new code. Prefer stdlib and already-installed deps over new ones; justify any new dependency in the PR.
-3. Plan the change as a list of behaviors to test, grouped into commits that fit the PR size limit.
-4. Build it test-first (§5): `core/` first, then the adapter (against fixtures), then wiring, then UI.
-5. Verify: typecheck, lint, tests, and run the app for anything user-facing.
-6. Report honestly what was done, what was skipped, and what is unverified.
+1. Find the PR in the roadmap (`docs/features/applio-mvp/applio-mvp-roadmap.md`). Read the SPEC section it implements and the code it touches.
+2. Write the PR's spec with `/spec-feature` and settle open questions with the requester before coding.
+3. Reuse what exists (helpers, types, patterns) before adding new code. Prefer stdlib and already-installed deps over new ones; justify any new dependency in the PR.
+4. Turn the spec's acceptance criteria into tests, grouped into commits that fit the PR size limit.
+5. Build it test-first (§5): `core/` first, then the adapter (against fixtures), then wiring, then UI.
+6. Verify: typecheck, lint, tests, build, and run the app for anything user-facing. Check every `AC-n` and `MNB-n` is proven.
+7. Report honestly what was done, what was skipped, and what is unverified.
