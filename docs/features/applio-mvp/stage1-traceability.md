@@ -3,11 +3,13 @@
 The seven Stage 1 specs were written before the PRs were built. Building them pushed three PRs past
 the ~1,000-line limit, so the work ended up in 13 PRs (1a–7b) and the specs were split to match.
 This table checks every criterion of the **original** seven specs, worded as first written,
-against the final stack (`feat/add-job`). Every row is met; the "Proof" column says how.
+against the final stack (`feat/add-job`). The "Proof" column says how each is shown. One item is
+**not yet fully proven**: the native file dialogs (electron-shell AC-8 and the picker parts of
+profile AC-1 and settings AC-6) — see the last section.
 
 Proof types: **test** = automated (`npm run check`), **built app** = checked in the packaged
 Electron app over the DevTools protocol, **browser** = checked in `npm run dev:web`,
-**faked OS** = unit test with a faked `electron` module (native dialogs not clicked by hand).
+**faked OS** = unit test with a faked `electron` module.
 
 ## domain-contract (original) → PR-1a, PR-1b
 
@@ -34,9 +36,9 @@ Electron app over the DevTools protocol, **browser** = checked in `npm run dev:w
 | AC-3 bridge exposes exactly `API_METHODS` | 2 | built app: method count equals `API_METHODS`, `listJobs()` returns data |
 | AC-4 untrusted frames rejected | 2 | test (`isAppUrl`) |
 | AC-5 readable error in page, detail logged in main | 2 | built app + main log `[ipc] approveDraft failed` |
-| AC-6 links leave the app, never a new window | 2 | test (`denyAndOpenExternally`, `guardNavigation`, registered by `index.ts`); built app: `window.open` returns `null`, still one window. Opening your default browser was not triggered on purpose |
+| AC-6 links leave the app, never a new window | 2 | built app: a real mouse click on an external `target=_blank` link made the default browser request it (seen in a local server's log), the app stayed on its page with one window; `window.open` returns `null`. Plus test (`denyAndOpenExternally`, `guardNavigation`) |
 | AC-7 only http(s) reaches the OS | 2 | test (`isSafeExternalUrl`, `backend.test.ts`); built app refuses `file:///etc/passwd` |
-| AC-8 native pickers; cancel isn't an error | 2 | faked OS (`backend.test.ts`: folder and resume, chosen and cancelled; folder paths, OS errors) |
+| AC-8 native pickers; cancel isn't an error | 2 | faked OS (`backend.test.ts`: folder and resume, chosen and cancelled; folder paths, OS errors). **Native dialog not yet driven by hand** — see below |
 | MNB-1 `dev:web` still works | 2 onward | browser |
 | MNB-2 preload requires only `electron` | 2 | inspected `dist/electron/preload.cjs` |
 
@@ -105,3 +107,17 @@ Electron app over the DevTools protocol, **browser** = checked in `npm run dev:w
 | AC-9 – AC-11 | 7b | test (`add-job-model.test.ts`, `add-job-page.test.tsx`); browser Discard and Add another |
 | MNB-1 secrets never shown | 7a | test; browser (`document.body` lacks the saved value) |
 | MNB-2 platform/career sites never autonomous | 1a, 7a | test (`autonomy.test.ts`); ChannelsSection offers only assisted fill for them |
+
+## Not yet fully proven: native file dialogs
+
+The built app opens the real macOS dialog when Settings → Change… is clicked, but this
+environment can't operate it: macOS refuses synthetic keystrokes ("osascript is not allowed to
+send keystrokes") and screen capture. The logic around the dialog is tested with a faked
+`electron` module; the dialog itself needs one manual pass, about a minute:
+
+1. `npm run build && npm start`
+2. Settings → **Change…** → press Esc. The path stays `~/JobApps`, no error toast.
+3. **Change…** again → pick any folder → the path shows that folder and a "New applications will be saved to …" toast appears.
+4. Profile → **Replace** → press Esc. The resume card is unchanged, no error toast.
+
+When these pass, electron-shell AC-8, profile AC-1 and settings AC-6 are fully met.
