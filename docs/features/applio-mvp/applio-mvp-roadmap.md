@@ -7,7 +7,7 @@ Small PRs, in order. Each phase is one reviewable PR. PRs 1, 3, 4, 6 and 7 are s
 (`feat/review-queue` → `docs/features/review-queue/review-queue-spec.md`). The spec ships in the
 same PR and is what the review checks against. See CLAUDE.md §6.
 
-**Where we are:** Stage 1 is done (#2–#14, landing on `main` with #15; CI in #16). Stage 2: PR-8 (#17) and PR-9 are in review; PR-10 is next.
+**Where we are:** Stage 1 is done (#2–#14, landing on `main` with #15; CI in #16). Stage 2: PR-8 (#17), PR-9 (#18) and PR-10 are in review. PR-11 (job sources) is next.
 
 ## Stage 1 — Frontend (mock data)
 
@@ -162,17 +162,17 @@ Wire real data behind the same `ApplioApi`. Each PR replaces part of the mock st
   - [x] schema per method in `src/shared/schemas.ts`, checked in `registerApiHandlers`
   - [x] tests: valid and invalid payloads per method group
 
-- [ ] **PR-10 — Profile, settings and secrets on disk**  Real profile, sources, settings; secrets in the OS keychain.
+- [x] **PR-10 — Profile, settings and secrets on disk**  Real profile, sources, settings; secrets in the OS keychain.
   - _branch:_ `feat/profile-store`
   - _PR title:_ `feat: persist profile, settings and secrets`
   - _why:_ first real slice; secrets must never touch SQLite or logs (CLAUDE.md §3)
   - _depends on:_ PR-8, PR-9
-  - [ ] spec: `docs/features/profile-store/profile-store-spec.md`
-  - [ ] profile/settings/sources API methods backed by repositories
-  - [ ] `setSecret` via Electron `safeStorage`; `secretsSet` derived from stored keys
-  - [ ] resume import: parse PDF/DOCX into fact-bank suggestions
-  - [ ] remove these methods from the mock-backed main backend
-  - [ ] tests
+  - [x] spec: `docs/features/profile-store/profile-store-spec.md`
+  - [x] profile/settings/sources API methods backed by repositories
+  - [x] `setSecret` via Electron `safeStorage`; `secretsSet` derived from stored keys
+  - [x] resume import: parse PDF/DOCX into fact-bank suggestions
+  - [x] remove these methods from the mock-backed main backend (`testConnection` stays mock until the Gmail/Telegram PRs)
+  - [x] tests
 
 - [ ] **PR-11 — Job sources**  Board and ATS adapters behind one `JobSource` interface.
   - _branch:_ `feat/job-sources`
