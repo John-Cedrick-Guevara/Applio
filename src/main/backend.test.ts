@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const electron = vi.hoisted(() => ({
   shell: { openExternal: vi.fn(), openPath: vi.fn() },
@@ -7,16 +7,39 @@ const electron = vi.hoisted(() => ({
 }));
 vi.mock('electron', () => electron);
 
-import { createBackend } from './backend';
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { openDatabase } from '../infra/db';
+import { createSecretStore, type Encryptor } from '../infra/secrets/secret-store';
+import { createBackend, type BackendDeps } from './backend';
+
+const fakeEncryptor: Encryptor = {
+  isEncryptionAvailable: () => true,
+  encryptString: (s) => Buffer.from([...s].reverse().join('')),
+  decryptString: (b) => [...b.toString()].reverse().join(''),
+};
+const RESUMES = join(__dirname, '../infra/resume/fixtures');
+
+let dir = '';
+/** A backend over a temp Applio folder; call again with the same folder to simulate a restart. */
+const backendIn = (folder = (dir = mkdtempSync(join(tmpdir(), 'applio-backend-')))) => {
+  const deps: BackendDeps = { db: openDatabase(join(folder, 'applio.db')), secrets: createSecretStore(fakeEncryptor, join(folder, 'secrets.json')) };
+  return { api: createBackend(() => null, deps), deps, folder };
+};
 
 beforeEach(() => {
   electron.shell.openExternal.mockResolvedValue(undefined);
   electron.shell.openPath.mockResolvedValue('');
 });
+afterEach(() => {
+  if (dir) rmSync(dir, { recursive: true, force: true });
+  dir = '';
+});
 
 describe('createBackend OS integration', () => {
   it('opens web links in the system browser and refuses other schemes', async () => {
-    const api = createBackend(() => null);
+    const { api } = backendIn();
     await api.openExternal('https://example.com/job');
     expect(electron.shell.openExternal).toHaveBeenCalledWith('https://example.com/job');
     await expect(api.openExternal('file:///etc/passwd')).rejects.toThrow('Only web links can be opened');
@@ -24,27 +47,84 @@ describe('createBackend OS integration', () => {
   });
 
   it('returns the chosen folder, or null when the picker is cancelled', async () => {
-    const api = createBackend(() => null);
+    const { api } = backendIn();
     electron.dialog.showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: ['/Users/me/JobApps'] });
     expect(await api.chooseFolder()).toBe('/Users/me/JobApps');
     electron.dialog.showOpenDialog.mockResolvedValueOnce({ canceled: true, filePaths: [] });
     expect(await api.chooseFolder()).toBeNull();
   });
 
-  it('imports the chosen resume file, or nothing when cancelled', async () => {
-    const api = createBackend(() => null);
-    electron.dialog.showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: ['/Users/me/cv.pdf'] });
-    expect((await api.importResume())?.resume).toMatchObject({ fileName: 'cv.pdf' });
+  it('imports nothing when the resume picker is cancelled', async () => {
+    const { api } = backendIn();
     electron.dialog.showOpenDialog.mockResolvedValueOnce({ canceled: true, filePaths: [] });
     expect(await api.importResume()).toBeNull();
   });
 
   it("opens a job's folder with the home directory expanded, and reports OS failures", async () => {
-    const api = createBackend(() => null);
+    const { api } = backendIn();
     await api.openJobFolder('j1');
     expect(electron.shell.openPath.mock.calls[0]![0]).not.toMatch(/^~/);
     electron.shell.openPath.mockResolvedValueOnce('No such folder');
     await expect(api.openJobFolder('j1')).rejects.toThrow("Couldn't open the folder: No such folder");
     await expect(api.openJobFolder('j6')).rejects.toThrow('This job has no folder yet');
+  });
+});
+
+describe('createBackend profile, settings and secrets on disk', () => {
+  it('keeps profile, sources and settings edits across a restart', async () => {
+    const first = backendIn();
+    const fact = await first.api.saveFact({ group: 'Projects', text: 'Built an Electron app.' });
+    await first.api.saveAnswer({ question: 'Notice period', answer: '2 weeks' });
+    const prefs = { targetRoles: ['Backend'], seniority: 'Senior', employmentTypes: ['contract' as const], remoteOnly: true, hoursOverlap: '4h', minimumPay: '$90k' };
+    await first.api.savePreferences(prefs);
+    await first.api.updateSource('remoteok', { enabled: false });
+    await first.api.saveSettings({ draftThreshold: 70, blocklist: ['Initech'] });
+    first.deps.db.close();
+
+    const { api } = backendIn(first.folder);
+    const profile = await api.getProfile();
+    expect(profile.facts).toEqual([fact]);
+    expect(profile.factGroups).toEqual([{ name: 'Projects' }]);
+    expect(profile.answers.map((a) => a.answer)).toEqual(['2 weeks']);
+    expect(profile.preferences).toEqual(prefs);
+    expect((await api.listSources()).find((s) => s.id === 'remoteok')?.enabled).toBe(false);
+    expect(await api.getSettings()).toMatchObject({ draftThreshold: 70, blocklist: ['Initech'] });
+  });
+
+  it('starts a fresh install with the default sources and guardrails', async () => {
+    const { api } = backendIn();
+    expect(await api.listSources()).toHaveLength(10);
+    expect(await api.getSettings()).toMatchObject({ draftThreshold: 75, autoSendThreshold: 85, maxPerChannelPerDay: 10, dailyTokenBudget: 150_000, assistedFill: { platform: false, custom: false } });
+    expect((await api.getProfile()).facts).toEqual([]);
+  });
+
+  it('keeps secrets out of the database, the settings and the Applio folder files', async () => {
+    const { api, deps, folder } = backendIn();
+    const secret = 'sk-ant-test-secret-4242';
+    const settings = await api.setSecret('anthropicApiKey', secret);
+    expect(settings.secretsSet.anthropicApiKey).toBe(true);
+    expect(deps.secrets.get('anthropicApiKey')).toBe(secret);
+    expect(JSON.stringify(await api.getSettings())).not.toContain(secret);
+    expect((await api.getStatus()).engineReady).toBe(true);
+    deps.db.close();
+    for (const file of readdirSync(folder)) expect(readFileSync(join(folder, file)).toString('latin1')).not.toContain(secret);
+  });
+
+  it('suggests facts from an imported resume and adds none until accepted', async () => {
+    const { api } = backendIn();
+    electron.dialog.showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: [join(RESUMES, 'resume.docx')] });
+    const result = await api.importResume();
+    expect(result?.resume).toMatchObject({ fileName: 'resume.docx', factsFound: 3 });
+    expect(result?.suggestions[0]).toEqual({ group: 'Acme Corp - Senior Engineer', text: 'Cut p95 query time from 900 ms to 120 ms by redesigning the invoicing schema.' });
+    const profile = await api.getProfile();
+    expect(profile.facts).toEqual([]);
+    expect(profile.referenceResume?.fileName).toBe('resume.docx');
+  });
+
+  it('reports an unreadable resume and changes nothing', async () => {
+    const { api } = backendIn();
+    electron.dialog.showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: [join(RESUMES, 'corrupt.pdf')] });
+    await expect(api.importResume()).rejects.toThrow("Applio couldn't read corrupt.pdf");
+    expect((await api.getProfile()).referenceResume).toBeUndefined();
   });
 });
