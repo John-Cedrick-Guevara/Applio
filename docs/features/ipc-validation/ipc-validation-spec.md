@@ -2,10 +2,10 @@
 Treat the main process as the trust boundary: every API call from the page is checked before it reaches any service (CLAUDE.md §2–3).
 
 ## Acceptance criteria
-- [ ] AC-1: Every method in `API_METHODS` has an argument schema; a call whose arguments don't match is rejected with a readable message and never reaches the backend.
-- [ ] AC-2: Strings are length-limited, ids are non-empty, numbers are finite and in range, enums accept only known values.
-- [ ] AC-3: Rejections are logged in main with the method name and the validation issue, without logging argument values that could hold secrets.
-- [ ] AC-4: A test fails if a method is added to `API_METHODS` without a schema.
+- [x] AC-1: Every method in `API_METHODS` has an argument schema; a call whose arguments don't match is rejected with a readable message and never reaches the backend.
+- [x] AC-2: Strings are length-limited, ids are non-empty, numbers are finite and in range, enums accept only known values.
+- [x] AC-3: Rejections are logged in main with the method name and the validation issue, without logging argument values that could hold secrets.
+- [x] AC-4: A test fails if a method is added to `API_METHODS` without a schema.
 
 ## Must not break
 - MNB-1: Every call the UI makes today still succeeds.
