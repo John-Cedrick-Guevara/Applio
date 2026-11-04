@@ -63,6 +63,17 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       return { ...(await store.getStatus()), engine: aiEngine, engineReady: aiEngine === 'claude-code' || secretsSet.anthropicApiKey, dailyTokenBudget };
     },
 
+    // Readiness is real; the live send/ping arrives with the Gmail, Telegram and AI adapter PRs.
+    testConnection: async (kind) => {
+      const { secretsSet, gmailAddress, telegramChatId, aiEngine } = settings.getSettings();
+      const ready =
+        kind === 'gmail' ? secretsSet.gmailAppPassword && !!gmailAddress
+        : kind === 'telegram' ? secretsSet.telegramBotToken && !!telegramChatId
+        : aiEngine === 'claude-code' || secretsSet.anthropicApiKey;
+      if (!ready) return { ok: false, message: 'Missing credentials. Fill in the fields above first.' };
+      return { ok: true, message: 'Credentials saved. A live test arrives with this integration.' };
+    },
+
     openExternal: async (url) => {
       if (!isSafeExternalUrl(url)) throw new Error('Only web links can be opened');
       await shell.openExternal(url);

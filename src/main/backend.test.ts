@@ -110,6 +110,14 @@ describe('createBackend profile, settings and secrets on disk', () => {
     for (const file of readdirSync(folder)) expect(readFileSync(join(folder, file)).toString('latin1')).not.toContain(secret);
   });
 
+  it('checks connection readiness against the saved settings and secrets', async () => {
+    const { api } = backendIn();
+    expect(await api.testConnection('telegram')).toEqual({ ok: false, message: 'Missing credentials. Fill in the fields above first.' });
+    await api.saveSettings({ telegramChatId: '12345' });
+    await api.setSecret('telegramBotToken', '123:abc');
+    expect(await api.testConnection('telegram')).toMatchObject({ ok: true });
+  });
+
   it('suggests facts from an imported resume and adds none until accepted', async () => {
     const { api } = backendIn();
     electron.dialog.showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: [join(RESUMES, 'resume.docx')] });

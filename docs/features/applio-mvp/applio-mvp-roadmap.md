@@ -171,7 +171,7 @@ Wire real data behind the same `ApplioApi`. Each PR replaces part of the mock st
   - [x] profile/settings/sources API methods backed by repositories
   - [x] `setSecret` via Electron `safeStorage`; `secretsSet` derived from stored keys
   - [x] resume import: parse PDF/DOCX into fact-bank suggestions
-  - [x] remove these methods from the mock-backed main backend (`testConnection` stays mock until the Gmail/Telegram PRs)
+  - [x] remove these methods from the mock-backed main backend (`testConnection` checks real credentials; the live test comes with the Gmail/Telegram PRs)
   - [x] tests
 
 - [ ] **PR-11 — Job sources**  Board and ATS adapters behind one `JobSource` interface.
