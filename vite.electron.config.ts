@@ -9,6 +9,12 @@ import { defineConfig } from 'vite';
 export default defineConfig(({ mode }) => {
   const entry = mode === 'preload' ? 'preload' : 'main';
   return {
+    // Main runs in Node: resolve packages' Node builds, not their "browser" builds (Vite's default),
+    // which differ in API — e.g. mammoth's browser build drops Buffer input. Preload keeps the defaults.
+    resolve:
+      entry === 'main'
+        ? { mainFields: ['module', 'jsnext:main', 'jsnext', 'main'], conditions: ['node', 'module', 'import', 'default'] }
+        : undefined,
     build: {
       outDir: 'dist/electron',
       emptyOutDir: false,
