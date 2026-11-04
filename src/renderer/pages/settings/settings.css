@@ -1,0 +1,141 @@
+/* Settings: stacked cards of rows. */
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 980px;
+}
+
+.settings-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.settings-row:last-child {
+  border-bottom: 0;
+}
+
+.settings-row-top {
+  align-items: flex-start;
+  padding-block: 14px;
+}
+
+.settings-row .toggle-row {
+  gap: 0;
+}
+
+.settings-row-text {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.settings-row-text.wide {
+  flex-basis: 300px;
+}
+
+.settings-row-name {
+  font-weight: 500;
+}
+
+.settings-desc {
+  margin-top: 3px;
+  line-height: 1.5;
+}
+
+.tabs.is-off {
+  opacity: 0.45;
+}
+
+.guard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+}
+
+.blocklist {
+  gap: 6px;
+  margin-top: var(--space-2);
+}
+
+.block-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+  font-size: var(--text-md);
+}
+
+.chip-remove {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.chip-add {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px dashed var(--border-dashed);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: var(--text-md);
+}
+
+.chip-input {
+  width: 180px;
+  height: 30px;
+  font-size: var(--text-md);
+}
+
+.out-dir {
+  flex: 1 1 280px;
+  width: auto;
+}
+
+.folder-tree {
+  margin: 0;
+  padding: 14px var(--space-4);
+  overflow-x: auto;
+  border-radius: var(--radius);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+}
+
+.secret-row {
+  flex: 1 1 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.secret-row .grow {
+  flex: 1 1 280px;
+}
+
+.full {
+  flex: 1 1 100%;
+}
+
+.connection-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.nowrap-row {
+  flex-wrap: nowrap;
+}

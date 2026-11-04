@@ -1,0 +1,164 @@
+/* Manual handoff: numbered steps (left) + job summary (right). */
+.back-link {
+  font-size: var(--text-md);
+  text-decoration: none;
+}
+
+.handoff-title {
+  margin-top: 10px;
+  font-size: var(--text-3xl);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.handoff-lede {
+  max-width: 720px;
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+.handoff-steps {
+  flex: 999 1 520px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.handoff-step {
+  padding: 18px var(--space-5);
+}
+
+.step-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.step-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--surface-muted);
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.step-title-wrap {
+  flex: 1 1 240px;
+}
+
+.step-title {
+  font-weight: 600;
+}
+
+.step-aside {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.step-body {
+  margin-left: 44px;
+}
+
+.handoff-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+}
+
+.handoff-answer {
+  align-items: flex-start;
+}
+
+.handoff-file-text,
+.handoff-answer-text {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.handoff-file-name {
+  font-weight: 500;
+}
+
+.path-wrap {
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+.handoff-answer-body {
+  margin: 4px 0 var(--space-2);
+  line-height: 1.5;
+}
+
+.handoff-letter {
+  padding: 14px var(--space-4);
+  border-radius: var(--radius);
+  background: var(--surface-sunken);
+  color: var(--text-body);
+  line-height: 1.6;
+}
+
+.handoff-done {
+  color: var(--success-text);
+}
+
+.done-icon {
+  color: var(--success);
+}
+
+.handoff-aside {
+  flex: 1 1 300px;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.aside-title {
+  margin-top: -10px;
+  font-size: var(--text-xl);
+  font-weight: 600;
+}
+
+.facts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px var(--space-3);
+  margin: 0;
+  font-size: var(--text-md);
+}
+
+.facts-grid dt {
+  color: var(--text-muted);
+}
+
+.facts-grid dd {
+  margin: 2px 0 0;
+}
+
+.handoff-tip {
+  padding: var(--space-4) 18px;
+  border: 1px dashed var(--border-dashed);
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
+  font-size: var(--text-md);
+  line-height: 1.5;
+}
+
+.handoff-tip-title {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.handoff-tip p {
+  margin: 4px 0 10px;
+}

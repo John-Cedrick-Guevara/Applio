@@ -1,0 +1,44 @@
+import type { ReferenceResume } from '../../../shared/types';
+import { useApi } from '../../api/api-context';
+import { Button } from '../../components/button';
+import { FileIcon } from '../../components/icons';
+import { useAction } from '../../hooks/use-action';
+import { formatShortDate } from '../../lib/format';
+
+interface Props {
+  resume?: ReferenceResume;
+  templateOpen: boolean;
+  onToggleTemplate: () => void;
+  onImported: (resume: ReferenceResume) => void;
+}
+
+/** The uploaded resume that seeds the fact bank and sets tone (SPEC F1). Parsing happens in main. */
+export function ReferenceResumeCard({ resume, templateOpen, onToggleTemplate, onImported }: Props) {
+  const api = useApi();
+  const action = useAction();
+
+  const replace = async () => {
+    const next = await action.run('import the resume', () => api.importResume());
+    if (next) onImported(next); // null = picker cancelled
+  };
+
+  return (
+    <section className="card profile-resume">
+      <h2 className="card-title">Reference resume</h2>
+      <div className="file-row">
+        <FileIcon />
+        <div className="file-row-text">
+          <div className="file-row-name">{resume?.fileName ?? 'No resume yet'}</div>
+          <div className="cell-sub">
+            {resume ? `Uploaded ${formatShortDate(resume.uploadedAt)} · seeded ${resume.factsSeeded} of your facts` : 'Upload a PDF or DOCX to seed your fact bank.'}
+          </div>
+        </div>
+      </div>
+      <p className="cell-sub">Sets tone and section order for every tailored resume. Output always uses the one ATS-safe template.</p>
+      <div className="row card-actions">
+        <Button busy={action.pending} onClick={replace}>{resume ? 'Replace' : 'Upload resume'}</Button>
+        <Button aria-expanded={templateOpen} onClick={onToggleTemplate}>{templateOpen ? 'Hide template' : 'Preview template'}</Button>
+      </div>
+    </section>
+  );
+}
