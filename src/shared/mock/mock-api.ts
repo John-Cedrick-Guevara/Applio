@@ -247,7 +247,14 @@ export function createMockApi({ latencyMs = 250, now = () => new Date() }: MockO
     savePreferences: (preferences) => run(() => (profile.preferences = preferences)),
 
     importResume: () =>
-      run(() => (profile.referenceResume = { fileName: 'resume.pdf', uploadedAt: now().toISOString(), factsSeeded: 6 })),
+      run(() => {
+        const suggestions = [
+          { group: '[Previous Company] — Senior Software Engineer', text: 'Cut monthly AWS spend by 30% by right-sizing ECS tasks.' },
+          { group: 'Projects', text: 'Maintain an open-source CLI for PostgreSQL migrations.' },
+        ];
+        profile.referenceResume = { fileName: 'resume.pdf', uploadedAt: now().toISOString(), factsFound: suggestions.length };
+        return { resume: profile.referenceResume, suggestions };
+      }),
 
     listSources: () => respond(sources),
 

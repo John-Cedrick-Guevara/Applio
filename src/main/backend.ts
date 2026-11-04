@@ -52,7 +52,7 @@ export function createBackend(getWindow: () => BrowserWindow | null): ApplioApi 
       const file = result.filePaths[0];
       if (result.canceled || !file) return null;
       // ponytail: fact extraction not wired yet — records the file only.
-      return { fileName: basename(file), uploadedAt: new Date().toISOString(), factsSeeded: 0 };
+      return { resume: { fileName: basename(file), uploadedAt: new Date().toISOString(), factsFound: 0 }, suggestions: [] };
     },
   };
 }

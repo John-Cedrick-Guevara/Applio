@@ -155,7 +155,20 @@ export interface Preferences {
 export interface ReferenceResume {
   fileName: string;
   uploadedAt: string;
-  factsSeeded: number;
+  /** Candidate facts found in it; each one joins the bank only once the operator accepts it. */
+  factsFound: number;
+}
+
+/** A line from an imported résumé offered as a fact, copied verbatim. */
+export interface FactSuggestion {
+  group: string;
+  text: string;
+}
+
+/** Result of importing a résumé: the reference card, plus facts waiting for the operator to accept. */
+export interface ResumeImport {
+  resume: ReferenceResume;
+  suggestions: FactSuggestion[];
 }
 
 export interface Profile {

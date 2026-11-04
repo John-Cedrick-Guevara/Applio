@@ -65,6 +65,24 @@ describe('ProfilePage', () => {
     expect((await api.getProfile()).preferences.targetRoles).toEqual(['Staff Engineer', 'Tech Lead']);
   });
 
+  it('imports a résumé and adds only the suggested facts the operator accepts', async () => {
+    const { api } = renderWithApp(<ProfilePage />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Replace' }));
+    const review = await screen.findByRole('region', { name: 'Facts found in resume.pdf' });
+    expect(screen.getByText(/found 2 facts/)).toBeInTheDocument();
+    expect((await api.getProfile()).facts.some((f) => f.text.startsWith('Cut monthly AWS'))).toBe(false);
+
+    const first = within(review).getByText(/Cut monthly AWS spend/).closest('li')!;
+    await userEvent.click(within(first).getByRole('button', { name: 'Add to fact bank' }));
+    expect(await screen.findByText('Cut monthly AWS spend by 30% by right-sizing ECS tasks.', { selector: '.fact-text' })).toBeInTheDocument();
+
+    await userEvent.click(within(review).getByRole('button', { name: 'Dismiss the rest' }));
+    expect(screen.queryByRole('region', { name: /Facts found/ })).not.toBeInTheDocument();
+    const texts = (await api.getProfile()).facts.map((f) => f.text);
+    expect(texts).toContain('Cut monthly AWS spend by 30% by right-sizing ECS tasks.');
+    expect(texts).not.toContain('Maintain an open-source CLI for PostgreSQL migrations.');
+  });
+
   it('toggles the ATS template preview', async () => {
     renderWithApp(<ProfilePage />);
     await userEvent.click(await screen.findByRole('button', { name: 'Preview template' }));

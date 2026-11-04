@@ -34,7 +34,7 @@ describe('createBackend OS integration', () => {
   it('imports the chosen resume file, or nothing when cancelled', async () => {
     const api = createBackend(() => null);
     electron.dialog.showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: ['/Users/me/cv.pdf'] });
-    expect(await api.importResume()).toMatchObject({ fileName: 'cv.pdf' });
+    expect((await api.importResume())?.resume).toMatchObject({ fileName: 'cv.pdf' });
     electron.dialog.showOpenDialog.mockResolvedValueOnce({ canceled: true, filePaths: [] });
     expect(await api.importResume()).toBeNull();
   });

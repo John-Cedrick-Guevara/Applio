@@ -190,3 +190,14 @@
 .col-question {
   width: 38%;
 }
+
+.resume-suggestions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.resume-suggestions .fact-row {
+  align-items: center;
+  justify-content: space-between;
+}

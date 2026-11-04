@@ -181,7 +181,7 @@ export function seedProfile(now: Date): Profile {
   const prev = '[Previous Company] — Senior Software Engineer';
   const earlier = '[Earlier Company] — Software Engineer';
   return {
-    referenceResume: { fileName: 'reference-resume.pdf', uploadedAt: hoursAgo(now, 24 * 8), factsSeeded: 38 },
+    referenceResume: { fileName: 'reference-resume.pdf', uploadedAt: hoursAgo(now, 24 * 8), factsFound: 38 },
     factGroups: [{ name: prev, dates: '2022 – now' }, { name: earlier, dates: '2020 – 2022' }, { name: 'Projects' }],
     facts: [
       { id: 'f1', group: prev, text: 'Redesigned the invoicing schema in PostgreSQL; p95 query time dropped from 900 ms to 120 ms.', tags: ['PostgreSQL', 'metric'], timesUsed: 14 },
