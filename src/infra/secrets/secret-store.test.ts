@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -47,6 +47,23 @@ describe('secret store', () => {
     const file = tempFile();
     createSecretStore(fakeEncryptor(), file).set('anthropicApiKey', 'sk-ant-1');
     expect(statSync(file).mode & 0o777).toBe(0o600);
+  });
+
+  it('tightens an existing file to owner-only on the next save', () => {
+    const file = tempFile();
+    writeFileSync(file, '{}');
+    chmodSync(file, 0o644);
+    createSecretStore(fakeEncryptor(), file).set('anthropicApiKey', 'sk-ant-1');
+    expect(statSync(file).mode & 0o777).toBe(0o600);
+  });
+
+  it('replaces the file in one step, leaving no temporary file behind', () => {
+    const file = tempFile();
+    const store = createSecretStore(fakeEncryptor(), file);
+    store.set('anthropicApiKey', 'sk-ant-1');
+    store.set('gmailAppPassword', 'abcd');
+    expect(readdirSync(dir)).toEqual(['secrets.json']);
+    expect(store.has('anthropicApiKey') && store.has('gmailAppPassword')).toBe(true);
   });
 
   it('refuses to save when the OS keychain is unavailable, never falling back to plain text', () => {

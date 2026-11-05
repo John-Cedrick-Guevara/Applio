@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { AppError } from '../../shared/errors';
 import type { SecretKey } from '../../shared/types';
@@ -41,7 +41,11 @@ export function createSecretStore(encryptor: Encryptor, file: string): SecretSto
       if (value) all[key] = encryptor.encryptString(value).toString('base64');
       else delete all[key];
       mkdirSync(dirname(file), { recursive: true });
-      writeFileSync(file, JSON.stringify(all), { mode: 0o600 });
+      // Write a temp file and rename it over the old one, so a crash mid-write can't lose every saved secret.
+      const tmp = `${file}.tmp`;
+      writeFileSync(tmp, JSON.stringify(all), { mode: 0o600 });
+      chmodSync(tmp, 0o600); // the mode option only applies when the file is created
+      renameSync(tmp, file);
     },
     has: (key) => key in load(),
     get: (key) => {

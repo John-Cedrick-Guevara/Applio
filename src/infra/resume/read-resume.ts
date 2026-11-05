@@ -26,6 +26,7 @@ export async function readResumeText(path: string): Promise<string> {
   if (!read) throw new ResumeUnreadableError(`${name} isn't a PDF or DOCX. Applio reads only PDF and DOCX résumés.`);
 
   let text: string;
+  // ponytail: parses on main's thread; fine for a few-page résumé — move to a utility process if imports grow large.
   try {
     text = await read(await readFile(path));
   } catch (err) {

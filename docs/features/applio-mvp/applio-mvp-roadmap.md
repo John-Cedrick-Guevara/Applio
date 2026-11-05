@@ -7,7 +7,7 @@ Small PRs, in order. Each phase is one reviewable PR. PRs 1, 3, 4, 6 and 7 are s
 (`feat/review-queue` → `docs/features/review-queue/review-queue-spec.md`). The spec ships in the
 same PR and is what the review checks against. See CLAUDE.md §6.
 
-**Where we are:** Stage 1 is done (#2–#14, landing on `main` with #15; CI in #16). Stage 2: PR-8 (#17), PR-9 (#18) and PR-10 are in review. PR-11 (job sources) is next.
+**Where we are:** Stage 1 is on `main` (#15), and CI runs on every PR (#16). Stage 2: PR-8 (#17), PR-9 (#18) and PR-10 (#19) are merged. Next is PR-11 (job sources).
 
 ## Stage 1 — Frontend (mock data)
 
@@ -134,7 +134,7 @@ in-memory mock in `src/shared/mock/`.
   - [x] spec: `docs/features/add-job/add-job-spec.md`
   - [x] `pages/add-job/*`, route
   - [x] tests: add-job model and page
-  - [ ] when merged, `main` matches `feat/renderer-ui` (plus fixes and tests); delete that branch
+  - [x] when merged, `main` matches `feat/renderer-ui` (plus fixes and tests); delete that branch (checked in #19's review: it differs only by code later fixes replaced; the branch is local-only)
 
 ## Stage 2 — Backend
 
