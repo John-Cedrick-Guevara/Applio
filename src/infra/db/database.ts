@@ -27,6 +27,8 @@ export function openDatabase(path: string): DatabaseSync {
  * @throws whatever `fn` throws, after rolling back.
  */
 export function transaction<T>(db: DatabaseSync, fn: () => T): T {
+  // Inside an outer transaction, join it: the outer one commits or rolls back everything together.
+  if (db.isTransaction) return fn();
   db.exec('BEGIN');
   try {
     const result = fn();
