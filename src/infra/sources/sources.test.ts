@@ -41,7 +41,7 @@ describe.each([
     first: {
       externalId: 'https://himalayas.app/companies/swamp-ventures/jobs/product-management-contractor', company: 'Swamp Ventures', title: 'Product Management Contractor',
       applyUrl: 'https://himalayas.app/companies/swamp-ventures/jobs/product-management-contractor?utm_source=api', location: 'United States',
-      postedAt: new Date(1793869281 * 1000).toISOString(), employmentType: 'contract', remote: true,
+      postedAt: new Date(1793869281 * 1000).toISOString(), employmentType: 'contract', remote: true, utcOffsets: [-10, -9, -8, -7, -6, -5, 14],
     },
   },
   {

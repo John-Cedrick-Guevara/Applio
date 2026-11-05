@@ -22,6 +22,8 @@ export interface DiscoveredJob {
   remote?: boolean;
   salary?: string;
   employmentType?: EmploymentType;
+  /** UTC offsets the job works in, when the board says (Himalayas does); the hours filter uses them. */
+  utcOffsets?: number[];
 }
 
 /** The read-only HTTP a source may use; the infra client adds politeness and the host allowlist. */
