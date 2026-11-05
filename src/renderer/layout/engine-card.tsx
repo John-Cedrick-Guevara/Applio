@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useApi } from '../api/api-context';
 import { useAsync } from '../hooks/use-async';
 import { formatClock, formatTokens } from '../lib/format';
@@ -5,12 +6,14 @@ import { usePath } from '../lib/router';
 
 /**
  * Sidebar status: engine readiness, next scheduled run and today's token use.
- * ponytail: refreshes on navigation only; push updates from main when the scheduler lands.
+ * Main pushes each change (scheduler AC-5). Browser dev has no push, so it
+ * also reloads on navigation.
  */
 export function EngineCard() {
   const api = useApi();
   const path = usePath();
-  const { data: status } = useAsync(() => api.getStatus(), [api, path]);
+  const { data: status, setData } = useAsync(() => api.getStatus(), [api, path]);
+  useEffect(() => window.applioEvents?.onStatus(setData), [setData]);
   if (!status) return null;
 
   const state = status.paused ? 'Paused' : status.engineReady ? 'Ready' : 'Needs a key';

@@ -1,0 +1,40 @@
+import { act, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
+import type { AppStatus } from '../../shared/types';
+import { renderWithApp } from '../../test/render';
+import { EngineCard } from './engine-card';
+
+/** Stands in for the preload's status channel, letting the test push like main does. */
+const fakeEvents = () => {
+  const listeners = new Set<(s: AppStatus) => void>();
+  window.applioEvents = {
+    onStatus: (l) => {
+      listeners.add(l);
+      return () => listeners.delete(l);
+    },
+  };
+  return { push: (s: AppStatus) => listeners.forEach((l) => l(s)), listeners };
+};
+
+afterEach(() => {
+  delete window.applioEvents;
+});
+
+describe('EngineCard', () => {
+  it('shows status pushed from main without any navigation', async () => {
+    const events = fakeEvents();
+    const { api } = renderWithApp(<EngineCard />);
+    expect(await screen.findByText('Ready')).toBeInTheDocument();
+    const paused = { ...(await api.getStatus()), paused: true, nextRunAt: undefined };
+    act(() => events.push(paused));
+    expect(screen.getByText('Paused', { selector: '.engine-state' })).toBeInTheDocument();
+  });
+
+  it('stops listening when it unmounts', async () => {
+    const events = fakeEvents();
+    const { unmount } = renderWithApp(<EngineCard />);
+    await screen.findByText('Ready');
+    unmount();
+    expect(events.listeners.size).toBe(0);
+  });
+});

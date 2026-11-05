@@ -1,17 +1,27 @@
-import { app, BrowserWindow, dialog, safeStorage, shell } from 'electron';
+import { app, BrowserWindow, dialog, powerMonitor, safeStorage, shell } from 'electron';
 import { join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { openDatabase } from '../infra/db';
 import { createSecretStore } from '../infra/secrets/secret-store';
+import { createAllSources, createPoliteHttp, SOURCE_HOSTS } from '../infra/sources';
+import { STATUS_CHANNEL } from '../shared/ipc';
 import { createBackend } from './backend';
 import { registerApiHandlers } from './ipc';
 import { denyAndOpenExternally, guardNavigation } from './security';
+import { createTray } from './tray';
 
 /** Set by scripts/dev.mjs; absent in a packaged build. */
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 
 let mainWindow: BrowserWindow | null = null;
 let db: DatabaseSync | null = null;
+// Closing the window only hides it (tray mode); Quit from the tray or the app menu sets this.
+let quitting = false;
+
+/** How often the scheduler checks whether a run is due; also checked on wake. */
+const TICK_MS = 60_000;
+/** Names the app and links its repo, as the boards ask; never a personal email. */
+const USER_AGENT = 'Applio/0.1 (+https://github.com/John-Cedrick-Guevara/Applio)';
 
 /** The one Applio folder: the database plus every generated application (SPEC F8). */
 const dataFolder = () => join(app.getPath('home'), 'Applio');
@@ -48,6 +58,11 @@ function createWindow(): BrowserWindow {
   if (DEV_SERVER_URL) void win.loadURL(DEV_SERVER_URL);
   else void win.loadFile(join(__dirname, '../renderer/index.html'));
 
+  win.on('close', (event) => {
+    if (quitting) return;
+    event.preventDefault();
+    win.hide();
+  });
   win.on('closed', () => {
     mainWindow = null;
   });
@@ -65,18 +80,63 @@ app.whenReady().then(() => {
   }
   // Secrets sit in the OS app-data folder, never in the Applio folder the operator browses and shares.
   const secrets = createSecretStore(safeStorage, join(app.getPath('userData'), 'secrets.json'));
-  registerApiHandlers(createBackend(() => mainWindow, { db, secrets }), DEV_SERVER_URL);
+  const http = createPoliteHttp({
+    fetch: (url, init) => fetch(url, init),
+    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    random: Math.random,
+    userAgent: USER_AGENT,
+    allowedHosts: SOURCE_HOSTS,
+  });
+  // The tray reads `paused` from each pushed status, so it never has to ask.
+  let paused = false;
+  let refreshTray = () => {};
+  const backend = createBackend(() => mainWindow, {
+    db,
+    secrets,
+    // ponytail: the ATS watchlist is empty until its editor lands; then read it from settings here.
+    sources: createAllSources(() => []),
+    httpFor: (source) => http.forSource(source.id),
+    onStatus: (status) => {
+      paused = status.paused;
+      mainWindow?.webContents.send(STATUS_CHANNEL, status);
+      refreshTray();
+    },
+    setLaunchAtLogin: (openAtLogin) => app.setLoginItemSettings({ openAtLogin }),
+  });
+  registerApiHandlers(backend, DEV_SERVER_URL);
   mainWindow = createWindow();
 
-  // macOS: re-open a window when the dock icon is clicked.
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow();
+  const show = () => {
+    if (!mainWindow) mainWindow = createWindow();
+    mainWindow.show();
+    mainWindow.focus();
+  };
+  refreshTray = createTray({
+    open: show,
+    runNow: () => void backend.runDiscovery().catch((err: unknown) => console.error('[tray] run failed', err)),
+    isPaused: () => paused,
+    setPaused: (next) => void backend.setAutomationPaused(next),
+    quit: () => app.quit(),
   });
+  void backend.getStatus().then((s) => {
+    paused = s.paused;
+    refreshTray();
+  });
+
+  // Catch-up: a run missed while asleep starts on the first tick after wake (or launch).
+  const tick = () => void backend.tick();
+  tick();
+  setInterval(tick, TICK_MS);
+  powerMonitor.on('resume', tick);
+
+  // macOS: re-open the window when the dock icon is clicked.
+  app.on('activate', show);
 });
 
+app.on('before-quit', () => {
+  quitting = true;
+});
 app.on('will-quit', () => db?.close());
 
-// ponytail: quits on last window close (except macOS); tray mode comes with the scheduler.
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
+// Tray mode: Applio keeps running with every window closed; Quit lives in the tray menu.
+app.on('window-all-closed', () => {});

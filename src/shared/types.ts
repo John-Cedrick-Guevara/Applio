@@ -260,6 +260,10 @@ export interface Settings {
   autoSendThreshold: number;
   maxPerChannelPerDay: number;
   dailyTokenBudget: number;
+  /** Hours between discovery runs, 4–6 (SPEC F2). */
+  discoveryIntervalHours: number;
+  /** Start Applio in the tray when the operator logs in. */
+  launchAtLogin: boolean;
   /** Companies never applied to (SPEC F6). */
   blocklist: string[];
   secretsSet: Record<SecretKey, boolean>;

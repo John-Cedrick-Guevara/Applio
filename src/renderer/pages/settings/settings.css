@@ -139,3 +139,5 @@
 .nowrap-row {
   flex-wrap: nowrap;
 }
+
+.schedule-select { width: auto; }
