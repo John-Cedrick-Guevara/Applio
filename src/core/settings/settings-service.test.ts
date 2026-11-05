@@ -37,7 +37,15 @@ describe('settings service', () => {
     const { ports } = fakes();
     createSettingsService(ports).listSources();
     const second = createSettingsService(ports);
-    expect(second.listSources().map((s) => s.id)).toEqual(['remoteok', 'remotive', 'himalayas', 'wwr', 'jobicy', 'ats', 'hn', 'upwork', 'clip', 'jsearch']);
+    expect(second.listSources().map((s) => s.id)).toEqual(['remoteok', 'remotive', 'himalayas', 'wwr', 'jobicy', 'arbeitnow', 'ats', 'hn', 'upwork', 'clip', 'jsearch']);
+  });
+
+  it('adds a newly shipped default source to an existing install, keeping its other choices', () => {
+    const { ports } = fakes();
+    ports.sources.save({ id: 'remoteok', name: 'RemoteOK', kind: 'board', enabled: false, autonomy: 'notify', via: 'Public JSON API' });
+    const ids = createSettingsService(ports).listSources();
+    expect(ids.find((s) => s.id === 'remoteok')).toMatchObject({ enabled: false, autonomy: 'notify' });
+    expect(ids.find((s) => s.id === 'arbeitnow')).toMatchObject({ enabled: true, autonomy: 'draft' });
   });
 
   it('keeps a saved patch and leaves other settings alone', () => {

@@ -30,7 +30,10 @@ const SECRET_KEYS: readonly SecretKey[] = ['anthropicApiKey', 'gmailAppPassword'
  * is always derived from the secret store, never stored.
  */
 export function createSettingsService({ kv, sources, secrets }: SettingsPorts): SettingsService {
-  if (sources.list().length === 0) DEFAULT_SOURCES.forEach((s) => sources.save(s));
+  // Seed any default source this install doesn't have yet: all of them on first launch, and
+  // sources added in later versions afterwards. Existing sources keep the operator's choices.
+  const known = new Set(sources.list().map((s) => s.id));
+  DEFAULT_SOURCES.filter((s) => !known.has(s.id)).forEach((s) => sources.save(s));
 
   /** Only what the operator changed; defaults fill the rest, so a later default change still reaches them. */
   const changed = () => (kv.get(KEY) as Partial<Settings> | undefined) ?? {};

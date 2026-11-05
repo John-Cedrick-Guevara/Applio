@@ -48,7 +48,7 @@ describe('openDatabase', () => {
   it('stores every entity the app keeps', () => {
     const db = openDatabase(':memory:');
     expect(names(db, 'table')).toEqual([
-      'answers', 'drafts', 'fact_groups', 'facts', 'jobs', 'run_summaries', 'settings', 'sources', 'status_events', 'usage_records',
+      'answers', 'drafts', 'fact_groups', 'facts', 'jobs', 'run_summaries', 'settings', 'source_polls', 'sources', 'status_events', 'usage_records',
     ]);
   });
 

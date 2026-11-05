@@ -1,0 +1,177 @@
+{
+  "comments": "21/08/2026: Cursor pagination is now available and is the preferred way to page through the feed. Pass the nextCursor value from each response back as ?cursor=. It is faster than offset and will never return the same job twice. The offset parameter is deprecated and will be removed in a future release. 13/03/2026: The API has been updated to include the companySlug field in the response.",
+  "updatedAt": 1793869281,
+  "offset": 0,
+  "limit": 5,
+  "totalCount": 112484,
+  "nextCursor": "MjAyNi0xMS0wNVQwODo1NjowMi4xNTU3MTRafDI1MDk3Mjk",
+  "jobs": [
+    {
+      "title": "Product Management Contractor",
+      "excerpt": "## Company OverviewSwamp Ventures is a dynamic company focused on providing innovative solutions for startups.",
+      "companyName": "Swamp Ventures",
+      "companySlug": "swamp-ventures",
+      "companyLogo": "https://cdn-images.himalayas.app/g0cby8ydssq1birk58ydhjjvw0xa",
+      "employmentType": "Contractor",
+      "minSalary": null,
+      "maxSalary": null,
+      "salaryPeriod": "annual",
+      "seniority": [
+        "Mid-level"
+      ],
+      "currency": "USD",
+      "locationRestrictions": [
+        "United States"
+      ],
+      "timezoneRestrictions": [
+        -10,
+        -9,
+        -8,
+        -7,
+        -6,
+        -5,
+        14
+      ],
+      "categories": [
+        "Product-Manager",
+        "Contract-Product-Management",
+        "Contract-Product-Manager",
+        "Interim-Senior-Product-Manager"
+      ],
+      "parentCategories": [
+        "Product"
+      ],
+      "description": "## Company Overview<a href=\"https://himalayas.app/companies/swamp-ventures\">Swamp Ventures</a> is a dynamic company focused on providing innovative solutions for startups. We are committed to fostering growth and driving innovation through cutting-edge technology and strategic partnerships.## Job TitleProduct Management Contractor## Job LocationInternational## Role DescriptionAs a Product Manageme…",
+      "pubDate": 1793869281,
+      "expiryDate": 1799053281,
+      "applicationLink": "https://himalayas.app/companies/swamp-ventures/jobs/product-management-contractor?utm_source=api",
+      "guid": "https://himalayas.app/companies/swamp-ventures/jobs/product-management-contractor"
+    },
+    {
+      "title": "Creative Marketing Project Coordinator",
+      "excerpt": "DescriptionCapsLock is a global IT marketing company that pioneers unique, scalable customer acquisition solutions for B2C clients.",
+      "companyName": "CapsLock",
+      "companySlug": "capslock",
+      "companyLogo": "https://cdn-images.himalayas.app/2ajt83qhwup9vmuffkwmkwj10lnh",
+      "employmentType": "Full Time",
+      "minSalary": null,
+      "maxSalary": null,
+      "salaryPeriod": "annual",
+      "seniority": [
+        "Mid-level"
+      ],
+      "currency": null,
+      "locationRestrictions": [
+        "Armenia"
+      ],
+      "timezoneRestrictions": [
+        4
+      ],
+      "categories": [
+        "Marketing-Project-Coordinator",
+        "Project-Coordinator",
+        "Creative-Operations-Coordinator",
+        "Marketing-Operations-Coordinator"
+      ],
+      "parentCategories": [
+        "Operations"
+      ],
+      "description": "<h3>Description</h3><p class=\"editor-paragraph\"><b><strong class=\"editor-text-bold\"><a href=\"https://himalayas.app/companies/capslock\">CapsLock</a></strong></b> is a global IT marketing company that pioneers unique, scalable customer acquisition solutions for B2C clients. We solve complex sales challenges across a wide range of industries, primarily for large North American partners. By integratin…",
+      "pubDate": 1793869230,
+      "expiryDate": 1799053229,
+      "applicationLink": "https://himalayas.app/companies/capslock/jobs/creative-marketing-project-coordinator-2411127904?utm_source=api",
+      "guid": "https://himalayas.app/companies/capslock/jobs/creative-marketing-project-coordinator-2411127904"
+    },
+    {
+      "title": "OpenBao Developer",
+      "excerpt": "Reports To: Delivery Manager, Head of OpenBao Development Employment Status: Full Time Salary: Up to £100k + bonus + benefits.",
+      "companyName": "Control Plane Limited",
+      "companySlug": "control-plane-limited",
+      "companyLogo": "https://cdn-images.himalayas.app/fhcx6m1wphsfklxg7muiqlv0kg6p",
+      "employmentType": "Full Time",
+      "minSalary": 100000,
+      "maxSalary": 100000,
+      "salaryPeriod": "annual",
+      "seniority": [
+        "Mid-level"
+      ],
+      "currency": "GBP",
+      "locationRestrictions": [
+        "Albania",
+        "Andorra",
+        "Austria",
+        "Belarus",
+        "Belgium",
+        "Bosnia and Herzegovina",
+        "Bulgaria",
+        "Croatia",
+        "Cyprus",
+        "Czechia",
+        "Denmark",
+        "Estonia",
+        "Faroe Islands",
+        "Finland",
+        "France",
+        "Germany",
+        "Gibraltar",
+        "Greece",
+        "Guernsey",
+        "Holy See (Vatican City State)",
+        "Hungary",
+        "Iceland",
+        "Ireland",
+        "Isle of Man",
+        "Italy",
+        "Jersey",
+        "Kosovo",
+        "Latvia",
+        "Liechtenstein",
+        "Lithuania",
+        "Luxembourg",
+        "Malta",
+        "Moldova",
+        "Monaco",
+        "Montenegro",
+        "Netherlands",
+        "North Macedonia",
+        "Norway",
+        "Poland",
+        "Portugal",
+        "Romania",
+        "San Marino",
+        "Serbia",
+        "Slovakia",
+        "Slovenia",
+        "Spain",
+        "Svalbard and Jan Mayen",
+        "Sweden",
+        "Switzerland",
+        "Ukraine",
+        "United Kingdom",
+        "Åland Islands"
+      ],
+      "timezoneRestrictions": [
+        -1,
+        0,
+        1,
+        2,
+        3
+      ],
+      "categories": [
+        "Software-Engineer",
+        "Go-Developer",
+        "Backend-Engineer",
+        "Security-Software-Engineer",
+        "Open-Source-Engineer"
+      ],
+      "parentCategories": [
+        "Developer"
+      ],
+      "description": "<p><strong>Reports To:</strong> Delivery Manager, Head of OpenBao Development<br><strong>Employment Status:</strong> Full Time<br><strong>Salary:</strong> Up to £100k + bonus + benefits. </p><h3><strong>Who is ControlPlane?</strong></h3><p>ControlPlane is a London-headquartered consultancy specialising in cloud-native, Kubernetes, and open-source security solutions. Our expertise lies in helping o…",
+      "pubDate": 1793869020,
+      "expiryDate": 1799053020,
+      "applicationLink": "https://himalayas.app/companies/control-plane-limited/jobs/openbao-developer?utm_source=api",
+      "guid": "https://himalayas.app/companies/control-plane-limited/jobs/openbao-developer"
+    }
+  ]
+}
