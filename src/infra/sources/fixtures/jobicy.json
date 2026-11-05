@@ -1,0 +1,73 @@
+{
+  "apiVersion": "2.2.19",
+  "documentationUrl": "https://jobi.cy/apidocs",
+  "friendlyNotice": "Thanks for using Jobicy API! Please ensure Jobicy is clearly credited with a direct link to the source, and all application buttons redirect to the original job URL provided in this feed. That’s all! You might be building something amazing, we wish you the best of luck!",
+  "jobCount": 3,
+  "lastUpdate": "2026-11-05T05:44:53+00:00",
+  "nextCursor": "AgAAAABq7FmMAAAAAGrsF6kAAAAAAAJthpGStyjVOt7ULMvdFdHp_0xjGsH--7hP_G6cSgT0AUpICm3q1ErY-gYTNOR3Ze0GiBmiC2TWCTtrR4NwhCqzw4A",
+  "hasMore": true,
+  "appliedFilters": {
+    "count": 5
+  },
+  "jobs": [
+    {
+      "id": 159113,
+      "url": "https://jobicy.com/jobs/159113-regional-sales-manager-singapore-2",
+      "jobSlug": "159113-regional-sales-manager-singapore-2",
+      "jobTitle": "Regional Sales Manager, Singapore",
+      "companyName": "Cribl",
+      "companyLogo": "https://jobicy.com/data/server-nyc0409/galaxy/mercury/2025/06/65d82c04-221.jpeg",
+      "jobIndustry": [
+        "Sales"
+      ],
+      "jobType": [
+        "Full-Time"
+      ],
+      "jobGeo": "APAC",
+      "jobLevel": "Director",
+      "jobExcerpt": "Join the company that’s building the telemetry infrastructure for the AI era. At Cribl, we partner with IT and Security teams at many of the world’s biggest enterprises, including half of the Fortune 100, to bridge the gap between AI ambition and infrastructure reality. As the AI Platform for Telemetry, we give customers the choice,&hellip;",
+      "jobDescription": "<p>Join the company that’s building the telemetry infrastructure for the AI era. At <a href=\"https://jobicy.com/company/cribl\" target=\"_blank\" rel=\"noopener\">Cribl</a>, we partner with IT and Security teams at many of the world’s biggest enterprises, including half of the Fortune 100, to bridge the gap between AI ambition and infrastructure reality. As the AI Platform for Telemetry, we give custom…",
+      "pubDate": "2026-11-05T05:44:53+00:00"
+    },
+    {
+      "id": 159111,
+      "url": "https://jobicy.com/jobs/159111-japanese-lead-multimedia-content-reviewer",
+      "jobSlug": "159111-japanese-lead-multimedia-content-reviewer",
+      "jobTitle": "Japanese Lead Multimedia Content Reviewer",
+      "companyName": "Welo Global",
+      "companyLogo": "https://jobicy.com/data/server-nyc0409/galaxy/mercury/2026/06/83c40f94-221.webp",
+      "jobIndustry": [
+        "Content & Editorial"
+      ],
+      "jobType": [
+        "Full-Time"
+      ],
+      "jobGeo": "Japan",
+      "jobLevel": "Senior",
+      "jobExcerpt": "About Welocalize Welocalize, a Welo Global brand, serves localization teams through AI-enabled multilingual content solutions that enable enterprises to operate and scale globally. Welocalize combines AI, automation, and human expertise to support enterprises in more than 300 languages, enabling accurate, culturally aligned, and compliant multilingual content at scale. Welocalize’s Opal Platform c…",
+      "jobDescription": "<p><strong>About Welocalize</strong> </p>\n<p>Welocalize, a <a href=\"https://jobicy.com/company/welo-global\" target=\"_blank\" rel=\"noopener\">Welo Global</a> brand, serves localization teams through AI-enabled multilingual content solutions that enable enterprises to operate and scale globally. Welocalize combines AI, automation, and human expertise to support enterprises in more than 300 languages, …",
+      "pubDate": "2026-11-05T05:44:33+00:00"
+    },
+    {
+      "id": 159107,
+      "url": "https://jobicy.com/jobs/159107-earn-operations-specialist-onchain-direction",
+      "jobSlug": "159107-earn-operations-specialist-onchain-direction",
+      "jobTitle": "Earn Operations Specialist (Onchain Direction)",
+      "companyName": "Binance",
+      "companyLogo": "https://jobicy.com/data/server-nyc0409/galaxy/mercury/2025/06/bc822f38-221.jpg",
+      "jobIndustry": [
+        "Product & Operations"
+      ],
+      "jobType": [
+        "Full-Time"
+      ],
+      "jobGeo": "Hong Kong",
+      "jobLevel": "Senior",
+      "jobExcerpt": "Binance is a leading global blockchain ecosystem behind the world’s largest cryptocurrency exchange by trading volume and registered users. We are trusted by 300+ million people in 100+ countries for our industry-leading security, user fund transparency, trading engine speed, deep liquidity, and an unmatched portfolio of digital-asset products. Binance offerings range from trading and finance&hell…",
+      "jobDescription": "<p><a href=\"https://jobicy.com/company/binance\" target=\"_blank\" rel=\"noopener\">Binance</a> is a leading global blockchain ecosystem behind the world’s largest cryptocurrency exchange by trading volume and registered users. We are trusted by 300+ million people in 100+ countries for our industry-leading security, user fund transparency, trading engine speed, deep liquidity, and an unmatched portfol…",
+      "pubDate": "2026-11-05T05:44:16+00:00"
+    }
+  ],
+  "statusCode": 200,
+  "success": true
+}
