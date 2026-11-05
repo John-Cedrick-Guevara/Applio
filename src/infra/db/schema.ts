@@ -126,4 +126,17 @@ export const MIGRATIONS: readonly Migration[] = [
       CREATE INDEX usage_records_at ON usage_records (at);
     `,
   },
+  {
+    version: 2,
+    name: 'source poll counts',
+    sql: `
+      -- Polls per source per local day, for each board's daily limit (SPEC F10).
+      CREATE TABLE source_polls (
+        source_id TEXT NOT NULL,
+        day TEXT NOT NULL,
+        count INTEGER NOT NULL,
+        PRIMARY KEY (source_id, day)
+      );
+    `,
+  },
 ];
