@@ -7,7 +7,7 @@ Small PRs, in order. Each phase is one reviewable PR. PRs 1, 3, 4, 6 and 7 are s
 (`feat/review-queue` → `docs/features/review-queue/review-queue-spec.md`). The spec ships in the
 same PR and is what the review checks against. See CLAUDE.md §6.
 
-**Where we are:** Stage 1 is done (#2–#14, landing on `main` with #15; CI in #16). Stage 2: PR-8 (local database) is in review; PR-9 and PR-10 are next.
+**Where we are:** Stage 1 is done (#2–#14, landing on `main` with #15; CI in #16). Stage 2: PR-8 (#17) and PR-9 are in review; PR-10 is next.
 
 ## Stage 1 — Frontend (mock data)
 
@@ -153,14 +153,14 @@ Wire real data behind the same `ApplioApi`. Each PR replaces part of the mock st
   - [x] tests against an in-memory database
   - _decided:_ `node:sqlite` (no native module); database at `~/Applio/applio.db` with the generated files
 
-- [ ] **PR-9 — IPC validation**  zod schemas for every API method's arguments.
+- [x] **PR-9 — IPC validation**  zod schemas for every API method's arguments.
   - _branch:_ `feat/ipc-validation`
   - _PR title:_ `feat: validate ipc arguments in main`
   - _why:_ main is the trust boundary; the `ponytail:` note in `src/main/ipc.ts` tracks this
   - _depends on:_ PR-2
-  - [ ] spec: `docs/features/ipc-validation/ipc-validation-spec.md`
-  - [ ] schema per method in `src/shared/schemas.ts`, checked in `registerApiHandlers`
-  - [ ] tests: valid and invalid payloads per method group
+  - [x] spec: `docs/features/ipc-validation/ipc-validation-spec.md`
+  - [x] schema per method in `src/shared/schemas.ts`, checked in `registerApiHandlers`
+  - [x] tests: valid and invalid payloads per method group
 
 - [ ] **PR-10 — Profile, settings and secrets on disk**  Real profile, sources, settings; secrets in the OS keychain.
   - _branch:_ `feat/profile-store`
