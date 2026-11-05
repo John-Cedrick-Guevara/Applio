@@ -1,3 +1,4 @@
+import { DEFAULT_SOURCES } from '../defaults';
 import type {
   Draft,
   Job,
@@ -180,7 +181,7 @@ export function seedProfile(now: Date): Profile {
   const prev = '[Previous Company] — Senior Software Engineer';
   const earlier = '[Earlier Company] — Software Engineer';
   return {
-    referenceResume: { fileName: 'reference-resume.pdf', uploadedAt: hoursAgo(now, 24 * 8), factsSeeded: 38 },
+    referenceResume: { fileName: 'reference-resume.pdf', uploadedAt: hoursAgo(now, 24 * 8), factsFound: 38 },
     factGroups: [{ name: prev, dates: '2022 – now' }, { name: earlier, dates: '2020 – 2022' }, { name: 'Projects' }],
     facts: [
       { id: 'f1', group: prev, text: 'Redesigned the invoicing schema in PostgreSQL; p95 query time dropped from 900 ms to 120 ms.', tags: ['PostgreSQL', 'metric'], timesUsed: 14 },
@@ -213,21 +214,8 @@ export function seedProfile(now: Date): Profile {
 /** Sources from the prototype, each with its fetch method and autonomy; clipped and Upwork are capped at draft. */
 export function seedSources(now: Date): Source[] {
   const polled = hoursAgo(now, 2);
-  const src = (id: string, name: string, kind: Source['kind'], autonomy: Source['autonomy'], via: string, extra: Partial<Source> = {}): Source => ({
-    id, name, kind, autonomy, via, enabled: true, lastPolledAt: polled, ...extra,
-  });
-  return [
-    src('remoteok', 'RemoteOK', 'board', 'draft', 'Public JSON API · 4 polls a day'),
-    src('remotive', 'Remotive', 'board', 'draft', 'Public JSON API · 4 polls a day'),
-    src('himalayas', 'Himalayas', 'board', 'autonomous', 'Public JSON API'),
-    src('wwr', 'WeWorkRemotely', 'board', 'draft', 'RSS feed'),
-    src('jobicy', 'Jobicy', 'board', 'notify', 'Public JSON API'),
-    src('ats', 'ATS watchlist', 'ats-watchlist', 'autonomous', 'Greenhouse, Lever, Ashby, Workable · 14 companies'),
-    src('hn', 'HN Who is hiring', 'api', 'draft', 'Monthly thread via Algolia API'),
-    src('upwork', 'Upwork', 'api', 'draft', 'Official API · proposals cost Connects', { maxAutonomy: 'draft' }),
-    src('clip', 'Clipped jobs', 'clip', 'draft', 'LinkedIn, Indeed, JobStreet, Facebook, anything you clip', { maxAutonomy: 'draft', lastPolledAt: undefined }),
-    src('jsearch', 'JSearch', 'api', 'notify', 'Optional · free tier 200 calls a month', { enabled: false, lastPolledAt: undefined }),
-  ];
+  // Clipped and optional sources have never been polled.
+  return DEFAULT_SOURCES.map((s) => (s.id === 'clip' || s.id === 'jsearch' ? { ...s } : { ...s, lastPolledAt: polled }));
 }
 
 /** Usage for either period, mirroring the prototype's numbers. */

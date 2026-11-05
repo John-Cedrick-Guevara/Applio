@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Profile } from '../../../shared/types';
+import type { Profile, ResumeImport } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { AsyncView } from '../../components/async-view';
 import { Button } from '../../components/button';
@@ -9,6 +9,7 @@ import { AnswerBank } from './answer-bank';
 import { FactBank } from './fact-bank';
 import { PreferencesCard } from './preferences-card';
 import { ReferenceResumeCard } from './reference-resume-card';
+import { ResumeSuggestions } from './resume-suggestions';
 import { TemplatePreview } from './template-preview';
 import './profile.css';
 
@@ -33,6 +34,8 @@ function ProfileBody({ profile, onChange }: { profile: Profile; onChange: (patch
   const [templateOpen, setTemplateOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('facts');
   const [adding, setAdding] = useState(false);
+  // ponytail: suggestions live only on this screen; leaving it drops them — import again to get them back.
+  const [imported, setImported] = useState<ResumeImport | null>(null);
 
   const pick = (next: Tab) => {
     setTab(next);
@@ -46,12 +49,25 @@ function ProfileBody({ profile, onChange }: { profile: Profile; onChange: (patch
           resume={profile.referenceResume}
           templateOpen={templateOpen}
           onToggleTemplate={() => setTemplateOpen((o) => !o)}
-          onImported={(referenceResume) => onChange({ referenceResume })}
+          onImported={(result) => {
+            onChange({ referenceResume: result.resume });
+            setImported(result);
+          }}
         />
         <PreferencesCard preferences={profile.preferences} onSaved={(preferences) => onChange({ preferences })} />
       </div>
 
       {templateOpen ? <TemplatePreview /> : null}
+
+      {imported ? (
+        <ResumeSuggestions
+          key={imported.resume.uploadedAt}
+          fileName={imported.resume.fileName}
+          suggestions={imported.suggestions}
+          onAdded={(fact) => onChange({ facts: [fact, ...profile.facts] })}
+          onDone={() => setImported(null)}
+        />
+      ) : null}
 
       <section className="card card-flush" aria-label="Fact and answer banks">
         <div className="card-header">

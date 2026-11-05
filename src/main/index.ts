@@ -1,7 +1,8 @@
-import { app, BrowserWindow, dialog, shell } from 'electron';
+import { app, BrowserWindow, dialog, safeStorage, shell } from 'electron';
 import { join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { openDatabase } from '../infra/db';
+import { createSecretStore } from '../infra/secrets/secret-store';
 import { createBackend } from './backend';
 import { registerApiHandlers } from './ipc';
 import { denyAndOpenExternally, guardNavigation } from './security';
@@ -62,8 +63,9 @@ app.whenReady().then(() => {
     app.quit();
     return;
   }
-  // ponytail: db is opened but unused until PR-10 moves the first API slice off the mock store.
-  registerApiHandlers(createBackend(() => mainWindow), DEV_SERVER_URL);
+  // Secrets sit in the OS app-data folder, never in the Applio folder the operator browses and shares.
+  const secrets = createSecretStore(safeStorage, join(app.getPath('userData'), 'secrets.json'));
+  registerApiHandlers(createBackend(() => mainWindow, { db, secrets }), DEV_SERVER_URL);
   mainWindow = createWindow();
 
   // macOS: re-open a window when the dock icon is clicked.

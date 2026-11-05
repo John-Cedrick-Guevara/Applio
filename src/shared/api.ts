@@ -11,7 +11,7 @@ import type {
   JobStatus,
   Preferences,
   Profile,
-  ReferenceResume,
+  ResumeImport,
   RunSummary,
   SecretKey,
   Settings,
@@ -77,8 +77,11 @@ export interface ApplioApi {
   saveAnswer(answer: Pick<Answer, 'question' | 'answer'> & { id?: string }): Promise<Answer>;
   deleteAnswer(id: string): Promise<void>;
   savePreferences(preferences: Preferences): Promise<Preferences>;
-  /** Opens a file picker in main and extracts facts from the chosen resume; null if cancelled. */
-  importResume(): Promise<ReferenceResume | null>;
+  /**
+   * Opens a file picker in main, reads the chosen PDF/DOCX résumé and suggests facts from it; null if cancelled.
+   * Suggestions join the bank only when the operator accepts each one (via `saveFact`).
+   */
+  importResume(): Promise<ResumeImport | null>;
 
   // Sources & guardrails (SPEC F2, F6)
   listSources(): Promise<Source[]>;
