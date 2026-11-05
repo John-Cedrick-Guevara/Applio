@@ -7,7 +7,7 @@ Small PRs, in order. Each phase is one reviewable PR. PRs 1, 3, 4, 6 and 7 are s
 (`feat/review-queue` → `docs/features/review-queue/review-queue-spec.md`). The spec ships in the
 same PR and is what the review checks against. See CLAUDE.md §6.
 
-**Where we are:** Stage 1 is on `main` (#15), and CI runs on every PR (#16). Stage 2: PR-8 (#17), PR-9 (#18) and PR-10 (#19) are merged. Fixes from the first manual run: #20 (folder message), #21 (dev audit), #22 (build warnings). PR-11a (#23) and PR-11b are in review. Next is PR-12 (triage).
+**Where we are:** Stage 1 is on `main` (#15), and CI runs on every PR (#16). Stage 2: PR-8 (#17), PR-9 (#18), PR-10 (#19), PR-11a (#23) and PR-11b (#24) are merged; fixes from the first manual run are in #20–#22. PR-12 (triage) is in review. Next is PR-13 (scheduler).
 
 ## Stage 1 — Frontend (mock data)
 
@@ -196,15 +196,16 @@ Wire real data behind the same `ApplioApi`. Each PR replaces part of the mock st
   - [x] attribution text and link on jobs from each board
   - [x] tests against recorded fixtures
 
-- [ ] **PR-12 — Triage**  Dedup, free prefilter and blocklist before any AI call.
+- [x] **PR-12 — Triage**  Dedup, free prefilter and blocklist before any AI call.
   - _branch:_ `feat/triage`
   - _PR title:_ `feat: add dedup and free prefilter`
   - _why:_ drop 80–90% of jobs for free (SPEC F3, principle 5)
   - _depends on:_ PR-11b
-  - [ ] spec: `docs/features/triage/triage-spec.md`
-  - [ ] pure `core/triage`: dedup key (company + normalized title + apply URL), prefilter by preferences, blocklist
-  - [ ] drop counts per reason recorded for the run summary
-  - [ ] tests for every filter branch
+  - [x] spec: `docs/features/triage/triage-spec.md`
+  - _decided:_ role match needs every word of one target role; dedup key is company + normalized title (SPEC F3 updated)
+  - [x] pure `core/triage`: dedup key (company + normalized title), prefilter by preferences, blocklist
+  - [x] drop counts per reason recorded for the run summary
+  - [x] tests for every filter branch
 
 - [ ] **PR-13 — Scheduler and automation state**  Runs every 4–6h with catch-up; pause/resume; tray.
   - _branch:_ `feat/scheduler`
