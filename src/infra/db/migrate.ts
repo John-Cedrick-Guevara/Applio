@@ -20,7 +20,7 @@ export class MigrationError extends AppError {
  * the database's `user_version`. Each one runs in its own transaction with the
  * version bump, so a failure rolls back that step completely.
  * @returns The versions applied by this call (empty when already current).
- * @throws MigrationError when the list is out of order or a migration fails.
+ * @throws MigrationError when the list is out of order, the database is newer than this app, or a migration fails.
  */
 export function migrate(db: DatabaseSync, migrations: readonly Migration[]): number[] {
   migrations.forEach((m, i) => {
@@ -28,6 +28,10 @@ export function migrate(db: DatabaseSync, migrations: readonly Migration[]): num
   });
 
   const current = Number(db.prepare('PRAGMA user_version').get()?.user_version ?? 0);
+  // An older app must not write to a schema it doesn't know; the operator updates Applio instead.
+  if (current > migrations.length) {
+    throw new MigrationError(`This data was saved by a newer version of Applio. Update Applio to open it.`);
+  }
   const applied: number[] = [];
   for (const m of migrations.slice(current)) {
     try {

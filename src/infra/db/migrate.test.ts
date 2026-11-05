@@ -39,6 +39,13 @@ describe('migrate', () => {
     expect(migrate(db, [ONE])).toEqual([]);
   });
 
+  it('refuses a database made by a newer version of Applio, leaving it untouched', () => {
+    const db = new DatabaseSync(':memory:');
+    migrate(db, [ONE, TWO]);
+    expect(() => migrate(db, [ONE])).toThrow(/newer version of Applio/);
+    expect(db.prepare('PRAGMA user_version').get()?.user_version).toBe(2);
+  });
+
   it('refuses migrations listed out of order', () => {
     const db = new DatabaseSync(':memory:');
     expect(() => migrate(db, [TWO, ONE])).toThrow(/out of order/);

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { ApplioApi } from './api';
 import { AppError } from './errors';
+import { EMAIL_PATTERN } from './patterns';
 import type {
   ApplyChannel, Autonomy, ConnectionKind, EmploymentType, JobStatus, SecretKey, AiEngine, UsagePeriod,
 } from './types';
@@ -72,7 +73,7 @@ const PreferencesSchema = z.strictObject({
 const SettingsPatchSchema = z.strictObject({
   outputFolder: z.string().min(1).max(1024).optional(),
   aiEngine: AiEngineSchema.optional(),
-  gmailAddress: z.union([z.literal(''), z.email().max(320)]).optional(),
+  gmailAddress: z.union([z.literal(''), z.string().max(320).regex(EMAIL_PATTERN, 'is not an email address')]).optional(),
   telegramChatId: short.optional(),
   assistedFill: z.strictObject({ platform: z.boolean(), custom: z.boolean() }).optional(),
   followUpDays: z.number().int().min(1).max(90).optional(),

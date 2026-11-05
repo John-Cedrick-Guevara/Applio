@@ -5,6 +5,7 @@ import { Button } from '../../components/button';
 import { Card } from '../../components/card';
 import { useToast } from '../../components/toast';
 import { useAction } from '../../hooks/use-action';
+import { EMAIL_PATTERN } from '../../../shared/patterns';
 
 type Props = { settings: Settings; onChange: (s: Settings) => void };
 
@@ -21,7 +22,7 @@ export function ConnectionsSection({ settings, onChange }: Props) {
         ready={gmailReady}
         readyText={`${settings.gmailAddress} · app password · sends with SMTP, watches replies with IMAP`}
         setupText="Use an app password from Google Account → Security, never your normal password."
-        field={{ key: 'gmailAddress', label: 'Gmail address', value: settings.gmailAddress, valid: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), invalid: 'Enter a valid email address.' }}
+        field={{ key: 'gmailAddress', label: 'Gmail address', value: settings.gmailAddress, valid: (v) => EMAIL_PATTERN.test(v), invalid: 'Enter a valid email address.' }}
         secret={{ key: 'gmailAppPassword', label: 'Gmail app password', isSet: settings.secretsSet.gmailAppPassword }}
         test={{ kind: 'gmail', label: 'Send test email' }}
         onChange={onChange}
