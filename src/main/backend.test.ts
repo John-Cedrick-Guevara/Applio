@@ -114,7 +114,7 @@ describe('createBackend profile, settings and secrets on disk', () => {
 
   it('starts a fresh install with the default sources and guardrails', async () => {
     const { api } = backendIn();
-    expect(await api.listSources()).toHaveLength(10);
+    expect(await api.listSources()).toHaveLength(11);
     expect(await api.getSettings()).toMatchObject({ draftThreshold: 75, autoSendThreshold: 85, maxPerChannelPerDay: 10, dailyTokenBudget: 150_000, assistedFill: { platform: false, custom: false } });
     expect((await api.getProfile()).facts).toEqual([]);
   });
