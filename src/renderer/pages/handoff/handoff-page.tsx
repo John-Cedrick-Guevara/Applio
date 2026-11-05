@@ -12,6 +12,7 @@ import { formatClock, formatTokens } from '../../lib/format';
 import { EMPLOYMENT_LABEL } from '../../lib/labels';
 import type { RouteParams } from '../../lib/router';
 import './handoff.css';
+import { SourceCredit } from '../../components/source-credit';
 
 /**
  * Manual handoff (prototype screen 2, SPEC F5): for channels Applio never
@@ -100,7 +101,7 @@ function Handoff({ job, draft, onJob }: { job: Job; draft: Draft | null; onJob: 
 
         <aside className="handoff-aside">
           <section className="card">
-            <div className="cell-sub">{job.company} · {job.sourceName}</div>
+            <div className="cell-sub">{job.company} · <SourceCredit job={job} /></div>
             <h2 className="aside-title">{job.title}</h2>
             {job.score !== undefined ? <ScoreBlock score={job.score} size="md" /> : null}
             <p className="body-text">{job.roleSummary}</p>

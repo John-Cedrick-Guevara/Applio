@@ -8,6 +8,7 @@ import { formatShortDate, formatTokens } from '../../lib/format';
 import { CHANNEL_LABEL } from '../../lib/labels';
 import { sentAt, timeline, type DisplayStatus } from './applications-model';
 import { StatusBadge } from './status-badge';
+import { SourceCredit } from '../../components/source-credit';
 
 interface DetailProps {
   job: Job;
@@ -28,7 +29,7 @@ export function ApplicationDetail({ job, status, followUpDays, now, onJob }: Det
   return (
     <aside className="card app-detail" aria-label="Application detail">
       <div>
-        <div className="cell-sub">{job.company}</div>
+        <div className="cell-sub">{job.company} · <SourceCredit job={job} /></div>
         <h2 className="app-detail-title">{job.title}</h2>
         <StatusBadge status={status} />
       </div>

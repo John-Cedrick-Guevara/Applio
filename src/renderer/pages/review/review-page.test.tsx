@@ -25,6 +25,19 @@ describe('ReviewPage', () => {
     expect(within(detail).getByText(/Hi Fieldwork team/)).toBeInTheDocument();
   });
 
+  it('credits the board a job came from, linking back to it', async () => {
+    open('j2');
+    const detail = await screen.findByRole('region', { name: 'Draft detail' });
+    expect(await within(detail).findByRole('link', { name: 'Himalayas' })).toHaveAttribute('href', 'https://example.com/jobs/j2');
+  });
+
+  it('names a source that asks for no credit without a link', async () => {
+    open('j3');
+    const detail = await screen.findByRole('region', { name: 'Draft detail' });
+    expect(await within(detail).findByText(/via clipped from LinkedIn/)).toBeInTheDocument();
+    expect(within(detail).queryByRole('link', { name: /LinkedIn/ })).not.toBeInTheDocument();
+  });
+
   it('switches between the letter, resume and original post', async () => {
     open('j1');
     await userEvent.click(await screen.findByRole('tab', { name: 'Resume' }));

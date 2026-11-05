@@ -15,6 +15,8 @@ export interface SourceResult {
   dropped: number;
   /** Operator-readable reason when `outcome` is 'failed'. */
   error?: string;
+  /** Partial problems from a source that otherwise worked. */
+  notes?: string[];
 }
 
 export interface RunSourcesResult {
@@ -55,8 +57,8 @@ export async function runSources({ sources, isEnabled, polls, httpFor, today }: 
       if (polls.count(source.id, day) >= source.dailyPollLimit) return empty('limit');
       polls.record(source.id, day);
       try {
-        const { jobs, dropped } = await source.fetchJobs(httpFor(source));
-        return { result: { sourceId: source.id, outcome: 'ok', jobs: jobs.length, dropped }, jobs };
+        const { jobs, dropped, notes } = await source.fetchJobs(httpFor(source));
+        return { result: { sourceId: source.id, outcome: 'ok', jobs: jobs.length, dropped, ...(notes?.length ? { notes } : {}) }, jobs };
       } catch (err) {
         return empty('failed', err instanceof Error ? err.message : String(err));
       }

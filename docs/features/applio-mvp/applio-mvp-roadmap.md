@@ -7,7 +7,7 @@ Small PRs, in order. Each phase is one reviewable PR. PRs 1, 3, 4, 6 and 7 are s
 (`feat/review-queue` → `docs/features/review-queue/review-queue-spec.md`). The spec ships in the
 same PR and is what the review checks against. See CLAUDE.md §6.
 
-**Where we are:** Stage 1 is on `main` (#15), and CI runs on every PR (#16). Stage 2: PR-8 (#17), PR-9 (#18) and PR-10 (#19) are merged. Fixes from the first manual run: #20 (folder message), #21 (dev audit), #22 (build warnings). PR-11a (JSON boards) is in review; PR-11b (feeds, ATS watchlist, HN, attribution) is next.
+**Where we are:** Stage 1 is on `main` (#15), and CI runs on every PR (#16). Stage 2: PR-8 (#17), PR-9 (#18) and PR-10 (#19) are merged. Fixes from the first manual run: #20 (folder message), #21 (dev audit), #22 (build warnings). PR-11a (#23) and PR-11b are in review. Next is PR-12 (triage).
 
 ## Stage 1 — Frontend (mock data)
 
@@ -186,15 +186,15 @@ Wire real data behind the same `ApplioApi`. Each PR replaces part of the mock st
   - [x] tests against recorded fixtures (no live calls)
   - _decided:_ split from one PR (size); Arbeitnow added (SPEC F2 lists it); fixtures recorded from one live fetch per board
 
-- [ ] **PR-11b — Job sources: feeds, ATS watchlist, HN and attribution**  The remaining source types, and board credit shown on jobs.
+- [x] **PR-11b — Job sources: feeds, ATS watchlist, HN and attribution**  The remaining source types, and board credit shown on jobs.
   - _branch:_ `feat/job-sources-feeds`
   - _PR title:_ `feat: add rss, ats watchlist and hn sources`
   - _why:_ completes SPEC F2's free sources; boards require credit with a link back (AC-5)
   - _depends on:_ PR-11a
-  - [ ] spec: `docs/features/job-sources-feeds/job-sources-feeds-spec.md`
-  - [ ] WeWorkRemotely (RSS), ATS watchlist (Greenhouse / Lever / Ashby / Workable; starts empty), HN Who is hiring via Algolia (thread only; PR-16 parses it)
-  - [ ] attribution text and link on jobs from each board
-  - [ ] tests against recorded fixtures
+  - [x] spec: `docs/features/job-sources-feeds/job-sources-feeds-spec.md`
+  - [x] WeWorkRemotely (RSS), ATS watchlist (Greenhouse / Lever / Ashby / Workable; starts empty), HN Who is hiring via Algolia (thread only; PR-16 parses it)
+  - [x] attribution text and link on jobs from each board
+  - [x] tests against recorded fixtures
 
 - [ ] **PR-12 — Triage**  Dedup, free prefilter and blocklist before any AI call.
   - _branch:_ `feat/triage`

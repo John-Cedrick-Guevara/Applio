@@ -70,6 +70,11 @@ describe('runSources', () => {
     expect(result.sources[0]).toEqual({ sourceId: 'broken', outcome: 'failed', jobs: 0, dropped: 0, error: 'remotive.com is unavailable (HTTP 503 after 3 tries)' });
   });
 
+  it('passes on partial problems a source reports', async () => {
+    const partly = source('ats', async () => ({ jobs: [job('ats', 0)], dropped: 0, notes: ['lever/gone: api.lever.co answered HTTP 404'] }));
+    expect((await run([partly])).sources[0]).toEqual({ sourceId: 'ats', outcome: 'ok', jobs: 1, dropped: 0, notes: ['lever/gone: api.lever.co answered HTTP 404'] });
+  });
+
   it('counts a failed poll against the limit, so a broken board is not hammered', async () => {
     const polls = memoryPolls();
     await run([source('broken', async () => Promise.reject(new Error('down')))], { polls });

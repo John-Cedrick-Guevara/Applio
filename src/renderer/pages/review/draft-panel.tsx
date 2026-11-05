@@ -12,6 +12,7 @@ import { CHANNEL_LABEL } from '../../lib/labels';
 import { navigate } from '../../lib/router';
 import { DraftDocument, type DocTab } from './draft-document';
 import { modeLabel, primaryAction, sentLine } from './review-model';
+import { SourceCredit } from '../../components/source-credit';
 
 interface DraftPanelProps {
   jobId: string;
@@ -81,7 +82,7 @@ function DraftDetail({ job, draft, nextId, thresholds, autonomyBySource, onJob, 
     <>
       <div className="draft-head">
         <div className="draft-head-text">
-          <div className="cell-sub">{job.company} · via {job.sourceName} · found {formatRelative(foundAt)}</div>
+          <div className="cell-sub">{job.company} · <SourceCredit job={job} /> · found {formatRelative(foundAt)}</div>
           <h2 className="draft-title">{job.title}</h2>
           <div className="tag-row">
             {job.tags.map((t) => <span key={t} className="tag">{t}</span>)}

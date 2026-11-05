@@ -35,6 +35,8 @@ export interface SourceFetch {
   jobs: DiscoveredJob[];
   /** Items in the response that didn't match the expected shape and were skipped. */
   dropped: number;
+  /** Partial problems worth showing the operator, e.g. one watchlist company whose board is gone. */
+  notes?: string[];
 }
 
 /** One job board or feed. Adding a source means adding one of these, not editing a switch. */

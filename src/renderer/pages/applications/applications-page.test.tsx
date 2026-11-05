@@ -35,6 +35,13 @@ describe('ApplicationsPage', () => {
     expect(await within(detail).findByText('resume.pdf')).toBeInTheDocument();
   });
 
+  it("credits the job's board with its own name and a link back", async () => {
+    renderWithApp(<ApplicationsPage />);
+    await userEvent.click(await screen.findByRole('button', { name: /Paperplane/ }));
+    const detail = screen.getByRole('complementary', { name: 'Application detail' });
+    expect(within(detail).getByRole('link', { name: 'Remote OK' })).toHaveAttribute('href', 'https://example.com/jobs/j8');
+  });
+
   it('generates interview prep for replies and interviews', async () => {
     renderWithApp(<ApplicationsPage />);
     await userEvent.click(await screen.findByRole('button', { name: /Corvid Health/ }));
