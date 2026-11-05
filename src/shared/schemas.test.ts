@@ -105,6 +105,12 @@ describe('API argument schemas', () => {
       expect(rejects('saveSettings', [{ maxPerChannelPerDay: 2.5 }])).toThrow(InvalidRequestError);
     });
 
+    it('accepts exactly the email addresses the Settings field accepts', () => {
+      expect(parseApiArgs('saveSettings', [{ gmailAddress: 'me@x.c' }])).toHaveLength(1);
+      expect(parseApiArgs('saveSettings', [{ gmailAddress: '' }])).toHaveLength(1);
+      expect(rejects('saveSettings', [{ gmailAddress: 'not an email' }])).toThrow(InvalidRequestError);
+    });
+
     it('refuses to let saveSettings mark a secret as set', () => {
       expect(rejects('saveSettings', [{ secretsSet: { anthropicApiKey: true } }])).toThrow(InvalidRequestError);
     });
