@@ -11,6 +11,7 @@ const FIELDS: { key: keyof GuardrailsDraft; label: string }[] = [
   { key: 'auto', label: 'Auto-send at match score' },
   { key: 'perDay', label: 'Max applications per channel per day' },
   { key: 'tokens', label: 'Claude tokens per day' },
+  { key: 'monthTokens', label: 'Claude tokens per month' },
 ];
 
 /** Guardrails (SPEC F6, F10): thresholds, daily caps and the company blocklist. Saved on blur. */

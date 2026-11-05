@@ -1,6 +1,6 @@
 import type { Settings } from '../../../shared/types';
 
-export type GuardrailValues = Pick<Settings, 'draftThreshold' | 'autoSendThreshold' | 'maxPerChannelPerDay' | 'dailyTokenBudget'>;
+export type GuardrailValues = Pick<Settings, 'draftThreshold' | 'autoSendThreshold' | 'maxPerChannelPerDay' | 'dailyTokenBudget' | 'monthlyTokenBudget'>;
 
 /** Guardrail inputs as typed by the operator. */
 export interface GuardrailsDraft {
@@ -8,6 +8,7 @@ export interface GuardrailsDraft {
   auto: string;
   perDay: string;
   tokens: string;
+  monthTokens: string;
 }
 
 export type GuardrailErrors = Partial<Record<keyof GuardrailsDraft, string>>;
@@ -25,6 +26,7 @@ export function toGuardrailsDraft(v: GuardrailValues): GuardrailsDraft {
     auto: String(v.autoSendThreshold),
     perDay: String(v.maxPerChannelPerDay),
     tokens: v.dailyTokenBudget.toLocaleString('en-US'),
+    monthTokens: v.monthlyTokenBudget.toLocaleString('en-US'),
   };
 }
 
@@ -38,13 +40,16 @@ export function parseGuardrails(d: GuardrailsDraft): { ok: true; value: Guardrai
   const auto = whole(d.auto);
   const perDay = whole(d.perDay);
   const tokens = whole(d.tokens);
+  const monthTokens = whole(d.monthTokens);
 
   if (Number.isNaN(draft) || draft > 100) errors.draft = 'Enter a score between 0 and 100.';
   if (Number.isNaN(auto) || auto > 100) errors.auto = 'Enter a score between 0 and 100.';
   else if (!errors.draft && auto < draft) errors.auto = 'Auto-send must be at least the draft score.';
   if (Number.isNaN(perDay)) errors.perDay = 'Enter a whole number, 0 or more.';
   if (Number.isNaN(tokens) || tokens < 1) errors.tokens = 'Enter a token budget above 0.';
+  if (Number.isNaN(monthTokens) || monthTokens < 1) errors.monthTokens = 'Enter a token budget above 0.';
+  else if (!errors.tokens && monthTokens < tokens) errors.monthTokens = 'The monthly budget must be at least the daily one.';
 
   if (Object.keys(errors).length > 0) return { ok: false, errors };
-  return { ok: true, value: { draftThreshold: draft, autoSendThreshold: auto, maxPerChannelPerDay: perDay, dailyTokenBudget: tokens } };
+  return { ok: true, value: { draftThreshold: draft, autoSendThreshold: auto, maxPerChannelPerDay: perDay, dailyTokenBudget: tokens, monthlyTokenBudget: monthTokens } };
 }

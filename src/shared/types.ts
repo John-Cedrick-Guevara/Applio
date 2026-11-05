@@ -260,6 +260,8 @@ export interface Settings {
   autoSendThreshold: number;
   maxPerChannelPerDay: number;
   dailyTokenBudget: number;
+  /** AI stops at this many tokens in a calendar month (SPEC F10). */
+  monthlyTokenBudget: number;
   /** Hours between discovery runs, 4–6 (SPEC F2). */
   discoveryIntervalHours: number;
   /** Start Applio in the tray when the operator logs in. */

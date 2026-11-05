@@ -54,6 +54,12 @@ describe('settings service', () => {
     expect(service.getSettings()).toMatchObject({ draftThreshold: 70, autoSendThreshold: 85, blocklist: ['Initech'] });
   });
 
+  it('refuses a monthly token budget below the daily one', () => {
+    const service = createSettingsService(fakes().ports);
+    expect(() => service.saveSettings({ monthlyTokenBudget: 1000 })).toThrow('The monthly token budget must be at least the daily one (150,000).');
+    expect(service.getSettings().monthlyTokenBudget).toBe(3_000_000);
+  });
+
   it('refuses an auto-send threshold below the draft threshold', () => {
     const service = createSettingsService(fakes().ports);
     expect(() => service.saveSettings({ autoSendThreshold: 60 })).toThrow('Auto-send must be at least the draft score (75).');

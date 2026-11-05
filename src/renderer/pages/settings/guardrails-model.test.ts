@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { parseGuardrails, toGuardrailsDraft } from './guardrails-model';
 
-const draft = { draft: '75', auto: '85', perDay: '10', tokens: '150,000' };
+const draft = { draft: '75', auto: '85', perDay: '10', tokens: '150,000', monthTokens: '3,000,000' };
 
 describe('parseGuardrails', () => {
   it('accepts valid limits, including thousands separators', () => {
-    expect(parseGuardrails(draft)).toEqual({ ok: true, value: { draftThreshold: 75, autoSendThreshold: 85, maxPerChannelPerDay: 10, dailyTokenBudget: 150_000 } });
+    expect(parseGuardrails(draft)).toEqual({ ok: true, value: { draftThreshold: 75, autoSendThreshold: 85, maxPerChannelPerDay: 10, dailyTokenBudget: 150_000, monthlyTokenBudget: 3_000_000 } });
   });
 
   it('keeps scores within 0–100', () => {
@@ -23,7 +23,12 @@ describe('parseGuardrails', () => {
     expect(parseGuardrails({ ...draft, tokens: 'lots' }).ok).toBe(false);
   });
 
+  it('never lets the monthly budget sit below the daily one', () => {
+    const r = parseGuardrails({ ...draft, monthTokens: '100,000' });
+    expect(!r.ok && r.errors.monthTokens).toBe('The monthly budget must be at least the daily one.');
+  });
+
   it('formats stored settings for the form', () => {
-    expect(toGuardrailsDraft({ draftThreshold: 75, autoSendThreshold: 85, maxPerChannelPerDay: 10, dailyTokenBudget: 150_000 })).toEqual(draft);
+    expect(toGuardrailsDraft({ draftThreshold: 75, autoSendThreshold: 85, maxPerChannelPerDay: 10, dailyTokenBudget: 150_000, monthlyTokenBudget: 3_000_000 })).toEqual(draft);
   });
 });

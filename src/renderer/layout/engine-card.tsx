@@ -16,7 +16,7 @@ export function EngineCard() {
   useEffect(() => window.applioEvents?.onStatus(setData), [setData]);
   if (!status) return null;
 
-  const state = status.paused ? 'Paused' : status.engineReady ? 'Ready' : 'Needs a key';
+  const state = status.paused ? 'Paused' : status.engineReady ? 'Ready' : 'Needs setup';
   const tone = status.paused || !status.engineReady ? 'warn' : 'ok';
   const pct = Math.min(100, Math.round((status.tokensToday / Math.max(1, status.dailyTokenBudget)) * 100));
 

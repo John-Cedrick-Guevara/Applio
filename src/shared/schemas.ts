@@ -81,6 +81,7 @@ const SettingsPatchSchema = z.strictObject({
   autoSendThreshold: score.optional(),
   maxPerChannelPerDay: count(10_000).optional(),
   dailyTokenBudget: z.number().int().min(1).max(100_000_000).optional(),
+  monthlyTokenBudget: z.number().int().min(1).max(3_000_000_000).optional(),
   discoveryIntervalHours: z.number().int().min(4).max(6).optional(),
   launchAtLogin: z.boolean().optional(),
   blocklist: list(short, 1000).optional(),

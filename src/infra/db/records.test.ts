@@ -101,4 +101,12 @@ describe('activity repository', () => {
     activity.recordUsage({ at: '2026-11-04T09:30:00.000Z', step: 'tailor', tokens: 400 });
     expect(activity.tokensSince('2026-11-04T00:00:00.000Z')).toBe(500);
   });
+
+  it('keeps input and output tokens apart on each usage record', () => {
+    const db = openDatabase(':memory:');
+    createActivityRepo(db).recordUsage({ at: '2026-11-04T08:00:00.000Z', step: 'score', tokens: 140, inputTokens: 100, outputTokens: 40, runId: 3, jobId: 'j1' });
+    expect(db.prepare('SELECT step, tokens, input_tokens, output_tokens, run_id, job_id FROM usage_records').get()).toEqual({
+      step: 'score', tokens: 140, input_tokens: 100, output_tokens: 40, run_id: 3, job_id: 'j1',
+    });
+  });
 });

@@ -5,6 +5,7 @@ import { Button } from '../../components/button';
 import { Card } from '../../components/card';
 import { useToast } from '../../components/toast';
 import { useAction } from '../../hooks/use-action';
+import { useAsync } from '../../hooks/use-async';
 import { EMAIL_PATTERN } from '../../../shared/patterns';
 
 type Props = { settings: Settings; onChange: (s: Settings) => void };
@@ -49,7 +50,9 @@ function EngineRow({ settings, onChange }: Props) {
   const [key, setKey] = useState('');
   const [keyError, setKeyError] = useState(false);
   const isApi = settings.aiEngine === 'api-key';
-  const ready = !isApi || settings.secretsSet.anthropicApiKey;
+  // A live check (Claude Code's sign-in, or the key with a free model lookup), re-run when the choice or key changes.
+  const check = useAsync(() => api.testConnection('ai'), [api, settings.aiEngine, settings.secretsSet.anthropicApiKey]);
+  const ready = check.data?.ok ?? (!isApi || settings.secretsSet.anthropicApiKey);
 
   const pick = async (engine: Settings['aiEngine']) => {
     const next = await action.run('switch the AI engine', () => api.saveSettings({ aiEngine: engine }));
@@ -71,8 +74,9 @@ function EngineRow({ settings, onChange }: Props) {
       <div className="settings-row-text wide">
         <div className="row">
           <span className="settings-row-name">AI engine</span>
-          <span className={ready ? 'badge badge-success' : 'badge badge-warning'}>{ready ? 'Ready' : 'Needs a key'}</span>
+          <span className={ready ? 'badge badge-success' : 'badge badge-warning'}>{ready ? 'Ready' : 'Needs setup'}</span>
         </div>
+        {check.data && !check.data.ok ? <div className="cell-sub settings-desc">{check.data.message}</div> : null}
         <div className="cell-sub settings-desc">
           {isApi
             ? 'Anthropic API with your own key. Pay per token; budget caps still apply.'
