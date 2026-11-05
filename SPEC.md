@@ -48,7 +48,7 @@ Status: personal tool first, open source once polished.
 | JSearch | Optional, off by default (free tier ~200 calls/mo) |
 
 ### F3. Triage pipeline
-1. **Dedup** across sources (company + normalized title + apply URL).
+1. **Dedup** across sources (company + normalized title; boards each give their own URL, so the apply URL can't be part of the key).
 2. **Free prefilter** (no AI): role keywords, remote, salary, timezone, blocklist. Target: drop 80–90%.
 3. **AI scoring** (batched): match score 0–100, role summary, job description summary, gaps.
 4. Jobs above the threshold go to generation.

@@ -11,6 +11,7 @@ const Item = z.object({
   maxSalary: z.number().nullish(),
   currency: z.string().nullish(),
   locationRestrictions: z.array(z.string()).default([]),
+  timezoneRestrictions: z.array(z.number()).default([]),
   categories: z.array(z.string()).default([]),
   description: z.string(),
   pubDate: z.number(),
@@ -43,6 +44,7 @@ export const himalayas: JobSource = {
       remote: true,
       salary: j.minSalary && j.maxSalary ? `${j.currency ?? ''} ${j.minSalary.toLocaleString('en-US')}–${j.maxSalary.toLocaleString('en-US')}`.trim() : undefined,
       employmentType: employmentFrom(j.employmentType),
+      ...(j.timezoneRestrictions.length ? { utcOffsets: j.timezoneRestrictions } : {}),
     }));
   },
 };
