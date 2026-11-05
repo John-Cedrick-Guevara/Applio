@@ -7,7 +7,7 @@ Small PRs, in order. Each phase is one reviewable PR. PRs 1, 3, 4, 6 and 7 are s
 (`feat/review-queue` → `docs/features/review-queue/review-queue-spec.md`). The spec ships in the
 same PR and is what the review checks against. See CLAUDE.md §6.
 
-**Where we are:** Stage 1 is on `main` (#15), and CI runs on every PR (#16). Stage 2: PR-8 (#17), PR-9 (#18) and PR-10 (#19) are merged. Next is PR-11 (job sources).
+**Where we are:** Stage 1 is on `main` (#15), and CI runs on every PR (#16). Stage 2: PR-8 (#17), PR-9 (#18) and PR-10 (#19) are merged. Fixes from the first manual run: #20 (folder message), #21 (dev audit), #22 (build warnings). Next is PR-11 (job sources).
 
 ## Stage 1 — Frontend (mock data)
 
