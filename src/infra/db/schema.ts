@@ -139,4 +139,12 @@ export const MIGRATIONS: readonly Migration[] = [
       );
     `,
   },
+  {
+    version: 3,
+    name: 'run details',
+    sql: `
+      -- Per-reason drop counts and each source's outcome, as JSON; shown, never queried by.
+      ALTER TABLE run_summaries ADD COLUMN details TEXT;
+    `,
+  },
 ];

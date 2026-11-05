@@ -28,6 +28,13 @@ describe('jobs repository', () => {
     expect(jobs.findByDedupKey('other')).toBeUndefined();
   });
 
+  it('lists every stored dedup key, whatever the status', () => {
+    const jobs = setup();
+    jobs.insert({ ...first, status: 'applied' }, { dedupKey: 'acme|engineer', createdAt: NOW.toISOString() });
+    jobs.insert(second, { dedupKey: 'globex|designer', createdAt: NOW.toISOString() });
+    expect(jobs.dedupKeys()).toEqual(new Set(['acme|engineer', 'globex|designer']));
+  });
+
   it('lists jobs in the given statuses, newest first', () => {
     const jobs = setup();
     jobs.insert({ ...first, status: 'drafted' }, { dedupKey: 'k1', createdAt: '2026-11-01T00:00:00.000Z' });
