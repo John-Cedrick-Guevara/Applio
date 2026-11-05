@@ -1,15 +1,29 @@
+<!-- Stacked PRs only: -->
+> **Stacked: merge #<n> → #<n> → this, each with "Create a merge commit".** Until then, this diff also shows their commits.
+
 Spec: docs/features/<slug>/<slug>-spec.md
-Roadmap: PR-<n> of docs/features/applio-mvp/applio-mvp-roadmap.md · depends on: <PR-n or none>
 
-## Why
-<!-- The roadmap's "why" line, plus anything a reviewer needs to know. -->
+<!-- One or two sentences: what this PR does and where it sits in the roadmap (PR-<n>). -->
 
-## Spec coverage
-<!-- One line per item in the spec. Every AC and MNB must be listed. -->
-- AC-1: <test name or manual check that proves it>
-- MNB-1: <how it is shown to still hold>
+<!-- If the spec listed defaults or open questions, say which ones it was built to: -->
+Built to the spec's defaults:
+- <default>
 
-## How to test
-<!-- Commands and clicks. Screenshots for UI changes. -->
+## Checklist
 
-## Risks / rollback
+<!-- Every AC and MNB from the spec. Point each at the test(s) that prove it: `File.test.ts` › "test name". -->
+- [x] **AC-1** <what it proves>: › "<test name>"
+- [x] **MNB-1** <what still holds>: › "<test name>"
+
+Type-check, lint and <n> tests pass. About <n> changed lines.
+
+### Manual checks for you
+1. <command or click, then what you should see>
+
+## What changed
+- `path/to/file.ts`: <what changed and why>
+
+Implements SPEC §<n>. <New dependencies, or "No new dependencies.">
+
+## Left for later
+<!-- What this PR deliberately doesn't do, and which PR picks it up. -->
