@@ -2,12 +2,12 @@
 Bring in jobs from free, public sources only, politely, with each source counted against its free limit (SPEC F2, principles 1 and 3). This is part a: the shared machinery and the five public JSON boards. Part b (`job-sources-feeds`) adds RSS, the ATS watchlist, HN and attribution in the UI.
 
 ## Acceptance criteria
-- [ ] AC-1: Adapters fetch and normalize jobs from RemoteOK, Remotive, Himalayas, Jobicy and Arbeitnow into one job shape: source, external id, company, title, board URL (the link back), apply URL, plain-text description, location, posted date, tags, remote flag, and salary and employment type when given.
-- [ ] AC-2: Only enabled sources are polled. Each poll is counted per source per local day in SQLite, and a source at its daily limit is skipped until the next day.
-- [ ] AC-3: Requests send a descriptive User-Agent, honor ETag / Last-Modified (a 304 reuses the last body), back off on 429 / 5xx (honoring Retry-After, with jitter, and giving up after 3 tries), and never run more than one request at a time per source.
-- [ ] AC-4: A failing source is recorded in the run result and skipped; other sources still complete. A malformed job inside a response is dropped and counted, and the rest are kept.
-- [ ] AC-5 (data only; the UI is in part b): every normalized job carries the board's name and its board URL, as RemoteOK, Remotive and Jobicy require.
-- [ ] AC-6: No adapter can fetch LinkedIn, Indeed, JobStreet or Upwork pages: the HTTP client refuses any host outside an allowlist.
+- [x] AC-1: Adapters fetch and normalize jobs from RemoteOK, Remotive, Himalayas, Jobicy and Arbeitnow into one job shape: source, external id, company, title, board URL (the link back), apply URL, plain-text description, location, posted date, tags, remote flag, and salary and employment type when given.
+- [x] AC-2: Only enabled sources are polled. Each poll is counted per source per local day in SQLite, and a source at its daily limit is skipped until the next day.
+- [x] AC-3: Requests send a descriptive User-Agent, honor ETag / Last-Modified (a 304 reuses the last body), back off on 429 / 5xx (honoring Retry-After, with jitter, and giving up after 3 tries), and never run more than one request at a time per source.
+- [x] AC-4: A failing source is recorded in the run result and skipped; other sources still complete. A malformed job inside a response is dropped and counted, and the rest are kept.
+- [x] AC-5 (data only; the UI is in part b): every normalized job carries the board's name and its board URL, as RemoteOK, Remotive and Jobicy require.
+- [x] AC-6: No adapter can fetch LinkedIn, Indeed, JobStreet or Upwork pages: the HTTP client refuses any host outside an allowlist.
 
 ## Must not break
 - MNB-1: Disabled sources are never contacted.
@@ -19,6 +19,9 @@ Bring in jobs from free, public sources only, politely, with each source counted
 - Fixtures were recorded from one live read-only GET per board on 2026-11-05, then trimmed to three jobs each.
 - Daily poll limits: 4 per board, matching Remotive's "max. 4 times a day" and the 6-hourly schedule (SPEC F2).
 - The User-Agent names the app and links its repository. It holds no personal email.
+
+## Found while building
+- Remote OK's API sends double-encoded UTF-8 ("HÃ¤user"). The adapter repairs each broken run (`repairMojibake`), and the fixture keeps a real example.
 
 ## Known risks
 - Boards' terms can change. Each adapter's comment quotes the attribution rule it follows (RemoteOK, Remotive, Jobicy, Arbeitnow).

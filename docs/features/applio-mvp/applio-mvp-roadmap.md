@@ -7,7 +7,7 @@ Small PRs, in order. Each phase is one reviewable PR. PRs 1, 3, 4, 6 and 7 are s
 (`feat/review-queue` → `docs/features/review-queue/review-queue-spec.md`). The spec ships in the
 same PR and is what the review checks against. See CLAUDE.md §6.
 
-**Where we are:** Stage 1 is on `main` (#15), and CI runs on every PR (#16). Stage 2: PR-8 (#17), PR-9 (#18) and PR-10 (#19) are merged. Fixes from the first manual run: #20 (folder message), #21 (dev audit), #22 (build warnings). PR-11a (job sources: JSON boards) is in progress.
+**Where we are:** Stage 1 is on `main` (#15), and CI runs on every PR (#16). Stage 2: PR-8 (#17), PR-9 (#18) and PR-10 (#19) are merged. Fixes from the first manual run: #20 (folder message), #21 (dev audit), #22 (build warnings). PR-11a (JSON boards) is in review; PR-11b (feeds, ATS watchlist, HN, attribution) is next.
 
 ## Stage 1 — Frontend (mock data)
 
@@ -174,16 +174,16 @@ Wire real data behind the same `ApplioApi`. Each PR replaces part of the mock st
   - [x] remove these methods from the mock-backed main backend (`testConnection` checks real credentials; the live test comes with the Gmail/Telegram PRs)
   - [x] tests
 
-- [ ] **PR-11a — Job sources: polite client and JSON boards**  One `JobSource` interface, a polite HTTP client, the source runner, and the five public JSON boards.
+- [x] **PR-11a — Job sources: polite client and JSON boards**  One `JobSource` interface, a polite HTTP client, the source runner, and the five public JSON boards.
   - _branch:_ `feat/job-sources`
   - _PR title:_ `feat: add job source adapters`
   - _why:_ discovery from free public sources only (SPEC F2, principle 3)
   - _depends on:_ PR-8
-  - [ ] spec: `docs/features/job-sources/job-sources-spec.md`
-  - [ ] RemoteOK, Remotive, Himalayas, Jobicy, Arbeitnow
-  - [ ] polite polling: ETag / Last-Modified, backoff with jitter, one request at a time per source, host allowlist
-  - [ ] per-source daily poll limits, counted in SQLite; a failing source is recorded and skipped
-  - [ ] tests against recorded fixtures (no live calls)
+  - [x] spec: `docs/features/job-sources/job-sources-spec.md`
+  - [x] RemoteOK, Remotive, Himalayas, Jobicy, Arbeitnow
+  - [x] polite polling: ETag / Last-Modified, backoff with jitter, one request at a time per source, host allowlist
+  - [x] per-source daily poll limits, counted in SQLite; a failing source is recorded and skipped
+  - [x] tests against recorded fixtures (no live calls)
   - _decided:_ split from one PR (size); Arbeitnow added (SPEC F2 lists it); fixtures recorded from one live fetch per board
 
 - [ ] **PR-11b — Job sources: feeds, ATS watchlist, HN and attribution**  The remaining source types, and board credit shown on jobs.
