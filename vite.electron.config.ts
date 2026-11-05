@@ -24,6 +24,10 @@ export default defineConfig(({ mode }) => {
       lib: { entry: `src/${entry}/index.ts`, formats: ['cjs'], fileName: () => `${entry}.cjs` },
       rollupOptions: {
         external: ['electron', ...builtinModules, ...builtinModules.map((m) => `node:${m}`)],
+        // CommonJS has no import.meta. The bundler already swaps it for {} and warns; saying so here
+        // keeps the build quiet. The only use in main, unpdf's `import.meta.resolve` for pdf.js font
+        // data, sits in a try/catch and falls back to defaults that text extraction doesn't need.
+        transform: { define: { 'import.meta': '{}' } },
       },
     },
   };
