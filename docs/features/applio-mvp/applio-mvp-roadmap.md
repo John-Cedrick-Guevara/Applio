@@ -7,7 +7,7 @@ Small PRs, in order. Each phase is one reviewable PR. PRs 1, 3, 4, 6 and 7 are s
 (`feat/review-queue` → `docs/features/review-queue/review-queue-spec.md`). The spec ships in the
 same PR and is what the review checks against. See CLAUDE.md §6.
 
-**Where we are:** Stage 1 is on `main` (#15), and CI runs on every PR (#16). Stage 2: PR-8 (#17), PR-9 (#18) and PR-10 (#19) are merged. Fixes from the first manual run: #20 (folder message), #21 (dev audit), #22 (build warnings). Next is PR-11 (job sources).
+**Where we are:** Stage 1 is on `main` (#15), and CI runs on every PR (#16). Stage 2: PR-8 (#17), PR-9 (#18) and PR-10 (#19) are merged. Fixes from the first manual run: #20 (folder message), #21 (dev audit), #22 (build warnings). PR-11a (job sources: JSON boards) is in progress.
 
 ## Stage 1 — Frontend (mock data)
 
@@ -174,21 +174,33 @@ Wire real data behind the same `ApplioApi`. Each PR replaces part of the mock st
   - [x] remove these methods from the mock-backed main backend (`testConnection` checks real credentials; the live test comes with the Gmail/Telegram PRs)
   - [x] tests
 
-- [ ] **PR-11 — Job sources**  Board and ATS adapters behind one `JobSource` interface.
+- [ ] **PR-11a — Job sources: polite client and JSON boards**  One `JobSource` interface, a polite HTTP client, the source runner, and the five public JSON boards.
   - _branch:_ `feat/job-sources`
   - _PR title:_ `feat: add job source adapters`
   - _why:_ discovery from free public sources only (SPEC F2, principle 3)
   - _depends on:_ PR-8
   - [ ] spec: `docs/features/job-sources/job-sources-spec.md`
-  - [ ] RemoteOK, Remotive, Himalayas, Jobicy, WeWorkRemotely (RSS), ATS watchlist (Greenhouse/Lever/Ashby/Workable), HN via Algolia
-  - [ ] polite polling: ETag, backoff, per-source poll counts for quotas
+  - [ ] RemoteOK, Remotive, Himalayas, Jobicy, Arbeitnow
+  - [ ] polite polling: ETag / Last-Modified, backoff with jitter, one request at a time per source, host allowlist
+  - [ ] per-source daily poll limits, counted in SQLite; a failing source is recorded and skipped
   - [ ] tests against recorded fixtures (no live calls)
+  - _decided:_ split from one PR (size); Arbeitnow added (SPEC F2 lists it); fixtures recorded from one live fetch per board
+
+- [ ] **PR-11b — Job sources: feeds, ATS watchlist, HN and attribution**  The remaining source types, and board credit shown on jobs.
+  - _branch:_ `feat/job-sources-feeds`
+  - _PR title:_ `feat: add rss, ats watchlist and hn sources`
+  - _why:_ completes SPEC F2's free sources; boards require credit with a link back (AC-5)
+  - _depends on:_ PR-11a
+  - [ ] spec: `docs/features/job-sources-feeds/job-sources-feeds-spec.md`
+  - [ ] WeWorkRemotely (RSS), ATS watchlist (Greenhouse / Lever / Ashby / Workable; starts empty), HN Who is hiring via Algolia (thread only; PR-16 parses it)
+  - [ ] attribution text and link on jobs from each board
+  - [ ] tests against recorded fixtures
 
 - [ ] **PR-12 — Triage**  Dedup, free prefilter and blocklist before any AI call.
   - _branch:_ `feat/triage`
   - _PR title:_ `feat: add dedup and free prefilter`
   - _why:_ drop 80–90% of jobs for free (SPEC F3, principle 5)
-  - _depends on:_ PR-11
+  - _depends on:_ PR-11b
   - [ ] spec: `docs/features/triage/triage-spec.md`
   - [ ] pure `core/triage`: dedup key (company + normalized title + apply URL), prefilter by preferences, blocklist
   - [ ] drop counts per reason recorded for the run summary
