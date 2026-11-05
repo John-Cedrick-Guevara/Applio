@@ -7,7 +7,7 @@ Small PRs, in order. Each phase is one reviewable PR. PRs 1, 3, 4, 6 and 7 are s
 (`feat/review-queue` → `docs/features/review-queue/review-queue-spec.md`). The spec ships in the
 same PR and is what the review checks against. See CLAUDE.md §6.
 
-**Where we are:** Stage 1 is done and merged as a stack (#2–#14); it lands on `main` with #15. Stage 2 is in progress: PR-8 is next.
+**Where we are:** Stage 1 is done (#2–#14, landing on `main` with #15; CI in #16). Stage 2: PR-8 (local database) is in review; PR-9 and PR-10 are next.
 
 ## Stage 1 — Frontend (mock data)
 
@@ -142,15 +142,16 @@ Wire real data behind the same `ApplioApi`. Each PR replaces part of the mock st
 `src/main/backend.ts`; the last one deletes `src/shared/mock/` from the main process
 (browser dev and tests may keep it as a fixture).
 
-- [ ] **PR-8 — Local database**  SQLite file in the app data folder, migrations, repositories.
+- [x] **PR-8 — Local database**  SQLite file in the app data folder, migrations, repositories.
   - _branch:_ `feat/local-database`
   - _PR title:_ `feat: add sqlite storage and migrations`
   - _why:_ data must survive restarts and stay on the operator's machine (SPEC §2)
   - _depends on:_ PR-7b
-  - [ ] spec: `docs/features/local-database/local-database-spec.md`
-  - [ ] schema + migration runner (jobs, status events, drafts, facts, answers, sources, settings, usage)
-  - [ ] repositories in `src/infra/db/`; WAL mode, indexes on dedup key / status / created_at
-  - [ ] tests against an in-memory database
+  - [x] spec: `docs/features/local-database/local-database-spec.md`
+  - [x] schema + migration runner (jobs, status events, drafts, facts, answers, sources, settings, usage)
+  - [x] repositories in `src/infra/db/`; WAL mode, indexes on dedup key / status / created_at
+  - [x] tests against an in-memory database
+  - _decided:_ `node:sqlite` (no native module); database at `~/Applio/applio.db` with the generated files
 
 - [ ] **PR-9 — IPC validation**  zod schemas for every API method's arguments.
   - _branch:_ `feat/ipc-validation`

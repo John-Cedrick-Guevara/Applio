@@ -1,5 +1,7 @@
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, dialog, shell } from 'electron';
 import { join } from 'node:path';
+import type { DatabaseSync } from 'node:sqlite';
+import { openDatabase } from '../infra/db';
 import { createBackend } from './backend';
 import { registerApiHandlers } from './ipc';
 import { denyAndOpenExternally, guardNavigation } from './security';
@@ -8,6 +10,10 @@ import { denyAndOpenExternally, guardNavigation } from './security';
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 
 let mainWindow: BrowserWindow | null = null;
+let db: DatabaseSync | null = null;
+
+/** The one Applio folder: the database plus every generated application (SPEC F8). */
+const dataFolder = () => join(app.getPath('home'), 'Applio');
 
 /**
  * Creates the app window with a locked-down renderer: no Node, isolated
@@ -48,6 +54,15 @@ function createWindow(): BrowserWindow {
 }
 
 app.whenReady().then(() => {
+  try {
+    db = openDatabase(join(dataFolder(), 'applio.db'));
+  } catch (err) {
+    console.error('[db] failed to open', err);
+    dialog.showErrorBox("Applio can't open its data", err instanceof Error ? err.message : String(err));
+    app.quit();
+    return;
+  }
+  // ponytail: db is opened but unused until PR-10 moves the first API slice off the mock store.
   registerApiHandlers(createBackend(() => mainWindow), DEV_SERVER_URL);
   mainWindow = createWindow();
 
@@ -56,6 +71,8 @@ app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow();
   });
 });
+
+app.on('will-quit', () => db?.close());
 
 // ponytail: quits on last window close (except macOS); tray mode comes with the scheduler.
 app.on('window-all-closed', () => {
