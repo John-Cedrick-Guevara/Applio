@@ -1,5 +1,6 @@
 import { dialog, shell, type BrowserWindow } from 'electron';
 import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
@@ -36,9 +37,16 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
   /** Runs a synchronous service call as the async API method; a throw becomes a rejection. */
   const later = <A extends unknown[], R>(fn: (...args: A) => R) => async (...args: A) => fn(...args);
 
-  const openWithShell = async (path: string) => {
-    const error = await shell.openPath(expandHome(path));
-    if (error) throw new Error(`Couldn't open the folder: ${error}`);
+  /**
+   * Opens a folder in Finder/Explorer. The UI already prefixes "Couldn't open the folder.",
+   * so messages here say only why. A missing folder is checked first: the OS's own
+   * answer for that ("Failed to open path") doesn't help the operator.
+   */
+  const openWithShell = async (path: string, missing: string) => {
+    const full = expandHome(path);
+    if (!existsSync(full)) throw new Error(missing);
+    const error = await shell.openPath(full);
+    if (error) throw new Error(`The system said: ${error}`);
   };
 
   return {
@@ -82,13 +90,13 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     openJobFolder: async (jobId) => {
       const { folderPath } = await store.getJob(jobId);
       if (!folderPath) throw new Error('This job has no folder yet');
-      await openWithShell(folderPath);
+      await openWithShell(folderPath, "This job's folder isn't on disk yet. Applio creates it when it saves the application.");
     },
 
     openOutputFolder: async () => {
       const { outputFolder } = settings.getSettings();
       if (!outputFolder) throw new Error('Choose an output folder first');
-      await openWithShell(outputFolder);
+      await openWithShell(outputFolder, `${outputFolder} no longer exists. Choose the folder again above.`);
     },
 
     chooseFolder: async () => {

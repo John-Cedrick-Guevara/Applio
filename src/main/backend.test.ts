@@ -7,7 +7,11 @@ const electron = vi.hoisted(() => ({
 }));
 vi.mock('electron', () => electron);
 
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+// A throwaway home, so `~/…` paths resolve somewhere the test controls.
+const home = vi.hoisted(() => ({ dir: '' }));
+vi.mock('node:os', async (original) => ({ ...(await original<typeof import('node:os')>()), homedir: () => home.dir }));
+
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDatabase } from '../infra/db';
@@ -29,10 +33,12 @@ const backendIn = (folder = (dir = mkdtempSync(join(tmpdir(), 'applio-backend-')
 };
 
 beforeEach(() => {
+  home.dir = mkdtempSync(join(tmpdir(), 'applio-home-'));
   electron.shell.openExternal.mockResolvedValue(undefined);
   electron.shell.openPath.mockResolvedValue('');
 });
 afterEach(() => {
+  rmSync(home.dir, { recursive: true, force: true });
   if (dir) rmSync(dir, { recursive: true, force: true });
   dir = '';
 });
@@ -60,13 +66,28 @@ describe('createBackend OS integration', () => {
     expect(await api.importResume()).toBeNull();
   });
 
-  it("opens a job's folder with the home directory expanded, and reports OS failures", async () => {
+  it("opens a job's folder with the home directory expanded, and passes on what the OS says when it can't", async () => {
     const { api } = backendIn();
+    const { folderPath } = await api.getJob('j1');
+    mkdirSync(join(home.dir, folderPath!.slice(1)), { recursive: true });
     await api.openJobFolder('j1');
-    expect(electron.shell.openPath.mock.calls[0]![0]).not.toMatch(/^~/);
-    electron.shell.openPath.mockResolvedValueOnce('No such folder');
-    await expect(api.openJobFolder('j1')).rejects.toThrow("Couldn't open the folder: No such folder");
-    await expect(api.openJobFolder('j6')).rejects.toThrow('This job has no folder yet');
+    expect(electron.shell.openPath).toHaveBeenCalledWith(join(home.dir, folderPath!.slice(1)));
+    electron.shell.openPath.mockResolvedValueOnce('Permission denied');
+    await expect(api.openJobFolder('j1')).rejects.toThrow(new Error('The system said: Permission denied'));
+  });
+
+  it("says plainly when a job's folder isn't on disk, without asking the OS", async () => {
+    const { api } = backendIn();
+    await expect(api.openJobFolder('j1')).rejects.toThrow(new Error("This job's folder isn't on disk yet. Applio creates it when it saves the application."));
+    await expect(api.openJobFolder('j6')).rejects.toThrow(new Error('This job has no folder yet'));
+    expect(electron.shell.openPath).not.toHaveBeenCalled();
+  });
+
+  it("says plainly when the output folder isn't on disk", async () => {
+    const { api } = backendIn();
+    await api.saveSettings({ outputFolder: '~/Gone' });
+    await expect(api.openOutputFolder()).rejects.toThrow(new Error('~/Gone no longer exists. Choose the folder again above.'));
+    expect(electron.shell.openPath).not.toHaveBeenCalled();
   });
 });
 
