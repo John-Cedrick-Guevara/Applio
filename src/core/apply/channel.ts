@@ -3,6 +3,18 @@ import type { ApplyChannel } from '../../shared/types';
 const ATS_DOMAINS = ['greenhouse.io', 'lever.co', 'ashbyhq.com', 'workable.com'];
 const PLATFORMS: Record<string, string> = { 'linkedin.com': 'LinkedIn', 'indeed.com': 'Indeed', 'jobstreet.com': 'JobStreet', 'upwork.com': 'Upwork' };
 
+/**
+ * The page an ATS application form lives on (SPEC F5 channel 2). Lever, Ashby and
+ * Workable put it one step after the job page; Greenhouse shows it on the job page.
+ */
+export function atsFormUrl(url: string): string {
+  const u = new URL(url);
+  const path = u.pathname.replace(/\/+$/, '');
+  const suffix = within(u.hostname, 'lever.co') || within(u.hostname, 'workable.com') ? '/apply' : within(u.hostname, 'ashbyhq.com') ? '/application' : '';
+  u.pathname = suffix && !path.endsWith(suffix) ? path + suffix : path;
+  return u.toString();
+}
+
 /** The host is the domain or one of its subdomains — never a look-alike such as `greenhouse.io.evil.net`. */
 const within = (host: string, domain: string) => host === domain || host.endsWith(`.${domain}`);
 

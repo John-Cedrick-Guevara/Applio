@@ -62,6 +62,7 @@ const toJob = (j: KeyedJob, id: string, at: string): Job => ({
   postedAt: j.postedAt,
   status: 'found',
   ...detectChannel(j.applyUrl),
+  applyUrl: j.applyUrl,
   description: j.description,
   tags: j.tags,
   strengths: [],

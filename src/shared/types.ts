@@ -59,6 +59,8 @@ export interface Job {
   gaps: string[];
   /** Where the application goes: an email address, ATS host, or platform flow. */
   applyTarget: string;
+  /** The link the application is made through, when the source gave one (the ATS form for channel 2). */
+  applyUrl?: string;
   /** Platform name for handoff copy, e.g. "LinkedIn" or "Upwork". */
   platform?: string;
   /** Number of fact-bank entries the draft draws on. */
