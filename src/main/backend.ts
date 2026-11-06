@@ -10,6 +10,8 @@ import { autoSend } from '../core/apply/auto-send';
 import { sendFollowUp } from '../core/apply/follow-up';
 import { interviewPrep } from '../core/apply/interview-prep';
 import { silentApplications } from '../core/apply/no-reply';
+import { trackReplies } from '../core/apply/track-replies';
+import { gmailImap, readInbox, type InboxClient } from '../infra/email/inbox';
 import { approveDraft, sendByAts, sendByEmail, type ApplyPorts, type AtsOutcome } from '../core/apply/send-application';
 import type { FillInput } from '../core/apply/ats-plan';
 import { folderFor, jobMarkdown } from '../core/generation/application-folder';
@@ -54,6 +56,8 @@ export interface BackendDeps {
   printPdf: (html: string) => Promise<Uint8Array>;
   /** SMTP for Gmail; the real one in the app, a recorder in tests. */
   mailTransport?: (auth: { user: string; pass: string }) => MailTransport;
+  /** IMAP for reply tracking; the real Gmail one in the app, a fake in tests. */
+  inbox?: (auth: { user: string; pass: string }) => InboxClient;
   /** Fills and submits an ATS form in Applio's own window (SPEC F5 channel 2). */
   submitAts: (request: { url: string; input: FillInput; visible: boolean }) => Promise<AtsOutcome>;
   /** One engine per Settings choice (SPEC §2). */
@@ -77,7 +81,7 @@ const MANUAL_APPLY_FROM = new Set(['scored', 'drafted', 'approved']);
  * in-memory store until their PRs land. OS integration is real.
  * ponytail: remaining in-memory data resets on restart — replace with SQLite-backed services per feature.
  */
-export function createBackend(getWindow: () => BrowserWindow | null, { db, secrets, sources, httpFor, onStatus, setLaunchAtLogin, printPdf, mailTransport, submitAts, engines }: BackendDeps): Backend {
+export function createBackend(getWindow: () => BrowserWindow | null, { db, secrets, sources, httpFor, onStatus, setLaunchAtLogin, printPdf, mailTransport, submitAts, inbox = gmailImap, engines }: BackendDeps): Backend {
   const store = createMockApi({ latencyMs: 0 });
   const kv = createSettingsRepo(db);
   const jobs = createJobsRepo(db);
@@ -266,6 +270,31 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     });
   };
 
+  // Reply tracking (SPEC F7): read new inbox mail every 15 minutes; it reads only and sends nothing, so pause doesn't stop it.
+  let lastInboxCheck = 0;
+  const checkReplies = async () => {
+    const user = settings.getSettings().gmailAddress;
+    const pass = secrets.get('gmailAppPassword');
+    if (!user || !pass || Date.now() - lastInboxCheck < 15 * 60_000) return;
+    lastInboxCheck = Date.now();
+    const afterUid = kv.get('inboxLastUid') as number | undefined;
+    const { mails, lastUid } = await readInbox({ ...(afterUid !== undefined ? { afterUid } : {}), since: new Date(Date.now() - 30 * 86_400_000) }, () => inbox({ user, pass }));
+    trackReplies(mails, {
+      applications: () =>
+        jobs.list({ statuses: ['applied', 'replied', 'interview'] }).map((j) => {
+          const row = sends.get(j.id);
+          return { id: j.id, company: j.company, applyTarget: j.applyTarget, status: j.status, messageIds: row?.state === 'sent' && row.messageId ? [row.messageId] : [] };
+        }),
+      ownAddress: user,
+      move: (id, status, text, at) => void jobs.transition(id, { status, at, note: text }),
+      note: (id, text, at) => {
+        const job = jobs.get(id);
+        if (job) jobs.transition(id, { status: job.status, at, note: text });
+      },
+    });
+    kv.set('inboxLastUid', lastUid);
+  };
+
   /** Moves silent applications to No reply (SPEC F7); runs on every scheduler tick. */
   const markNoReply = () => {
     for (const id of silentApplications(jobs.list({ statuses: ['applied'] }), new Date())) {
@@ -374,6 +403,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     tick: async () => {
       await scheduler.tick();
       markNoReply();
+      await checkReplies().catch((err: unknown) => console.error('[replies] inbox check failed', err));
     },
 
     sendFollowUp: (jobId, text) =>
