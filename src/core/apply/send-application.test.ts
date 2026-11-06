@@ -55,9 +55,16 @@ describe('approveDraft over email', () => {
     const { ports, outbox } = setup();
     await approveDraft('j1', ports);
     expect(outbox).toEqual([{
-      from: 'Sam Rivera <sam@gmail.com>', to: 'jobs@acme.com', subject: 'Application: Senior Backend Engineer — Sam Rivera',
+      from: '"Sam Rivera" <sam@gmail.com>', to: 'jobs@acme.com', subject: 'Application: Senior Backend Engineer — Sam Rivera',
       text: 'Dear Acme team,\n\nI build APIs.', attachments: [{ filename: 'resume.pdf', path: '/out/acme/resume.pdf' }], messageId: '<j1.1@applio.local>',
     }]);
+  });
+
+  it('quotes the sender name, so a comma in it stays one address', async () => {
+    const { ports, outbox } = setup();
+    ports.owner = () => ({ name: 'Rivera, Sam', email: 'sam@gmail.com' });
+    await approveDraft('j1', ports);
+    expect((outbox[0] as { from: string }).from).toBe('"Rivera, Sam" <sam@gmail.com>');
   });
 
   it('marks the job applied by you and writes sent.md with exactly what went out', async () => {

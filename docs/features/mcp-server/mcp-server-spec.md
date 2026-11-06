@@ -24,6 +24,7 @@ Give Claude a small, safe set of tools to read the profile and save results, so 
 - The server and main share the SQLite file, so the database now waits up to 5 s for a lock instead of failing.
 
 ## Found while building
+- Found in review: in print mode Claude Code denies any tool that needs a permission prompt, MCP tools included. The engine now passes `--allowedTools mcp__applio`, so Applio's six tools work and nothing else is allowed.
 - `save_draft` can move a job straight from found to drafted. Pasted jobs (PR-23) are scored and drafted in one call.
 - Verified by hand: the built `mcp.cjs`, run as Node over a throwaway database, answers `initialize`, lists the six tools, and returns scoped jobs.
 
