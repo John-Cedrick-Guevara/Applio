@@ -3,12 +3,13 @@ import { defineConfig } from 'vite';
 
 /**
  * Builds the Electron main process (`--mode main`), preload (`--mode preload`) or
- * the MCP server Claude Code starts (`--mode mcp`) into one CommonJS file each.
+ * the MCP server Claude Code starts (`--mode mcp`), or the end-to-end check (`--mode e2e`,
+ * `npm run e2e`) into one CommonJS file each.
  * They're separate builds so each is self-contained: the sandboxed preload can't
  * `require` shared chunks, and the MCP server runs as plain Node.
  */
 export default defineConfig(({ mode }) => {
-  const entry = mode === 'preload' ? 'preload' : mode === 'mcp' ? 'mcp' : 'main';
+  const entry = mode === 'preload' ? 'preload' : mode === 'mcp' ? 'mcp' : mode === 'e2e' ? 'e2e' : 'main';
   return {
     // Main runs in Node: resolve packages' Node builds, not their "browser" builds (Vite's default),
     // which differ in API — e.g. mammoth's browser build drops Buffer input. Preload keeps the defaults.

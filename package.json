@@ -16,6 +16,7 @@
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "check": "npm run typecheck && npm run lint && npm run test",
+    "e2e": "vite build -c vite.electron.config.ts --mode e2e && electron dist/electron/e2e.cjs",
     "preview": "vite preview"
   },
   "dependencies": {

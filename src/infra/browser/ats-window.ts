@@ -42,6 +42,18 @@ const formWindow = (partition: string, visible: boolean, title: string) => {
   return win;
 };
 
+/**
+ * Applies every step, then detaches the DevTools debugger the file uploads needed.
+ * A window closed with the debugger still attached crashes the whole app (found by `npm run e2e`).
+ */
+const applyAll = async (win: BrowserWindow, steps: readonly FillStep[]) => {
+  try {
+    for (const step of steps) await apply(win, step);
+  } finally {
+    if (win.webContents.debugger.isAttached()) win.webContents.debugger.detach();
+  }
+};
+
 const apply = async (win: BrowserWindow, step: FillStep) => {
   if (step.action === 'file') return attachFile(win, step.selector, step.value);
   if (step.action === 'check') return void (await inPage(win, click, step.value));
@@ -58,7 +70,7 @@ export async function submitAtsForm({ url, input, visible }: { url: string; inpu
   // Its own session: the ATS's cookies never mix with the app's, and nothing here can reach Node.
   const win = formWindow('persist:ats', visible, 'Applio — applying');
   // Approved sends leave the window to the operator; a hidden autonomous run closes it, and the job waits in Review.
-  const release = () => (visible ? win.show() : win.destroy());
+  const release = () => (visible ? win.show() : win.close());
   const handoff = (reason: string): AtsOutcome => {
     release();
     return { kind: 'handoff', reason };
@@ -71,7 +83,7 @@ export async function submitAtsForm({ url, input, visible }: { url: string; inpu
     if (form.captcha) return handoff('The form shows a CAPTCHA, which only you can answer.');
 
     const plan = planFill(form.fields, input);
-    for (const step of plan.steps) await apply(win, step);
+    await applyAll(win, plan.steps);
     if (plan.missing.length > 0) return handoff(`It asks things Applio has no saved answer for: ${plan.missing.slice(0, 3).join('; ')}${plan.missing.length > 3 ? '; …' : ''}.`);
 
     const before = { url: win.webContents.getURL(), text: await inPage<string>(win, pageText).catch(() => '') };
@@ -80,7 +92,7 @@ export async function submitAtsForm({ url, input, visible }: { url: string; inpu
       const now = { url: win.webContents.getURL(), text: await inPage<string>(win, pageText).catch(() => '') };
       if (looksSubmitted(before, now)) {
         const screenshot = (await win.webContents.capturePage()).toPNG();
-        win.destroy();
+        win.close();
         return { kind: 'submitted', filled: plan.steps, screenshot };
       }
       const after = await inPage<ReadForm>(win, extractForm, null).catch(() => undefined);
@@ -106,6 +118,6 @@ export async function fillPlatformForm({ url, input }: { url: string; input: Fil
   const form = await readForm(win);
   if (form.fields.length === 0) return { filled: 0, missing: ['Applio found no form on this page. Sign in or open the application step in the window, then click Fill again.'] };
   const plan = planFill(form.fields, input);
-  for (const step of plan.steps) await apply(win, step);
+  await applyAll(win, plan.steps);
   return { filled: plan.steps.length, missing: plan.missing };
 }
