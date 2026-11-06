@@ -1,12 +1,15 @@
 import { dialog, shell, type BrowserWindow } from 'electron';
 import { randomUUID } from 'node:crypto';
-import { existsSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { createAi } from '../core/ai/ai-service';
 import type { AiEngine } from '../core/ai/engine';
 import { autoSend } from '../core/apply/auto-send';
+import { sendFollowUp } from '../core/apply/follow-up';
+import { interviewPrep } from '../core/apply/interview-prep';
+import { silentApplications } from '../core/apply/no-reply';
 import { approveDraft, sendByAts, sendByEmail, type ApplyPorts, type AtsOutcome } from '../core/apply/send-application';
 import type { FillInput } from '../core/apply/ats-plan';
 import { folderFor, jobMarkdown } from '../core/generation/application-folder';
@@ -26,8 +29,9 @@ import { findJobFolder, writeApplication } from '../infra/fs/application-files';
 import { readResumeText } from '../infra/resume/read-resume';
 import type { SecretStore } from '../infra/secrets/secret-store';
 import type { ApplioApi } from '../shared/api';
-import type { Draft, AiEngine as EngineKind, AppStatus, Job } from '../shared/types';
+import type { Draft, AiEngine as EngineKind, AppStatus, InterviewPrep, Job } from '../shared/types';
 import { AUTONOMY_LEVELS } from '../shared/autonomy';
+import { nextStatuses } from '../shared/status';
 import { matchesFilter } from '../shared/job-filter';
 import { letterBody, pageHtml, resumeBody } from '../shared/templates/application-documents';
 import { createMockApi } from '../shared/mock/mock-api';
@@ -237,6 +241,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     caps: () => ({ gmailDaily: GMAIL_DAILY_CAP, perChannel: settings.getSettings().maxPerChannelPerDay }),
     dayStart: localMidnight,
     now: () => new Date(),
+    newMessageId: (jobId) => `<${jobId}.${randomUUID()}@applio.local>`,
     saveAiAnswers: (answers) => {
       for (const a of answers) profile.saveAnswer(a);
     },
@@ -259,6 +264,13 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       send: (id) => (job.channel === 'email' ? sendByEmail(id, 'autonomous', applyPorts) : sendByAts(id, 'autonomous', applyPorts)),
       note,
     });
+  };
+
+  /** Moves silent applications to No reply (SPEC F7); runs on every scheduler tick. */
+  const markNoReply = () => {
+    for (const id of silentApplications(jobs.list({ statuses: ['applied'] }), new Date())) {
+      jobs.transition(id, { status: 'ghosted', at: new Date().toISOString(), note: 'No reply in 21 days' });
+    }
   };
 
   const getStatus = (): AppStatus => {
@@ -361,7 +373,43 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       pushStatus();
       return getStatus();
     }),
-    tick: () => scheduler.tick(),
+    tick: async () => {
+      await scheduler.tick();
+      markNoReply();
+    },
+
+    sendFollowUp: (jobId, text) =>
+      sendFollowUp(jobId, text, {
+        job: getJob,
+        sent: (id) => {
+          const row = sends.get(id);
+          return row?.state === 'sent' ? { subject: row.subject, ...(row.messageId ? { messageId: row.messageId } : {}) } : undefined;
+        },
+        sendEmail: (message) => gmail().send(message),
+        owner,
+        folder: jobFolder,
+        appendFile: (path, text) => appendFileSync(path, text),
+        logFollowUp: (id) => jobs.transition(id, { status: 'applied', at: new Date().toISOString(), note: 'Follow-up sent' }),
+        newMessageId: applyPorts.newMessageId,
+        now: () => new Date(),
+      }),
+
+    getInterviewPrep: (jobId) =>
+      interviewPrep(jobId, {
+        cached: (id) => kv.get(`prep:${id}`) as InterviewPrep | undefined,
+        save: (id, prep) => kv.set(`prep:${id}`, prep),
+        sent: (id) => {
+          const draft = drafts.get(id);
+          return { letter: draft?.coverLetter ?? '', resume: draft?.resume.flatMap((s) => s.items.map((i) => i.text)) ?? [] };
+        },
+        ai: ai.run,
+      }),
+
+    setStatus: later((jobId, status, statusNote) => {
+      const job = getJob(jobId);
+      if (!nextStatuses(job.status).includes(status)) throw new Error(`Cannot move job from ${job.status} to ${status}`);
+      return jobs.transition(jobId, { status, at: new Date().toISOString(), ...(statusNote ? { note: statusNote } : {}) });
+    }),
 
     // AI and Gmail are live checks. Telegram checks saved credentials; its live test comes with PR-22.
     testConnection: async (kind) => {

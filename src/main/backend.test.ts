@@ -20,6 +20,7 @@ import type { JobSource } from '../core/jobs/source';
 import { discovered } from '../core/triage/test-jobs';
 import { createSecretStore, type Encryptor } from '../infra/secrets/secret-store';
 import { seedJobs } from '../shared/mock/fixtures';
+import type { Job } from '../shared/types';
 import { createToolPorts } from '../mcp/db-ports';
 import { createTools } from '../mcp/tools';
 import { createBackend, type BackendDeps } from './backend';
@@ -501,6 +502,41 @@ describe('createBackend discovery', () => {
     const { api } = await draftedBackend();
     expect(await api.listJobs({ statuses: ['applied'] })).toEqual([]);
     expect(await api.listJobs({ statuses: ['drafted'] })).toHaveLength(1);
+  });
+
+  it('follows up in the same Gmail thread as the application, and restarts the window', async () => {
+    const { api, job } = await emailJob();
+    await api.approveDraft(job.id);
+    const followed = await api.sendFollowUp(job.id, 'Hi again, still keen.');
+    expect(followed.history.at(-1)).toMatchObject({ status: 'applied', note: 'Follow-up sent' });
+    const [application, followUp] = outbox as { messageId?: string; inReplyTo?: string; subject?: string }[];
+    expect(followUp).toMatchObject({ inReplyTo: application!.messageId, subject: 'Re: Application: Senior Backend Engineer — Sam Rivera' });
+    expect(readFileSync(join(job.folderPath!, 'follow-ups.md'), 'utf8')).toContain('Hi again, still keen.');
+  });
+
+  it('generates interview prep once and reuses it on reopen', async () => {
+    const { api, job, deps } = await draftedBackend();
+    const complete = vi.fn(async () => ({ text: '{"told":["Cut latency 40%"],"likelyQuestions":["How?"],"askThem":["Why now?"]}', inputTokens: 900, outputTokens: 100 }));
+    deps.engines['claude-code'] = { complete, check: async () => ({ ready: true, message: 'ok' }) };
+    expect(await api.getInterviewPrep(job.id)).toEqual({ told: ['Cut latency 40%'], likelyQuestions: ['How?'], askThem: ['Why now?'], tokens: 1000 });
+    expect(await api.getInterviewPrep(job.id)).toMatchObject({ told: ['Cut latency 40%'] });
+    expect(complete).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets the operator correct a status within the rules, and logs it', async () => {
+    const { api, job } = await draftedBackend();
+    await api.markApplied(job.id);
+    expect((await api.setStatus(job.id, 'interview', 'Recruiter called')).history.at(-1)).toMatchObject({ status: 'interview', note: 'Recruiter called' });
+    await expect(api.setStatus(job.id, 'drafted')).rejects.toThrow('Cannot move job from interview to drafted');
+  });
+
+  it('marks an application with no reply in 21 days as No reply on the next tick', async () => {
+    const { api, deps } = backendIn();
+    await api.setAutomationPaused(true); // no discovery run on this tick, only the time rules
+    const old = { ...(seedJobs(new Date())[0] as Job), id: 'old', status: 'applied' as const, history: [{ status: 'applied' as const, at: new Date(Date.now() - 22 * 86_400_000).toISOString() }] };
+    createJobsRepo(deps.db).insert(old, { dedupKey: 'old', createdAt: old.history[0]!.at });
+    await (api as unknown as { tick: () => Promise<void> }).tick();
+    expect((await api.getJob('old')).status).toBe('ghosted');
   });
 
   it('keeps a sent application exactly as sent: its letter can no longer be edited', async () => {

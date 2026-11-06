@@ -304,20 +304,30 @@ Wire real data behind the same `ApplioApi`. Each PR replaces part of the mock st
   - [x] tests for every gate
   - _decided:_ held jobs stay drafted in Review with the reason; no extra first-run cap (the per-channel cap bounds it); hidden ATS window for autonomous runs
 
-- [ ] **PR-21 — Reply tracking and follow-ups**  IMAP watcher, status updates, follow-ups, interview prep.
-  - _branch:_ `feat/reply-tracking`
-  - _PR title:_ `feat: track replies and draft follow-ups`
+- [x] **PR-21a — Follow-ups, No reply, prep and status**  The log keeps itself current between replies.
+  - _branch:_ `feat/followups`
+  - _PR title:_ `feat: send follow-ups and prepare interviews`
   - _why:_ the application log updates itself (SPEC F7)
-  - _depends on:_ PR-18
+  - _depends on:_ PR-20
+  - [x] spec: `docs/features/follow-ups/follow-ups-spec.md`
+  - [x] real `sendFollowUp` (threaded, logged), `getInterviewPrep` (cached), `setStatus`; No reply after 21 days
+  - [x] tests with a fake clock and Gmail
+  - _decided:_ split from PR-21 (size); every email gets a stored Message-ID; "Correct status" menu in the application detail
+
+- [ ] **PR-21b — Reply tracking**  IMAP watcher matches replies and moves applications on.
+  - _branch:_ `feat/reply-tracking`
+  - _PR title:_ `feat: track replies in gmail`
+  - _why:_ replies move the log without manual work (SPEC F7)
+  - _depends on:_ PR-21a
   - [ ] spec: `docs/features/reply-tracking/reply-tracking-spec.md`
-  - [ ] IMAP matches replies to applications; real `sendFollowUp`, `getInterviewPrep`, `setStatus`
+  - [ ] IMAP matches replies to applications by thread, domain or company; Replied, Interview, Rejected
   - [ ] tests with a fake mailbox
 
 - [ ] **PR-22 — Telegram notifications**  Alerts and one-tap approvals.
   - _branch:_ `feat/telegram-notify`
   - _PR title:_ `feat: add telegram notifications`
   - _why:_ approve drafts and see replies away from the desk (SPEC F9)
-  - _depends on:_ PR-20, PR-21
+  - _depends on:_ PR-20, PR-21b
   - [ ] spec: `docs/features/telegram-notify/telegram-notify-spec.md`
   - [ ] long-polling bot; new matches, drafts with Approve / Open / Skip, replies, follow-ups due, quota warnings
   - [ ] real `testConnection('telegram')`

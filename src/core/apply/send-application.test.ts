@@ -43,6 +43,7 @@ const setup = (over: Partial<Job> = {}, opts: { sentToday?: number; perChannel?:
     dayStart: () => '2026-11-06T00:00:00.000Z',
     now: () => NOW,
     saveAiAnswers: vi.fn(),
+    newMessageId: () => '<j1.1@applio.local>',
     bankAnswers: () => [{ question: 'Phone', answer: '+63 917 555 0100' }],
     submitAts: vi.fn(async () => ({ kind: 'submitted' as const, filled: [{ selector: '#email', label: 'Email', action: 'type' as const, value: 'sam@gmail.com' }] })),
   };
@@ -55,7 +56,7 @@ describe('approveDraft over email', () => {
     await approveDraft('j1', ports);
     expect(outbox).toEqual([{
       from: '"Sam Rivera" <sam@gmail.com>', to: 'jobs@acme.com', subject: 'Application: Senior Backend Engineer — Sam Rivera',
-      text: 'Dear Acme team,\n\nI build APIs.', attachments: [{ filename: 'resume.pdf', path: '/out/acme/resume.pdf' }],
+      text: 'Dear Acme team,\n\nI build APIs.', attachments: [{ filename: 'resume.pdf', path: '/out/acme/resume.pdf' }], messageId: '<j1.1@applio.local>',
     }]);
   });
 

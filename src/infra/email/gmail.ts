@@ -47,7 +47,12 @@ export function createGmail({ user, pass, transport = gmailSmtp }: Options) {
     }
   };
   return {
-    send: (m: EmailMessage) => send({ from: m.from, to: m.to, subject: m.subject, text: m.text, attachments: m.attachments }),
+    send: (m: EmailMessage) =>
+      send({
+        from: m.from, to: m.to, subject: m.subject, text: m.text, attachments: m.attachments,
+        ...(m.messageId ? { messageId: m.messageId } : {}),
+        ...(m.inReplyTo ? { inReplyTo: m.inReplyTo, references: m.references ?? m.inReplyTo } : {}),
+      }),
     /** Settings' "Send test email": a short note to the operator's own address. */
     sendTest: () => send({ from: user, to: user, subject: 'Applio test email', text: 'Applio can send from this Gmail account.' }),
   };

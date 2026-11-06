@@ -26,19 +26,20 @@ const toRow = (r: Row): SendRow => {
   return {
     ...base, state: 'sent', to: String(r.recipient), subject: String(r.subject), body: String(r.body),
     attachments: json<string[]>(r.attachments), at: optText(r.sent_at) ?? String(r.claimed_at),
+    ...(r.message_id == null ? {} : { messageId: String(r.message_id) }),
   };
 };
 
 /** SQLite-backed send log. The job id is the primary key, so a second claim can't succeed. */
 export function createSendsRepo(db: DatabaseSync): SendsRepo {
   const insert = db.prepare("INSERT INTO sends (job_id, channel, state, claimed_at) VALUES (?, ?, 'sending', ?)");
-  const sent = db.prepare("UPDATE sends SET state = 'sent', sent_at = ?, recipient = ?, subject = ?, body = ?, attachments = ? WHERE job_id = ?");
+  const sent = db.prepare("UPDATE sends SET state = 'sent', sent_at = ?, recipient = ?, subject = ?, body = ?, attachments = ?, message_id = ? WHERE job_id = ?");
   const remove = db.prepare("DELETE FROM sends WHERE job_id = ? AND state = 'sending'");
   const select = db.prepare('SELECT * FROM sends WHERE job_id = ?');
   const count = db.prepare('SELECT COUNT(*) AS n FROM sends WHERE channel = ? AND claimed_at >= ?');
   return {
     claim: (jobId, channel, at) => void insert.run(jobId, channel, at),
-    markSent: (jobId, r) => void sent.run(r.at, r.to, r.subject, r.body, JSON.stringify(r.attachments), jobId),
+    markSent: (jobId, r) => void sent.run(r.at, r.to, r.subject, r.body, JSON.stringify(r.attachments), r.messageId ?? null, jobId),
     release: (jobId) => void remove.run(jobId),
     get: (jobId) => {
       const r = select.get(jobId);
