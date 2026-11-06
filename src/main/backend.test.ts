@@ -94,6 +94,8 @@ const backendIn = (folder = (dir = mkdtempSync(join(tmpdir(), 'applio-backend-')
     mailTransport: () => ({ sendMail: async (m) => void outbox.push(m) }),
     // Stands in for Applio's form window: "submits" and reports what it filled.
     inbox: fakeInbox(),
+    // Stands in for the assisted-fill window: reports what it filled; it has no way to submit.
+    fillPlatformForm: vi.fn(async () => ({ filled: 5, missing: ['Current company'] })),
     // Stands in for api.telegram.org: answers like the Bot API and records each call.
     telegramFetch: vi.fn(async (url: string, init: RequestInit) => {
       const method = url.split('/').at(-1)!;
@@ -693,6 +695,8 @@ describe('createBackend discovery', () => {
     const preview = await api.analyzeJob({ kind: 'text', value: 'Senior TypeScript Engineer at Brightline. https://www.linkedin.com/jobs/view/123' });
     expect(preview).toMatchObject({ channel: 'platform', sourceName: 'clipped from LinkedIn', maxAutonomy: 'draft' });
     expect(pages).toEqual([]);
+    // The link stays with the job, so the handoff can open it and assisted fill can fill it.
+    expect(await api.addJob(preview)).toMatchObject({ url: 'https://www.linkedin.com/jobs/view/123', applyUrl: 'https://www.linkedin.com/jobs/view/123', platform: 'LinkedIn' });
   });
 
   it('refuses to add a job Applio already has, naming it', async () => {
@@ -709,6 +713,23 @@ describe('createBackend discovery', () => {
     const job = await api.addJob({ ...preview, score: 100, company: 'Tampered' });
     expect(job).toMatchObject({ company: 'Brightline Studio', score: 84 });
     await expect(api.addJob({ ...preview, previewId: 'unknown' })).rejects.toThrow('Analyze the post again, then add it.');
+  });
+
+  it('fills a platform form in the operator’s own session only when assisted fill is on, and never submits', async () => {
+    const { api, job, deps } = await draftedBackend();
+    deps.db.prepare("UPDATE jobs SET channel = 'platform', platform = 'LinkedIn', apply_url = 'https://www.linkedin.com/jobs/view/1' WHERE id = ?").run(job.id);
+    await expect(api.assistFill(job.id)).rejects.toThrow('Assisted fill is off for platform apply. Turn it on in Settings → Apply channels, or apply by hand.');
+    await api.saveSettings({ assistedFill: { platform: true, custom: false } });
+    expect(await api.assistFill(job.id)).toEqual({ filled: 5, missing: ['Current company'] });
+    expect(deps.fillPlatformForm).toHaveBeenCalledWith(expect.objectContaining({ url: 'https://www.linkedin.com/jobs/view/1' }));
+    expect((await api.getJob(job.id)).status).toBe('drafted');
+    expect((await api.getJob(job.id)).history.at(-1)?.note).toBe('Assisted fill: 5 fields filled. You check them and click Submit.');
+  });
+
+  it('never fills an email or ATS job by assisted fill', async () => {
+    const { api, job } = await emailJob();
+    await api.saveSettings({ assistedFill: { platform: true, custom: true } });
+    await expect(api.assistFill(job.id)).rejects.toThrow('Assisted fill is only for platform and career-site jobs.');
   });
 
   it('keeps a sent application exactly as sent: its letter can no longer be edited', async () => {

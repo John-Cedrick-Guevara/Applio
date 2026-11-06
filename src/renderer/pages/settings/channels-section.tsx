@@ -7,7 +7,7 @@ import { useAction } from '../../hooks/use-action';
 const CHANNELS = [
   { name: 'Email', auto: true, desc: 'Sends the cover letter and resume PDF from your Gmail.' },
   { name: 'Standard ATS forms', auto: true, desc: 'Greenhouse, Lever, Ashby, Workable. Filled and submitted in Applio’s own window. A CAPTCHA pauses it and hands the job to you.' },
-  { id: 'platform', name: 'Platform apply', auto: false, desc: 'LinkedIn Easy Apply, Indeed, JobStreet, Upwork. Off: manual handoff, where Applio prepares everything and you apply yourself. On: Applio fills the form in your signed-in session and you click Submit.' },
+  { id: 'platform', name: 'Platform apply', auto: false, desc: 'LinkedIn Easy Apply, Indeed, JobStreet, Upwork. Off: manual handoff, where Applio prepares everything and you apply yourself. On: Applio fills the form in your signed-in session and you click Submit. Platforms may restrict accounts that use automation, so use it sparingly.' },
   { id: 'custom', name: 'Company career sites', auto: false, desc: 'Workday, iCIMS and custom forms. Best-effort fill when on; manual handoff when off.' },
 ] as const;
 

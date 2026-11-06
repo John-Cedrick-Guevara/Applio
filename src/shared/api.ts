@@ -61,6 +61,11 @@ export interface ApplioApi {
   // OS integration
   openExternal(url: string): Promise<void>;
   openJobFolder(jobId: string): Promise<void>;
+  /**
+   * Assisted fill (SPEC F5 channels 3–4): opens the platform or career-site form in an
+   * Applio window with the operator's own sign-in and fills what it can. Never submits.
+   */
+  assistFill(jobId: string): Promise<{ filled: number; missing: string[] }>;
   /** Opens the job's résumé or letter (PDF, or proposal.md) in the system viewer. */
   openDraftFile(jobId: string, file: 'resume' | 'letter'): Promise<void>;
   chooseFolder(): Promise<string | null>;
@@ -108,7 +113,7 @@ export const API_METHODS = [
   'listJobs', 'getJob', 'getDraft', 'updateCoverLetter', 'approveDraft', 'skipJob', 'markApplied', 'setStatus',
   'sendFollowUp', 'getInterviewPrep',
   'getStatus', 'runDiscovery', 'setAutomationPaused',
-  'openExternal', 'openJobFolder', 'openDraftFile', 'chooseFolder', 'openOutputFolder',
+  'openExternal', 'openJobFolder', 'openDraftFile', 'assistFill', 'chooseFolder', 'openOutputFolder',
   'analyzeJob', 'addJob',
   'getProfile', 'saveFact', 'deleteFact', 'saveAnswer', 'deleteAnswer', 'savePreferences', 'importResume',
   'listSources', 'updateSource',

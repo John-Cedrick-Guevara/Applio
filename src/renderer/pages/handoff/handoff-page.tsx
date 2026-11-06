@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { connectsCost } from '../../../shared/connects';
 import type { Draft, Job } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { AsyncView } from '../../components/async-view';
@@ -22,20 +23,24 @@ export default function HandoffPage({ params }: { params: RouteParams }) {
   const api = useApi();
   const id = params.id ?? '';
   const state = useAsync(async () => {
-    const [job, draft] = await Promise.all([api.getJob(id), api.getDraft(id)]);
-    return { job, draft };
+    const [job, draft, settings] = await Promise.all([api.getJob(id), api.getDraft(id), api.getSettings()]);
+    const assisted = (job.channel === 'platform' || job.channel === 'custom') && settings.assistedFill[job.channel];
+    return { job, draft, assisted };
   }, [api, id]);
 
   return (
     <AsyncView state={state} what="this handoff" rows={5}>
-      {({ job, draft }) => <Handoff key={job.id} job={job} draft={draft} onJob={(next) => state.setData((d) => ({ ...d, job: next }))} />}
+      {({ job, draft, assisted }) => <Handoff key={job.id} job={job} draft={draft} assisted={assisted} onJob={(next) => state.setData((d) => ({ ...d, job: next }))} />}
     </AsyncView>
   );
 }
 
-function Handoff({ job, draft, onJob }: { job: Job; draft: Draft | null; onJob: (job: Job) => void }) {
+function Handoff({ job, draft, assisted, onJob }: { job: Job; draft: Draft | null; assisted: boolean; onJob: (job: Job) => void }) {
   const api = useApi();
   const os = useAction();
+  const fill = useAction();
+  const [filled, setFilled] = useState<{ filled: number; missing: string[] } | null>(null);
+  const connects = job.platform === 'Upwork' ? connectsCost(job.description) : undefined;
   const platform = job.platform ?? 'the site';
   const letterWord = draft?.kind === 'proposal' ? 'Proposal' : 'Cover letter';
 
@@ -45,18 +50,51 @@ function Handoff({ job, draft, onJob }: { job: Job; draft: Draft | null; onJob: 
         <a href={`#/review/${job.id}`} className="back-link">← Review</a>
         <h1 className="handoff-title">Apply to {job.company} on {platform}</h1>
         <p className="muted handoff-lede">
-          Assisted fill is off for {platform}, so you apply yourself. Everything is ready to copy. Applio never submits on {platform}.
+          {assisted
+            ? `Applio can fill the form in its own window, signed in as you. You check it and click Submit. Applio never submits on ${platform}.`
+            : `Assisted fill is off for ${platform}, so you apply yourself. Everything is ready to copy. Applio never submits on ${platform}.`}
         </p>
+        {job.platform === 'Upwork' ? (
+          <p className="handoff-lede strong">
+            {connects !== undefined ? `This proposal costs ${connects} Connects on Upwork.` : 'Upwork charges Connects for every proposal. Check the cost on the job page before you submit.'}
+          </p>
+        ) : null}
       </header>
 
       <div className="split">
         <ol className="list-plain handoff-steps">
-          <Step n={1} title="Open the job" sub="Opens in your browser, where you are already signed in.">
-            <Button onClick={() => os.run('open the job', () => api.openExternal(job.url))}>
-              Open on {platform}
-              <Icon name="external" size={14} strokeWidth={1.8} />
-            </Button>
-          </Step>
+          {assisted ? (
+            <Step n={1} title="Fill the form in Applio" sub={`The first time, sign in to ${platform} in the window that opens.`}>
+              <Button
+                variant="primary"
+                busy={fill.pending}
+                onClick={async () => {
+                  const result = await fill.run('fill the form', () => api.assistFill(job.id));
+                  if (result) setFilled(result);
+                }}
+              >
+                Fill it in Applio
+              </Button>
+              {filled ? (
+                <div className="stack-sm">
+                  <p className="body-text">Filled {filled.filled} fields. Check them in the window, then click Submit yourself.</p>
+                  {filled.missing.length > 0 ? (
+                    <>
+                      <p className="cell-sub">Still for you:</p>
+                      <ul className="list-plain">{filled.missing.map((m) => <li key={m}>{m}</li>)}</ul>
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
+            </Step>
+          ) : (
+            <Step n={1} title="Open the job" sub="Opens in your browser, where you are already signed in.">
+              <Button onClick={() => os.run('open the job', () => api.openExternal(job.url))}>
+                Open on {platform}
+                <Icon name="external" size={14} strokeWidth={1.8} />
+              </Button>
+            </Step>
+          )}
 
           <Step n={2} title="Upload your tailored resume">
             <div className="handoff-box handoff-file">
@@ -112,11 +150,13 @@ function Handoff({ job, draft, onJob }: { job: Job; draft: Draft | null; onJob: 
               {job.salary ? <div><dt>Pay</dt><dd>{job.salary}</dd></div> : null}
             </dl>
           </section>
-          <section className="handoff-tip">
-            <div className="handoff-tip-title">Want this filled for you?</div>
-            <p>Turn on assisted fill for platform apply. Applio opens the form in its own window and fills it in. You still click Submit.</p>
-            <a href="#/settings">Channel settings</a>
-          </section>
+          {assisted ? null : (
+            <section className="handoff-tip">
+              <div className="handoff-tip-title">Want this filled for you?</div>
+              <p>Turn on assisted fill for platform apply. Applio opens the form in its own window and fills it in. You still click Submit.</p>
+              <a href="#/settings">Channel settings</a>
+            </section>
+          )}
         </aside>
       </div>
     </>

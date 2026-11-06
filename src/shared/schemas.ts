@@ -113,6 +113,7 @@ export const API_ARGS = {
   openExternal: z.tuple([url]),
   openJobFolder: z.tuple([id]),
   openDraftFile: z.tuple([id, z.enum(['resume', 'letter'])]),
+  assistFill: z.tuple([id]),
   chooseFolder: none,
   openOutputFolder: none,
 

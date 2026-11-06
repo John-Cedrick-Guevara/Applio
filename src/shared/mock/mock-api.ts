@@ -179,6 +179,7 @@ export function createMockApi({ latencyMs = 250, now = () => new Date() }: MockO
     openExternal: () => respond(undefined),
     openJobFolder: () => respond(undefined),
     openDraftFile: () => respond(undefined),
+    assistFill: () => respond({ filled: 6, missing: ['Current company'] }),
     chooseFolder: () => respond('~/JobApps'),
     openOutputFolder: () => respond(undefined),
 
