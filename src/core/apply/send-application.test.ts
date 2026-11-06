@@ -143,6 +143,7 @@ describe('approveDraft on a standard ATS form', () => {
         letter: 'Dear Acme team,\n\nI build APIs.',
         answers: [{ question: 'Why us?', answer: 'Your API work.' }, { question: 'Notice?', answer: 'Two weeks' }, { question: 'Phone', answer: '+63 917 555 0100' }],
       },
+      visible: true,
     });
     expect(job()).toMatchObject({ status: 'applied', sentBy: 'you-app' });
     expect(files['/out/acme/sent.md']).toContain('Email: sam@gmail.com');

@@ -47,8 +47,10 @@ export async function submitAtsForm({ url, input, visible }: { url: string; inpu
     webPreferences: { partition: 'persist:ats', sandbox: true, contextIsolation: true, nodeIntegration: false },
   });
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  // Approved sends leave the window to the operator; a hidden autonomous run closes it, and the job waits in Review.
+  const release = () => (visible ? win.show() : win.destroy());
   const handoff = (reason: string): AtsOutcome => {
-    win.show();
+    release();
     return { kind: 'handoff', reason };
   };
 
@@ -79,10 +81,10 @@ export async function submitAtsForm({ url, input, visible }: { url: string; inpu
       const after = await inPage<ReadForm>(win, extractForm, null).catch(() => undefined);
       if (after?.captcha) return handoff('A CAPTCHA appeared after Submit, which only you can answer.');
     }
-    win.show();
+    release();
     return { kind: 'unconfirmed', filled: plan.steps };
   } catch (err) {
-    win.show();
+    release();
     throw err;
   }
 }

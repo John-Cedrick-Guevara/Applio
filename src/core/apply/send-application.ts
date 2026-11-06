@@ -66,8 +66,8 @@ export interface ApplyPorts {
   /** Adds answers the operator just approved to the answer bank. */
   saveAiAnswers: (answers: { question: string; answer: string }[]) => void;
   bankAnswers: () => { question: string; answer: string }[];
-  /** Fills and submits an ATS form in Applio's own window (SPEC F5 channel 2). */
-  submitAts: (request: { url: string; input: FillInput }) => Promise<AtsOutcome>;
+  /** Fills and submits an ATS form in Applio's own window (SPEC F5 channel 2); hidden for autonomous sends. */
+  submitAts: (request: { url: string; input: FillInput; visible: boolean }) => Promise<AtsOutcome>;
 }
 
 const join = (dir: string, file: string) => `${dir.replace(/\/+$/, '')}/${file}`;
@@ -189,7 +189,7 @@ export async function sendByAts(jobId: string, sentBy: SentBy, ports: ApplyPorts
   ports.sendLog.claim(jobId, 'ats', ports.now().toISOString());
   let outcome: AtsOutcome;
   try {
-    outcome = await ports.submitAts({ url, input });
+    outcome = await ports.submitAts({ url, input, visible: sentBy !== 'autonomous' });
   } catch (err) {
     ports.sendLog.release(jobId);
     ports.note(jobId, `Not sent: ${err instanceof Error ? err.message : String(err)}`);
@@ -199,7 +199,11 @@ export async function sendByAts(jobId: string, sentBy: SentBy, ports: ApplyPorts
   if (outcome.kind === 'handoff') {
     ports.sendLog.release(jobId);
     ports.note(jobId, `Handed to you: ${outcome.reason}`);
-    throw new SendBlockedError(`Applio filled what it could. Finish the form in its window, then use Mark as applied. ${outcome.reason}`);
+    throw new SendBlockedError(
+      sentBy === 'autonomous'
+        ? `The form needs you. ${outcome.reason}`
+        : `Applio filled what it could. Finish the form in its window, then use Mark as applied. ${outcome.reason}`,
+    );
   }
   if (outcome.kind === 'unconfirmed') {
     ports.note(jobId, "Submit was pressed, but no confirmation showed. Check the form window and your email.");
