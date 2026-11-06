@@ -7,7 +7,7 @@ Small PRs, in order. Each phase is one reviewable PR. PRs 1, 3, 4, 6 and 7 are s
 (`feat/review-queue` → `docs/features/review-queue/review-queue-spec.md`). The spec ships in the
 same PR and is what the review checks against. See CLAUDE.md §6.
 
-**Where we are:** Stage 1 is on `main` (#15), and CI runs on every PR (#16). Stage 2: PR-8 (#17), PR-9 (#18), PR-10 (#19), PR-11a (#23) and PR-11b (#24) are merged; fixes from the first manual run are in #20–#22. PR-12 (triage) is in review. Next is PR-13 (scheduler).
+**Where we are:** Stage 1 is on `main` (#15), and CI runs on every PR (#16). Stage 2: PR-8 to PR-12 are merged (#17–#19, #23–#25); fixes from the first manual run are in #20–#22. PR-13 (scheduler), PR-14 (AI engine) and PR-15 (MCP server) are in review as a stack. Next is PR-16 (scoring).
 
 ## Stage 1 — Frontend (mock data)
 
@@ -207,16 +207,17 @@ Wire real data behind the same `ApplioApi`. Each PR replaces part of the mock st
   - [x] drop counts per reason recorded for the run summary
   - [x] tests for every filter branch
 
-- [ ] **PR-13 — Scheduler and automation state**  Runs every 4–6h with catch-up; pause/resume; tray.
+- [x] **PR-13 — Scheduler and automation state**  Runs every 4–6h with catch-up; pause/resume; tray.
   - _branch:_ `feat/scheduler`
   - _PR title:_ `feat: schedule discovery runs`
   - _why:_ discovery must run on its own and catch up after sleep (SPEC F2)
   - _depends on:_ PR-12
-  - [ ] spec: `docs/features/scheduler/scheduler-spec.md`
-  - [ ] real `runDiscovery`, `getStatus`, `setAutomationPaused`; run summaries stored
-  - [ ] tray mode and launch at login
-  - [ ] status pushed to the renderer (replaces the engine card's refresh-on-navigation)
-  - [ ] tests with a fake clock
+  - [x] spec: `docs/features/scheduler/scheduler-spec.md`
+  - [x] real `runDiscovery`, `getStatus`, `setAutomationPaused`; run summaries stored
+  - [x] tray mode and launch at login
+  - [x] status pushed to the renderer (replaces the engine card's refresh-on-navigation)
+  - [x] tests with a fake clock
+  - _decided:_ interval 4–6h in Settings (default 6); launch at login off by default with a Settings switch; discovery waits until Profile has a target role
 
 - [ ] **PR-14 — AI engine and budget guard**  Headless Claude Code with API-key fallback; token accounting.
   - _branch:_ `feat/ai-engine`

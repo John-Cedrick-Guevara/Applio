@@ -5,6 +5,9 @@ export function channelFor(method: keyof ApplioApi): string {
   return `applio:${method}`;
 }
 
+/** Main → renderer: the new `AppStatus` whenever it changes. Not an API method, so the renderer can't invoke it. */
+export const STATUS_CHANNEL = 'applio:status-changed';
+
 const REMOTE_PREFIX = /^Error invoking remote method '[^']*': (?:\w*Error: )?/;
 
 /**

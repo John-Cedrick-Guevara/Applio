@@ -118,9 +118,16 @@ export const API_METHODS = [
 type UnlistedMethod = Exclude<keyof ApplioApi, (typeof API_METHODS)[number]>;
 export const API_METHODS_COMPLETE: UnlistedMethod extends never ? true : UnlistedMethod = true;
 
+/** Pushes from main. Separate from `ApplioApi` because nothing here is a request. */
+export interface ApplioEvents {
+  /** Calls `listener` with each new status; returns the unsubscribe function. */
+  onStatus(listener: (status: AppStatus) => void): () => void;
+}
+
 declare global {
   interface Window {
     /** Exposed by the preload script via contextBridge; absent in browser dev. */
     applio?: ApplioApi;
+    applioEvents?: ApplioEvents;
   }
 }

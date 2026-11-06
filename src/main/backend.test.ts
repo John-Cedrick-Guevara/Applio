@@ -15,6 +15,8 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDatabase } from '../infra/db';
+import type { JobSource } from '../core/jobs/source';
+import { discovered } from '../core/triage/test-jobs';
 import { createSecretStore, type Encryptor } from '../infra/secrets/secret-store';
 import { createBackend, type BackendDeps } from './backend';
 
@@ -25,10 +27,26 @@ const fakeEncryptor: Encryptor = {
 };
 const RESUMES = join(__dirname, '../infra/resume/fixtures');
 
+/** One board that always lists the same two jobs; only one fits a "Backend Engineer" search. */
+const fakeBoard: JobSource = {
+  id: 'remotive', name: 'Remotive', dailyPollLimit: 4, hosts: [],
+  fetchJobs: vi.fn(async () => ({
+    jobs: [discovered({ externalId: '1', title: 'Senior Backend Engineer' }), discovered({ externalId: '2', title: 'Sales Manager' })],
+    dropped: 0,
+  })),
+};
+
 let dir = '';
 /** A backend over a temp Applio folder; call again with the same folder to simulate a restart. */
 const backendIn = (folder = (dir = mkdtempSync(join(tmpdir(), 'applio-backend-')))) => {
-  const deps: BackendDeps = { db: openDatabase(join(folder, 'applio.db')), secrets: createSecretStore(fakeEncryptor, join(folder, 'secrets.json')) };
+  const deps: BackendDeps = {
+    db: openDatabase(join(folder, 'applio.db')),
+    secrets: createSecretStore(fakeEncryptor, join(folder, 'secrets.json')),
+    sources: [fakeBoard],
+    httpFor: () => ({ getJson: async () => null, getText: async () => '' }),
+    onStatus: vi.fn(),
+    setLaunchAtLogin: vi.fn(),
+  };
   return { api: createBackend(() => null, deps), deps, folder };
 };
 
@@ -155,5 +173,61 @@ describe('createBackend profile, settings and secrets on disk', () => {
     electron.dialog.showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: [join(RESUMES, 'corrupt.pdf')] });
     await expect(api.importResume()).rejects.toThrow("Applio couldn't read corrupt.pdf");
     expect((await api.getProfile()).referenceResume).toBeUndefined();
+  });
+});
+
+describe('createBackend discovery', () => {
+  const searchingBackend = async (folder?: string) => {
+    const b = backendIn(folder);
+    const prefs = (await b.api.getProfile()).preferences;
+    await b.api.savePreferences({ ...prefs, targetRoles: ['Backend Engineer'] });
+    return b;
+  };
+
+  it('runs discovery, keeps the summary across a restart, and saves only the job that fits', async () => {
+    const { api, deps, folder } = await searchingBackend();
+    expect(await api.runDiscovery()).toMatchObject({ found: 2, newAfterDedup: 2, passedFilters: 1, drafted: 0 });
+    deps.db.close();
+    const after = backendIn(folder);
+    expect((await after.api.getStatus()).lastRun).toMatchObject({ found: 2, passedFilters: 1 });
+    expect(after.deps.db.prepare("SELECT title, status FROM jobs").all()).toEqual([{ title: 'Senior Backend Engineer', status: 'found' }]);
+  });
+
+  it('does not save the same job again on the next run', async () => {
+    const { api } = await searchingBackend();
+    await api.runDiscovery();
+    // The dropped job isn't stored, so it's new again and dropped again, for free.
+    expect(await api.runDiscovery()).toMatchObject({ found: 2, newAfterDedup: 1, passedFilters: 0 });
+  });
+
+  it('stays paused across a restart, refuses Run now, and shows no next run', async () => {
+    const { api, deps, folder } = backendIn();
+    expect((await api.getStatus()).nextRunAt).toBeDefined();
+    await api.setAutomationPaused(true);
+    deps.db.close();
+    const after = backendIn(folder).api;
+    expect(await after.getStatus()).toMatchObject({ paused: true, nextRunAt: undefined });
+    await expect(after.runDiscovery()).rejects.toThrow('Automation is paused. Resume it to run discovery');
+  });
+
+  it('pushes the new status when automation is paused or a run ends', async () => {
+    const { api, deps } = await searchingBackend();
+    await api.runDiscovery();
+    expect(deps.onStatus).toHaveBeenLastCalledWith(expect.objectContaining({ lastRun: expect.objectContaining({ passedFilters: 1 }) }));
+    await api.setAutomationPaused(true);
+    expect(deps.onStatus).toHaveBeenLastCalledWith(expect.objectContaining({ paused: true }));
+  });
+
+  it('turns launch at login on and off with the setting', async () => {
+    const { api, deps } = backendIn();
+    await api.saveSettings({ launchAtLogin: true });
+    expect(deps.setLaunchAtLogin).toHaveBeenLastCalledWith(true);
+    await api.saveSettings({ dailyTokenBudget: 1000 });
+    expect(deps.setLaunchAtLogin).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports tokens used today from the usage records', async () => {
+    const { api } = backendIn();
+    expect((await api.getStatus()).tokensToday).toBe(0);
   });
 });

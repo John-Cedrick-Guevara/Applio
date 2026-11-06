@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { openDatabase } from './database';
+import { openDatabase, transaction } from './database';
 import { MIGRATIONS } from './schema';
 
 let dir = '';
@@ -65,5 +65,19 @@ describe('openDatabase', () => {
       db.prepare(`SELECT name FROM pragma_table_info(?)`).all(t).map((c) => String(c.name)),
     );
     expect(columns.filter((c) => /password|secret|api_?key|(^|_)token($|_)/i.test(c))).toEqual([]);
+  });
+});
+
+describe('transaction', () => {
+  it('joins an outer transaction, so the whole outer one rolls back together', () => {
+    const db = openDatabase(':memory:');
+    db.exec('CREATE TABLE t (n INTEGER)');
+    expect(() =>
+      transaction(db, () => {
+        transaction(db, () => db.exec('INSERT INTO t VALUES (1)'));
+        throw new Error('later step failed');
+      }),
+    ).toThrow('later step failed');
+    expect(db.prepare('SELECT COUNT(*) AS n FROM t').get()).toEqual({ n: 0 });
   });
 });

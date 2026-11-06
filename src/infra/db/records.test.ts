@@ -85,4 +85,20 @@ describe('activity repository', () => {
       { step: 'tailor', tokens: 400 },
     ]);
   });
+
+  it('stores a run with its drop counts and source outcomes', () => {
+    const activity = createActivityRepo(openDatabase(':memory:'));
+    const details = { duplicates: 2, dropped: { blocklist: 0, type: 0, remote: 1, role: 3, pay: 0, hours: 0 }, sources: [{ sourceId: 'remotive', outcome: 'ok' as const, jobs: 6, dropped: 0 }] };
+    activity.addRun({ at: '2026-11-04T06:00:00.000Z', found: 6, newAfterDedup: 4, passedFilters: 0, drafted: 0 }, details);
+    expect(activity.latestRunDetails()).toEqual(details);
+  });
+
+  it('totals all tokens since a given time', () => {
+    const activity = createActivityRepo(openDatabase(':memory:'));
+    expect(activity.tokensSince('2026-11-04T00:00:00.000Z')).toBe(0);
+    activity.recordUsage({ at: '2026-11-03T23:00:00.000Z', step: 'score', tokens: 999 });
+    activity.recordUsage({ at: '2026-11-04T08:00:00.000Z', step: 'score', tokens: 100 });
+    activity.recordUsage({ at: '2026-11-04T09:30:00.000Z', step: 'tailor', tokens: 400 });
+    expect(activity.tokensSince('2026-11-04T00:00:00.000Z')).toBe(500);
+  });
 });

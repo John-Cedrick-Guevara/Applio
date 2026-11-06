@@ -12,6 +12,8 @@ export const DEFAULT_SETTINGS: Omit<Settings, 'secretsSet'> = {
   autoSendThreshold: 85,
   maxPerChannelPerDay: 10,
   dailyTokenBudget: 150_000,
+  discoveryIntervalHours: 6,
+  launchAtLogin: false,
   blocklist: [],
 };
 

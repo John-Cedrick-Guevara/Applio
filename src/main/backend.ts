@@ -4,23 +4,41 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
+import { discover } from '../core/jobs/discover';
+import { localDay, runSources } from '../core/jobs/run-sources';
+import { createScheduler } from '../core/jobs/scheduler';
+import type { HttpGet, JobSource } from '../core/jobs/source';
 import { createProfileService } from '../core/profile/profile-service';
 import { createSettingsService } from '../core/settings/settings-service';
-import { createProfileRepo, createSettingsRepo, createSourcesRepo } from '../infra/db';
+import {
+  createActivityRepo, createJobsRepo, createPollsRepo, createProfileRepo, createSettingsRepo, createSourcesRepo, transaction,
+} from '../infra/db';
 import { readResumeText } from '../infra/resume/read-resume';
 import type { SecretStore } from '../infra/secrets/secret-store';
 import type { ApplioApi } from '../shared/api';
+import type { AppStatus } from '../shared/types';
 import { createMockApi } from '../shared/mock/mock-api';
 import { isSafeExternalUrl } from './security';
 
 /** Expands a leading `~` so stored folder paths work with the OS shell. */
 const expandHome = (path: string) => (path.startsWith('~') ? homedir() + path.slice(1) : path);
 
-/** Everything the backend persists to: the Applio database and the keychain-backed secret file. */
+/** Everything the backend persists to, the job sources it polls, and where status changes go. */
 export interface BackendDeps {
   db: DatabaseSync;
   secrets: SecretStore;
+  sources: readonly JobSource[];
+  httpFor: (source: JobSource) => HttpGet;
+  /** Pushes status to the page whenever it changes (scheduler AC-5). */
+  onStatus: (status: AppStatus) => void;
+  /** Registers or removes Applio as a login item (scheduler AC-6). */
+  setLaunchAtLogin: (open: boolean) => void;
 }
+
+/** The API, plus the scheduler tick main runs every minute and on wake. */
+export type Backend = ApplioApi & { tick(): Promise<void> };
+
+const PAUSED_KEY = 'automationPaused';
 
 /**
  * The backend the IPC layer serves. Profile, sources, settings and secrets are
@@ -28,11 +46,56 @@ export interface BackendDeps {
  * in-memory store until their PRs land. OS integration is real.
  * ponytail: remaining in-memory data resets on restart — replace with SQLite-backed services per feature.
  */
-export function createBackend(getWindow: () => BrowserWindow | null, { db, secrets }: BackendDeps): ApplioApi {
+export function createBackend(getWindow: () => BrowserWindow | null, { db, secrets, sources, httpFor, onStatus, setLaunchAtLogin }: BackendDeps): Backend {
   const store = createMockApi({ latencyMs: 0 });
   const kv = createSettingsRepo(db);
-  const settings = createSettingsService({ kv, sources: createSourcesRepo(db), secrets });
+  const jobs = createJobsRepo(db);
+  const activity = createActivityRepo(db);
+  const polls = createPollsRepo(db);
+  const sourcesRepo = createSourcesRepo(db);
+  const settings = createSettingsService({ kv, sources: sourcesRepo, secrets });
   const profile = createProfileService({ store: createProfileRepo(db), kv, newId: randomUUID, now: () => new Date() });
+  const isPaused = () => kv.get(PAUSED_KEY) === true;
+
+  const runDiscovery = () =>
+    discover({
+      poll: () => runSources({ sources, isEnabled: (id) => sourcesRepo.get(id)?.enabled ?? false, polls, httpFor, today: () => localDay(new Date()) }),
+      existingKeys: () => jobs.dedupKeys(),
+      filters: () => ({ preferences: profile.getProfile().preferences, blocklist: settings.getSettings().blocklist }),
+      save: (found, details, summary) =>
+        transaction(db, () => {
+          for (const { job, dedupKey } of found) jobs.insert(job, { dedupKey, createdAt: summary.at });
+          activity.addRun(summary, details);
+        }),
+      now: () => new Date(),
+      newId: randomUUID,
+    });
+
+  const scheduler = createScheduler({
+    now: () => new Date(),
+    intervalHours: () => settings.getSettings().discoveryIntervalHours,
+    lastRunAt: () => activity.latestRun()?.at,
+    isPaused,
+    run: runDiscovery,
+    onChange: () => pushStatus(),
+    log: console.error,
+  });
+
+  const getStatus = (): AppStatus => {
+    const { aiEngine, secretsSet, dailyTokenBudget } = settings.getSettings();
+    const now = new Date();
+    const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    return {
+      engine: aiEngine,
+      engineReady: aiEngine === 'claude-code' || secretsSet.anthropicApiKey,
+      paused: isPaused(),
+      nextRunAt: scheduler.nextRunAt(),
+      tokensToday: activity.tokensSince(midnight),
+      dailyTokenBudget,
+      lastRun: activity.latestRun(),
+    };
+  };
+  const pushStatus = () => onStatus(getStatus());
 
   /** Runs a synchronous service call as the async API method; a throw becomes a rejection. */
   const later = <A extends unknown[], R>(fn: (...args: A) => R) => async (...args: A) => fn(...args);
@@ -62,14 +125,27 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     listSources: later(settings.listSources),
     updateSource: later(settings.updateSource),
     getSettings: later(settings.getSettings),
-    saveSettings: later(settings.saveSettings),
-    setSecret: later(settings.setSecret),
+    // Engine, budget and interval all show in the status card, so a save pushes it.
+    saveSettings: later((patch) => {
+      const next = settings.saveSettings(patch);
+      if (patch.launchAtLogin !== undefined) setLaunchAtLogin(patch.launchAtLogin);
+      pushStatus();
+      return next;
+    }),
+    setSecret: later((key, value) => {
+      const next = settings.setSecret(key, value);
+      pushStatus();
+      return next;
+    }),
 
-    // Engine readiness and the token budget come from the real settings; the rest is still the mock scheduler.
-    getStatus: async () => {
-      const { aiEngine, secretsSet, dailyTokenBudget } = settings.getSettings();
-      return { ...(await store.getStatus()), engine: aiEngine, engineReady: aiEngine === 'claude-code' || secretsSet.anthropicApiKey, dailyTokenBudget };
-    },
+    getStatus: later(getStatus),
+    runDiscovery: () => scheduler.runNow(),
+    setAutomationPaused: later((paused) => {
+      kv.set(PAUSED_KEY, paused);
+      pushStatus();
+      return getStatus();
+    }),
+    tick: () => scheduler.tick(),
 
     // Readiness is real; the live send/ping arrives with the Gmail, Telegram and AI adapter PRs.
     testConnection: async (kind) => {

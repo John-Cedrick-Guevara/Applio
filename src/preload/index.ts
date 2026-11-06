@@ -1,6 +1,7 @@
-import { contextBridge, ipcRenderer } from 'electron';
-import { API_METHODS, type ApplioApi } from '../shared/api';
-import { channelFor, unwrapIpcError } from '../shared/ipc';
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
+import { API_METHODS, type ApplioApi, type ApplioEvents } from '../shared/api';
+import { channelFor, STATUS_CHANNEL, unwrapIpcError } from '../shared/ipc';
+import type { AppStatus } from '../shared/types';
 
 /**
  * Exposes `window.applio`: one async function per allow-listed API method,
@@ -21,3 +22,14 @@ const api = Object.fromEntries(
 ) as unknown as ApplioApi;
 
 contextBridge.exposeInMainWorld('applio', api);
+
+/** Status pushed by main. Only the payload crosses over, never the IPC event object. */
+const events: ApplioEvents = {
+  onStatus: (listener) => {
+    const handler = (_event: IpcRendererEvent, status: AppStatus) => listener(status);
+    ipcRenderer.on(STATUS_CHANNEL, handler);
+    return () => ipcRenderer.off(STATUS_CHANNEL, handler);
+  },
+};
+
+contextBridge.exposeInMainWorld('applioEvents', events);
