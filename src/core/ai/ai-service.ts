@@ -63,16 +63,25 @@ export function createAi(ports: AiPorts) {
     ];
   };
 
+  const usage = () => periods().map((p) => ({ ...p, used: ports.tokensSince(p.since) }));
+  const stopMessage = (p: ReturnType<typeof usage>[number]) => `${p.over} (${fmt(p.used)} of ${fmt(p.limit)}). AI resumes ${p.resumes}, or raise the budget in Settings.`;
+
   return {
+    /** The hard-stop message when a budget is used up, else undefined (SPEC F10). */
+    budgetStop(): string | undefined {
+      const full = usage().find((p) => p.used >= p.limit);
+      return full ? stopMessage(full) : undefined;
+    },
+
     /**
      * @throws AutomationPausedError for scheduled work while paused.
      * @throws QuotaExceededError once a budget is used up.
      */
     async run(request: AiRequest): Promise<AiReply> {
       if (request.trigger === 'scheduled' && ports.isPaused()) throw new AutomationPausedError();
-      const before = periods().map((p) => ({ ...p, used: ports.tokensSince(p.since) }));
+      const before = usage();
       const full = before.find((p) => p.used >= p.limit);
-      if (full) throw new QuotaExceededError(`${full.over} (${fmt(full.used)} of ${fmt(full.limit)}). AI resumes ${full.resumes}, or raise the budget in Settings.`);
+      if (full) throw new QuotaExceededError(stopMessage(full));
 
       const reply = await ports.engine().complete({ system: request.system, prompt: request.prompt, jobIds: request.jobIds });
       ports.record({
