@@ -1,6 +1,8 @@
 import { app, BrowserWindow, dialog, powerMonitor, safeStorage, shell } from 'electron';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
+import { createApiEngine } from '../infra/ai/api-engine';
+import { createClaudeCodeEngine } from '../infra/ai/claude-code-engine';
 import { openDatabase } from '../infra/db';
 import { createSecretStore } from '../infra/secrets/secret-store';
 import { createAllSources, createPoliteHttp, SOURCE_HOSTS } from '../infra/sources';
@@ -22,6 +24,13 @@ let quitting = false;
 const TICK_MS = 60_000;
 /** Names the app and links its repo, as the boards ask; never a personal email. */
 const USER_AGENT = 'Applio/0.1 (+https://github.com/John-Cedrick-Guevara/Applio)';
+
+/**
+ * PATH for spawning `claude`. An app opened from Finder or at login doesn't get the
+ * shell's PATH, so add the places Claude Code's installers use.
+ */
+const enginePath = () =>
+  [process.env.PATH, join(app.getPath('home'), '.local', 'bin'), '/opt/homebrew/bin', '/usr/local/bin'].filter(Boolean).join(delimiter);
 
 /** The one Applio folder: the database plus every generated application (SPEC F8). */
 const dataFolder = () => join(app.getPath('home'), 'Applio');
@@ -102,6 +111,17 @@ app.whenReady().then(() => {
       refreshTray();
     },
     setLaunchAtLogin: (openAtLogin) => app.setLoginItemSettings({ openAtLogin }),
+    engines: {
+      'claude-code': createClaudeCodeEngine({
+        command: 'claude',
+        // App data, not a project folder, so no CLAUDE.md or project settings load.
+        cwd: app.getPath('userData'),
+        env: { ...process.env, PATH: enginePath() },
+        // ponytail: no MCP servers until PR-15 adds Applio's; --strict-mcp-config keeps the operator's own out.
+        mcpConfig: () => JSON.stringify({ mcpServers: {} }),
+      }),
+      'api-key': createApiEngine({ apiKey: () => secrets.get('anthropicApiKey') }),
+    },
   });
   registerApiHandlers(backend, DEV_SERVER_URL);
   mainWindow = createWindow();

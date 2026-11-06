@@ -147,4 +147,13 @@ export const MIGRATIONS: readonly Migration[] = [
       ALTER TABLE run_summaries ADD COLUMN details TEXT;
     `,
   },
+  {
+    version: 4,
+    name: 'input and output tokens',
+    sql: `
+      -- \`tokens\` stays the total the budget counts; these split it for the usage page (SPEC F10).
+      ALTER TABLE usage_records ADD COLUMN input_tokens INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE usage_records ADD COLUMN output_tokens INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
 ];

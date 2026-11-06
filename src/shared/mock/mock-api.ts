@@ -287,7 +287,7 @@ export function createMockApi({ latencyMs = 250, now = () => new Date() }: MockO
           kind === 'gmail' ? settings.secretsSet.gmailAppPassword && !!settings.gmailAddress
           : kind === 'telegram' ? settings.secretsSet.telegramBotToken && !!settings.telegramChatId
           : settings.aiEngine === 'claude-code' || settings.secretsSet.anthropicApiKey;
-        if (!ready) return { ok: false, message: 'Missing credentials. Fill in the fields above first.' };
+        if (!ready) return { ok: false, message: kind === 'ai' ? 'Add your Anthropic API key below.' : 'Missing credentials. Fill in the fields above first.' };
         const message = kind === 'gmail' ? `Test email sent to ${settings.gmailAddress}` : kind === 'telegram' ? 'Test message delivered to Telegram' : 'Engine is ready';
         return { ok: true, message };
       }),

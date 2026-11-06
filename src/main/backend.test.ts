@@ -15,6 +15,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDatabase } from '../infra/db';
+import type { AiEngine } from '../core/ai/engine';
 import type { JobSource } from '../core/jobs/source';
 import { discovered } from '../core/triage/test-jobs';
 import { createSecretStore, type Encryptor } from '../infra/secrets/secret-store';
@@ -36,6 +37,12 @@ const fakeBoard: JobSource = {
   })),
 };
 
+/** Engines that only answer readiness; what they report is set per test. */
+const fakeEngine = (ready: boolean, message: string): AiEngine => ({
+  complete: async () => Promise.reject(new Error('not used here')),
+  check: vi.fn(async () => ({ ready, message })),
+});
+
 let dir = '';
 /** A backend over a temp Applio folder; call again with the same folder to simulate a restart. */
 const backendIn = (folder = (dir = mkdtempSync(join(tmpdir(), 'applio-backend-')))) => {
@@ -46,6 +53,10 @@ const backendIn = (folder = (dir = mkdtempSync(join(tmpdir(), 'applio-backend-')
     httpFor: () => ({ getJson: async () => null, getText: async () => '' }),
     onStatus: vi.fn(),
     setLaunchAtLogin: vi.fn(),
+    engines: {
+      'claude-code': fakeEngine(false, "Claude Code isn't signed in. Run `claude auth login` in a terminal, or switch to an Anthropic API key below."),
+      'api-key': fakeEngine(true, 'The Anthropic API accepted the key.'),
+    },
   };
   return { api: createBackend(() => null, deps), deps, folder };
 };
@@ -144,7 +155,6 @@ describe('createBackend profile, settings and secrets on disk', () => {
     expect(settings.secretsSet.anthropicApiKey).toBe(true);
     expect(deps.secrets.get('anthropicApiKey')).toBe(secret);
     expect(JSON.stringify(await api.getSettings())).not.toContain(secret);
-    expect((await api.getStatus()).engineReady).toBe(true);
     deps.db.close();
     for (const file of readdirSync(folder)) expect(readFileSync(join(folder, file)).toString('latin1')).not.toContain(secret);
   });
@@ -155,6 +165,20 @@ describe('createBackend profile, settings and secrets on disk', () => {
     await api.saveSettings({ telegramChatId: '12345' });
     await api.setSecret('telegramBotToken', '123:abc');
     expect(await api.testConnection('telegram')).toMatchObject({ ok: true });
+  });
+
+  it("tests the selected AI engine and shows Claude Code's reason when it needs setup", async () => {
+    const { api } = backendIn();
+    expect(await api.testConnection('ai')).toEqual({ ok: false, message: "Claude Code isn't signed in. Run `claude auth login` in a terminal, or switch to an Anthropic API key below." });
+    expect((await api.getStatus()).engineReady).toBe(false);
+    await api.saveSettings({ aiEngine: 'api-key' });
+    expect(await api.testConnection('ai')).toEqual({ ok: true, message: 'The Anthropic API accepted the key.' });
+    expect((await api.getStatus()).engineReady).toBe(true);
+  });
+
+  it('checks the engine on start and pushes whether it is ready', async () => {
+    const { deps } = backendIn();
+    await vi.waitFor(() => expect(deps.onStatus).toHaveBeenLastCalledWith(expect.objectContaining({ engineReady: false })));
   });
 
   it('suggests facts from an imported resume and adds none until accepted', async () => {

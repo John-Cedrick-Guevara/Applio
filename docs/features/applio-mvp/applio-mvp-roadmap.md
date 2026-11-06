@@ -219,15 +219,16 @@ Wire real data behind the same `ApplioApi`. Each PR replaces part of the mock st
   - [x] tests with a fake clock
   - _decided:_ interval 4–6h in Settings (default 6); launch at login off by default with a Settings switch; discovery waits until Profile has a target role
 
-- [ ] **PR-14 — AI engine and budget guard**  Headless Claude Code with API-key fallback; token accounting.
+- [x] **PR-14 — AI engine and budget guard**  Headless Claude Code with API-key fallback; token accounting.
   - _branch:_ `feat/ai-engine`
   - _PR title:_ `feat: add ai engine with token budget guard`
   - _why:_ one interface for both engines, and AI pauses at the budget hard stop (SPEC §2, F10)
   - _depends on:_ PR-10
-  - [ ] spec: `docs/features/ai-engine/ai-engine-spec.md`
-  - [ ] `claude -p --output-format stream-json --strict-mcp-config` runner; Anthropic API fallback with the saved key
-  - [ ] usage recorded per run / job / step; hard stop at 100% of the daily or monthly budget
-  - [ ] tests with a fake engine
+  - [x] spec: `docs/features/ai-engine/ai-engine-spec.md`
+  - [x] `claude -p --output-format stream-json --strict-mcp-config` runner; Anthropic API fallback with the saved key
+  - [x] usage recorded per run / job / step; hard stop at 100% of the daily or monthly budget
+  - [x] tests with a fake engine
+  - _decided:_ `claude-opus-5-5` for every API step; monthly budget added (default 3M tokens); `@anthropic-ai/sdk` is the one new dependency
 
 - [ ] **PR-15 — MCP server**  The six tools Claude may call.
   - _branch:_ `feat/mcp-server`

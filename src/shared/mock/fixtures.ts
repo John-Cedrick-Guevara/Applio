@@ -261,6 +261,7 @@ export function seedSettings(): Settings {
     autoSendThreshold: 85,
     maxPerChannelPerDay: 10,
     dailyTokenBudget: 150_000,
+    monthlyTokenBudget: 3_000_000,
     discoveryIntervalHours: 6,
     launchAtLogin: false,
     blocklist: ['[Current employer]', 'Quillstack'],

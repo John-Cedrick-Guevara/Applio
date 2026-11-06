@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
+import type { AiEngine } from '../core/ai/engine';
 import { discover } from '../core/jobs/discover';
 import { localDay, runSources } from '../core/jobs/run-sources';
 import { createScheduler } from '../core/jobs/scheduler';
@@ -16,7 +17,7 @@ import {
 import { readResumeText } from '../infra/resume/read-resume';
 import type { SecretStore } from '../infra/secrets/secret-store';
 import type { ApplioApi } from '../shared/api';
-import type { AppStatus } from '../shared/types';
+import type { AiEngine as EngineKind, AppStatus } from '../shared/types';
 import { createMockApi } from '../shared/mock/mock-api';
 import { isSafeExternalUrl } from './security';
 
@@ -33,6 +34,8 @@ export interface BackendDeps {
   onStatus: (status: AppStatus) => void;
   /** Registers or removes Applio as a login item (scheduler AC-6). */
   setLaunchAtLogin: (open: boolean) => void;
+  /** One engine per Settings choice (SPEC §2). */
+  engines: Record<EngineKind, AiEngine>;
 }
 
 /** The API, plus the scheduler tick main runs every minute and on wake. */
@@ -46,7 +49,7 @@ const PAUSED_KEY = 'automationPaused';
  * in-memory store until their PRs land. OS integration is real.
  * ponytail: remaining in-memory data resets on restart — replace with SQLite-backed services per feature.
  */
-export function createBackend(getWindow: () => BrowserWindow | null, { db, secrets, sources, httpFor, onStatus, setLaunchAtLogin }: BackendDeps): Backend {
+export function createBackend(getWindow: () => BrowserWindow | null, { db, secrets, sources, httpFor, onStatus, setLaunchAtLogin, engines }: BackendDeps): Backend {
   const store = createMockApi({ latencyMs: 0 });
   const kv = createSettingsRepo(db);
   const jobs = createJobsRepo(db);
@@ -81,13 +84,25 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     log: console.error,
   });
 
+  // Last readiness check per engine. Checks spawn Claude Code or call the API, so they run on
+  // start, on an engine or key change, and on Test, not on every status read.
+  const engineChecks: Partial<Record<EngineKind, { ready: boolean; message: string }>> = {};
+  const checkEngine = async () => {
+    const kind = settings.getSettings().aiEngine;
+    const result = await engines[kind].check();
+    engineChecks[kind] = result;
+    pushStatus();
+    return result;
+  };
+
   const getStatus = (): AppStatus => {
     const { aiEngine, secretsSet, dailyTokenBudget } = settings.getSettings();
+    // Until the first check returns, a saved key (or Claude Code, the default) counts as ready.
     const now = new Date();
     const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
     return {
       engine: aiEngine,
-      engineReady: aiEngine === 'claude-code' || secretsSet.anthropicApiKey,
+      engineReady: engineChecks[aiEngine]?.ready ?? (aiEngine === 'claude-code' || secretsSet.anthropicApiKey),
       paused: isPaused(),
       nextRunAt: scheduler.nextRunAt(),
       tokensToday: activity.tokensSince(midnight),
@@ -96,6 +111,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     };
   };
   const pushStatus = () => onStatus(getStatus());
+  void checkEngine().catch((err: unknown) => console.error('[engine] check failed', err));
 
   /** Runs a synchronous service call as the async API method; a throw becomes a rejection. */
   const later = <A extends unknown[], R>(fn: (...args: A) => R) => async (...args: A) => fn(...args);
@@ -129,11 +145,13 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     saveSettings: later((patch) => {
       const next = settings.saveSettings(patch);
       if (patch.launchAtLogin !== undefined) setLaunchAtLogin(patch.launchAtLogin);
+      if (patch.aiEngine !== undefined) void checkEngine();
       pushStatus();
       return next;
     }),
     setSecret: later((key, value) => {
       const next = settings.setSecret(key, value);
+      if (key === 'anthropicApiKey') void checkEngine();
       pushStatus();
       return next;
     }),
@@ -147,13 +165,14 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     }),
     tick: () => scheduler.tick(),
 
-    // Readiness is real; the live send/ping arrives with the Gmail, Telegram and AI adapter PRs.
+    // AI is a live check. Gmail and Telegram check saved credentials; their live test comes with their PRs.
     testConnection: async (kind) => {
-      const { secretsSet, gmailAddress, telegramChatId, aiEngine } = settings.getSettings();
-      const ready =
-        kind === 'gmail' ? secretsSet.gmailAppPassword && !!gmailAddress
-        : kind === 'telegram' ? secretsSet.telegramBotToken && !!telegramChatId
-        : aiEngine === 'claude-code' || secretsSet.anthropicApiKey;
+      if (kind === 'ai') {
+        const { ready, message } = await checkEngine();
+        return { ok: ready, message };
+      }
+      const { secretsSet, gmailAddress, telegramChatId } = settings.getSettings();
+      const ready = kind === 'gmail' ? secretsSet.gmailAppPassword && !!gmailAddress : secretsSet.telegramBotToken && !!telegramChatId;
       if (!ready) return { ok: false, message: 'Missing credentials. Fill in the fields above first.' };
       return { ok: true, message: 'Credentials saved. A live test arrives with this integration.' };
     },

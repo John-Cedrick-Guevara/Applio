@@ -28,6 +28,15 @@ describe('SettingsPage', () => {
     expect((await api.getSettings()).launchAtLogin).toBe(true);
   });
 
+  it('shows whether the AI engine is ready, and why not', async () => {
+    renderWithApp(<SettingsPage />);
+    const engine = await screen.findByRole('radiogroup', { name: 'AI engine' });
+    expect(await screen.findByText('Ready', { selector: '.badge' })).toBeInTheDocument();
+    await userEvent.click(within(engine).getByRole('radio', { name: 'API key' }));
+    expect(await screen.findByText('Needs setup')).toBeInTheDocument();
+    expect(screen.getByText('Add your Anthropic API key below.')).toBeInTheDocument();
+  });
+
   it('switches platform apply to assisted fill', async () => {
     const { api } = renderWithApp(<SettingsPage />);
     await userEvent.click(await screen.findByRole('switch', { name: 'Assisted fill for Platform apply' }));
@@ -62,7 +71,7 @@ describe('SettingsPage', () => {
   it('stores an API key in the keychain without showing it again', async () => {
     const { api } = renderWithApp(<SettingsPage />);
     await userEvent.click(await screen.findByRole('radio', { name: 'API key' }));
-    expect(screen.getByText('Needs a key')).toBeInTheDocument();
+    expect(await screen.findByText('Needs setup')).toBeInTheDocument();
     const key = screen.getByLabelText('Anthropic API key');
     await userEvent.type(key, 'nope');
     await userEvent.click(screen.getByRole('button', { name: 'Save to keychain' }));
