@@ -316,11 +316,11 @@ describe('createBackend discovery', () => {
 
   it("scores the run's new jobs through the engine, charging the tokens to today", async () => {
     const { api, deps } = await searchingBackend();
-    // Stands in for Claude calling save_match through the tools.
-    const complete = vi.fn(async ({ jobIds }: { jobIds: readonly string[] }) => {
-      for (const id of jobIds) createJobsRepo(deps.db).saveMatch(id, { score: 60, roleSummary: 'APIs', descriptionSummary: 'Remote', strengths: [], gaps: [] });
-      return { text: 'done', inputTokens: 900, outputTokens: 100 };
-    });
+    // Stands in for Claude answering a scoring call with JSON.
+    const complete = vi.fn(async ({ jobIds }: { jobIds: readonly string[] }) => ({
+      text: JSON.stringify(jobIds.map((jobId) => ({ jobId, score: 60, roleSummary: 'APIs', descriptionSummary: 'Remote', strengths: [], gaps: [] }))),
+      inputTokens: 900, outputTokens: 100,
+    }));
     deps.engines['claude-code'] = { complete, check: async () => ({ ready: true, message: 'ok' }) };
     await api.runDiscovery();
     // Below the draft threshold, so this run scores and drafts nothing.
@@ -343,10 +343,9 @@ describe('createBackend discovery', () => {
     const complete = vi.fn(async ({ prompt, jobIds }: { prompt: string; jobIds: readonly string[] }) => {
       const tools = createTools(createToolPorts(deps.db, jobIds, () => new Date()));
       const call = (name: string, input: unknown) => tools.find((t) => t.name === name)!.call(input);
-      for (const jobId of jobIds) {
-        if (prompt.startsWith('Score')) call('save_match', { jobId, score: 90, roleSummary: 'APIs', descriptionSummary: 'Remote', strengths: [{ text: 'Fast APIs', factId: fact.id }], gaps: [] });
-        else call('save_draft', { jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ heading: 'Acme', items: [{ text: 'Cut latency 40%', factId: fact.id }] }], coverLetter: 'Dear team', answers: [] });
-      }
+      // Scoring is one turn that answers with JSON; drafting goes through the tools.
+      if (prompt.startsWith('Score')) return { text: JSON.stringify(jobIds.map((jobId) => ({ jobId, score: 90, roleSummary: 'APIs', descriptionSummary: 'Remote', strengths: [{ text: 'Fast APIs', factId: fact.id }], gaps: [] }))), inputTokens: 900, outputTokens: 100 };
+      for (const jobId of jobIds) call('save_draft', { jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ heading: 'Acme', items: [{ text: 'Cut latency 40%', factId: fact.id }] }], coverLetter: 'Dear team', answers: [] });
       return { text: 'done', inputTokens: 900, outputTokens: 100 };
     });
     deps.engines['claude-code'] = { complete, check: async () => ({ ready: true, message: 'ok' }) };
@@ -375,10 +374,9 @@ describe('createBackend discovery', () => {
       complete: async ({ prompt, jobIds }) => {
         const tools = createTools(createToolPorts(b.deps.db, jobIds, () => new Date()));
         const call = (name: string, input: unknown) => tools.find((t) => t.name === name)!.call(input);
-        for (const jobId of jobIds) {
-          if (prompt.startsWith('Score')) call('save_match', { jobId, score: 90, roleSummary: 'APIs', descriptionSummary: 'Remote', strengths: [{ text: 'Fast APIs', factId: fact.id }], gaps: [] });
-          else call('save_draft', { jobId, kind: 'cover-letter', headline: 'Backend engineer', summary: 's', resume: [{ heading: 'Acme', items: [{ text: 'Cut latency 40%', factId: fact.id }] }], coverLetter: 'Dear team', answers: [] });
-        }
+        // Scoring is one turn that answers with JSON; drafting goes through the tools.
+        if (prompt.startsWith('Score')) return { text: JSON.stringify(jobIds.map((jobId) => ({ jobId, score: 90, roleSummary: 'APIs', descriptionSummary: 'Remote', strengths: [{ text: 'Fast APIs', factId: fact.id }], gaps: [] }))), inputTokens: 900, outputTokens: 100 };
+        for (const jobId of jobIds) call('save_draft', { jobId, kind: 'cover-letter', headline: 'Backend engineer', summary: 's', resume: [{ heading: 'Acme', items: [{ text: 'Cut latency 40%', factId: fact.id }] }], coverLetter: 'Dear team', answers: [] });
         return { text: 'done', inputTokens: 900, outputTokens: 100 };
       },
     };
@@ -427,10 +425,9 @@ describe('createBackend discovery', () => {
       check: async () => ({ ready: true, message: 'ok' }),
       complete: async ({ prompt, jobIds }) => {
         const call = (name: string, input: unknown) => createTools(createToolPorts(b.deps.db, jobIds, () => new Date())).find((t) => t.name === name)!.call(input);
-        for (const jobId of jobIds) {
-          if (prompt.startsWith('Score')) call('save_match', { jobId, score: 90, roleSummary: 'r', descriptionSummary: 'd', strengths: [], gaps: [] });
-          else call('save_draft', { jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ heading: 'A', items: [{ text: 'Shipped APIs', factId: fact.id }] }], coverLetter: 'Hi', answers: [] });
-        }
+        // Scoring is one turn that answers with JSON; drafting goes through the tools.
+        if (prompt.startsWith('Score')) return { text: JSON.stringify(jobIds.map((jobId) => ({ jobId, score: 90, roleSummary: 'r', descriptionSummary: 'd', strengths: [], gaps: [] }))), inputTokens: 900, outputTokens: 100 };
+        for (const jobId of jobIds) call('save_draft', { jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ heading: 'A', items: [{ text: 'Shipped APIs', factId: fact.id }] }], coverLetter: 'Hi', answers: [] });
         return { text: 'done', inputTokens: 1, outputTokens: 1 };
       },
     };
@@ -522,10 +519,9 @@ describe('createBackend discovery', () => {
         // The board's job applies by email, so the channel allows sending on its own.
         for (const id of jobIds) b.deps.db.prepare("UPDATE jobs SET channel = 'email', apply_target = 'jobs@acme.com' WHERE id = ?").run(id);
         const call = (name: string, input: unknown) => createTools(createToolPorts(b.deps.db, jobIds, () => new Date())).find((t) => t.name === name)!.call(input);
-        for (const jobId of jobIds) {
-          if (prompt.startsWith('Score')) call('save_match', { jobId, score: 92, roleSummary: 'r', descriptionSummary: 'd', strengths: [], gaps: [] });
-          else call('save_draft', { jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ heading: 'A', items: [{ text: 'Shipped APIs', factId: fact.id }] }], coverLetter: 'Dear team', answers: [] });
-        }
+        // Scoring is one turn that answers with JSON; drafting goes through the tools.
+        if (prompt.startsWith('Score')) return { text: JSON.stringify(jobIds.map((jobId) => ({ jobId, score: 92, roleSummary: 'r', descriptionSummary: 'd', strengths: [], gaps: [] }))), inputTokens: 900, outputTokens: 100 };
+        for (const jobId of jobIds) call('save_draft', { jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ heading: 'A', items: [{ text: 'Shipped APIs', factId: fact.id }] }], coverLetter: 'Dear team', answers: [] });
         return { text: 'done', inputTokens: 1, outputTokens: 1 };
       },
     };
@@ -605,10 +601,9 @@ describe('createBackend discovery', () => {
       check: async () => ({ ready: true, message: 'ok' }),
       complete: async ({ prompt, jobIds }) => {
         const call = (name: string, input: unknown) => createTools(createToolPorts(b.deps.db, jobIds, () => new Date())).find((t) => t.name === name)!.call(input);
-        for (const jobId of jobIds) {
-          if (prompt.startsWith('Score')) call('save_match', { jobId, score: 90, roleSummary: 'Builds APIs.', descriptionSummary: 'd', strengths: [], gaps: [] });
-          else call('save_draft', { jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ heading: 'A', items: [{ text: 'Shipped APIs', factId: fact.id }] }], coverLetter: 'Dear team, this letter stays private.', answers: [] });
-        }
+        // Scoring is one turn that answers with JSON; drafting goes through the tools.
+        if (prompt.startsWith('Score')) return { text: JSON.stringify(jobIds.map((jobId) => ({ jobId, score: 90, roleSummary: 'Builds APIs.', descriptionSummary: 'd', strengths: [], gaps: [] }))), inputTokens: 900, outputTokens: 100 };
+        for (const jobId of jobIds) call('save_draft', { jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ heading: 'A', items: [{ text: 'Shipped APIs', factId: fact.id }] }], coverLetter: 'Dear team, this letter stays private.', answers: [] });
         return { text: 'done', inputTokens: 1, outputTokens: 1 };
       },
     };

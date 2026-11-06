@@ -141,11 +141,10 @@ describe('MCP tools', () => {
     expect((vi.mocked(ports.saveDraft).mock.calls[0]![0] as Draft).kind).toBe('proposal');
   });
 
-  it('sends at most 3,000 characters of each posting, so a batch stays inside the tool output limit', () => {
+  it('sends postings without their boilerplate, as scoring does', () => {
     const { call, ports } = setup();
-    ports.job = (id) => (id === inScope.id ? { ...inScope, description: 'x'.repeat(10_000) } : undefined);
+    ports.job = (id) => (id === inScope.id ? { ...inScope, description: 'The role\nBuild APIs.\nWhat we offer\n- Free lunch' } : undefined);
     const [job] = JSON.parse(call('get_jobs')) as { description: string }[];
-    expect(job!.description).toHaveLength(3001);
-    expect(job!.description.endsWith('…')).toBe(true);
+    expect(job!.description).toBe('The role\nBuild APIs.');
   });
 });

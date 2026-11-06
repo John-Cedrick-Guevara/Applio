@@ -19,6 +19,8 @@ export interface AiRequest {
   runId?: number;
   /** The jobs this call is about: the tools' scope, and the usage row's job when there's one. */
   jobIds: readonly string[];
+  /** False for a one-turn call that answers in text (scoring); Applio's tools are offered otherwise. */
+  tools?: boolean;
   /** Scheduled work stops while automation is paused; what the operator asks for still runs (MNB-1). */
   trigger: 'scheduled' | 'operator';
 }
@@ -83,7 +85,7 @@ export function createAi(ports: AiPorts) {
       const full = before.find((p) => p.used >= p.limit);
       if (full) throw new QuotaExceededError(stopMessage(full));
 
-      const reply = await ports.engine().complete({ system: request.system, prompt: request.prompt, jobIds: request.jobIds });
+      const reply = await ports.engine().complete({ system: request.system, prompt: request.prompt, jobIds: request.jobIds, ...(request.tools === false ? { tools: false } : {}) });
       ports.record({
         at: ports.now().toISOString(),
         step: request.step,
