@@ -136,6 +136,8 @@ function ConnectionRow({ title, ready, readyText, setupText, field, secret, test
   const [value, setValue] = useState(field.value);
   const [secretValue, setSecretValue] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // A connected row hides its fields; Change brings them back to replace a token or chat.
+  const [editing, setEditing] = useState(false);
 
   const saveField = async () => {
     const v = value.trim();
@@ -165,7 +167,7 @@ function ConnectionRow({ title, ready, readyText, setupText, field, secret, test
           <span className={ready ? 'badge badge-success' : 'badge badge-warning'}>{ready ? 'Connected' : 'Not set up'}</span>
         </div>
         <div className="cell-sub settings-desc">{ready ? readyText : setupText}</div>
-        {ready ? null : (
+        {ready && !editing ? null : (
           <div className="connection-fields">
             <div className="field">
               <label htmlFor={`f-${field.key}`}>{field.label}</label>
@@ -190,7 +192,10 @@ function ConnectionRow({ title, ready, readyText, setupText, field, secret, test
           </div>
         )}
       </div>
-      <Button busy={action.pending} onClick={runTest}>{action.pending ? 'Sending…' : test.label}</Button>
+      <div className="row">
+        {ready && !editing ? <Button variant="ghost" aria-label={`Change ${title}`} onClick={() => setEditing(true)}>Change</Button> : null}
+        <Button busy={action.pending} onClick={runTest}>{action.pending ? 'Sending…' : test.label}</Button>
+      </div>
     </div>
   );
 }

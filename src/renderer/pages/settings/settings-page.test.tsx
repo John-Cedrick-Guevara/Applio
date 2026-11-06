@@ -107,4 +107,18 @@ describe('SettingsPage', () => {
     expect(screen.getByRole('button', { name: /Copy/ })).toBeInTheDocument();
     expect(screen.getByText('Needs setup')).toBeInTheDocument();
   });
+
+  it('lets a connected Telegram bot get a new token', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    await api.saveSettings({ telegramChatId: '42' });
+    await api.setSecret('telegramBotToken', '1:old');
+    renderWithApp(<SettingsPage />, api);
+    expect(await screen.findByText('Connected')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Bot token')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Change Telegram' }));
+    await userEvent.type(screen.getByLabelText('Bot token'), '1:new');
+    await userEvent.click(within(screen.getByLabelText('Bot token').closest('.field')!).getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText(/Bot token saved to your system keychain/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Chat ID')).toHaveValue('42');
+  });
 });
