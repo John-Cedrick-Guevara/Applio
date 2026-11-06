@@ -252,6 +252,7 @@ export function seedUsage(now: Date, period: UsagePeriod): Usage {
 export function seedSettings(): Settings {
   return {
     outputFolder: '~/JobApps',
+    fullName: '',
     aiEngine: 'claude-code',
     gmailAddress: '',
     telegramChatId: '',

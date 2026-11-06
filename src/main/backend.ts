@@ -1,11 +1,12 @@
 import { dialog, shell, type BrowserWindow } from 'electron';
 import { randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { basename } from 'node:path';
+import { basename, join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { createAi } from '../core/ai/ai-service';
 import type { AiEngine } from '../core/ai/engine';
+import { folderFor, jobMarkdown } from '../core/generation/application-folder';
 import { draftJobs } from '../core/generation/draft-jobs';
 import { discover } from '../core/jobs/discover';
 import { localDay, runSources } from '../core/jobs/run-sources';
@@ -17,11 +18,13 @@ import { createSettingsService } from '../core/settings/settings-service';
 import {
   createActivityRepo, createDraftsRepo, createJobsRepo, createPollsRepo, createProfileRepo, createSettingsRepo, createSourcesRepo, transaction,
 } from '../infra/db';
+import { findJobFolder, writeApplication } from '../infra/fs/application-files';
 import { readResumeText } from '../infra/resume/read-resume';
 import type { SecretStore } from '../infra/secrets/secret-store';
 import type { ApplioApi } from '../shared/api';
-import type { AiEngine as EngineKind, AppStatus } from '../shared/types';
+import type { Draft, AiEngine as EngineKind, AppStatus, Job } from '../shared/types';
 import { matchesFilter } from '../shared/job-filter';
+import { letterBody, pageHtml, resumeBody } from '../shared/templates/application-documents';
 import { createMockApi } from '../shared/mock/mock-api';
 import { isSafeExternalUrl } from './security';
 
@@ -38,6 +41,8 @@ export interface BackendDeps {
   onStatus: (status: AppStatus) => void;
   /** Registers or removes Applio as a login item (scheduler AC-6). */
   setLaunchAtLogin: (open: boolean) => void;
+  /** Renders one template page to PDF (Electron's printToPDF in the app). */
+  printPdf: (html: string) => Promise<Uint8Array>;
   /** One engine per Settings choice (SPEC §2). */
   engines: Record<EngineKind, AiEngine>;
 }
@@ -53,7 +58,7 @@ const PAUSED_KEY = 'automationPaused';
  * in-memory store until their PRs land. OS integration is real.
  * ponytail: remaining in-memory data resets on restart — replace with SQLite-backed services per feature.
  */
-export function createBackend(getWindow: () => BrowserWindow | null, { db, secrets, sources, httpFor, onStatus, setLaunchAtLogin, engines }: BackendDeps): Backend {
+export function createBackend(getWindow: () => BrowserWindow | null, { db, secrets, sources, httpFor, onStatus, setLaunchAtLogin, printPdf, engines }: BackendDeps): Backend {
   const store = createMockApi({ latencyMs: 0 });
   const kv = createSettingsRepo(db);
   const jobs = createJobsRepo(db);
@@ -95,6 +100,38 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     return job;
   };
 
+  // Application files (SPEC F8): the same template the Review preview shows, printed to PDF.
+  const outputRoot = () => expandHome(settings.getSettings().outputFolder ?? '~/Applio');
+  const owner = () => {
+    const { fullName, gmailAddress } = settings.getSettings();
+    return { name: fullName, email: gmailAddress };
+  };
+  /** A proposal stays editable Markdown (SPEC F8); a cover letter is a PDF. */
+  const letterName = (draft: Draft) => (draft.kind === 'proposal' ? 'proposal.md' : 'cover-letter.pdf');
+  const letterFile = async (job: Job, draft: Draft) =>
+    draft.kind === 'proposal' ? draft.coverLetter : printPdf(pageHtml(letterBody(draft, job, owner()), 'Cover letter'));
+
+  /** Prints both documents first, then writes the folder, so a failed print leaves nothing half-written. */
+  const saveFiles = async (jobId: string) => {
+    const job = getJob(jobId);
+    const draft = drafts.get(jobId);
+    if (!draft) return;
+    const files = {
+      'resume.pdf': await printPdf(pageHtml(resumeBody(draft, owner()), 'Resume')),
+      [letterName(draft)]: await letterFile(job, draft),
+      'job.md': jobMarkdown(job),
+    };
+    jobs.update(jobId, { folderPath: writeApplication(outputRoot(), folderFor(job, new Date()), files) });
+  };
+
+  /** The job's folder on disk, re-linked by job id if it was renamed or moved under the output folder. */
+  const jobFolder = (job: Job): string | undefined => {
+    if (job.folderPath && existsSync(expandHome(job.folderPath))) return expandHome(job.folderPath);
+    const found = findJobFolder(outputRoot(), job.id);
+    if (found) jobs.update(job.id, { folderPath: found });
+    return found;
+  };
+
   const runDiscovery = () =>
     discover({
       poll: () => runSources({ sources, isEnabled: (id) => sourcesRepo.get(id)?.enabled ?? false, polls, httpFor, today: () => localDay(new Date()) }),
@@ -115,6 +152,8 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
           autonomy: (sourceId) => sourcesRepo.get(sourceId)?.autonomy ?? 'draft',
           note,
           addTokens: (id, tokens) => jobs.update(id, { tokensUsed: (jobs.get(id)?.tokensUsed ?? 0) + tokens }),
+          // The draft stands even if its files fail; the note says why, and Review can retry later.
+          onDrafted: (id) => saveFiles(id).catch((err: unknown) => note(id, `Couldn't save the files: ${err instanceof Error ? err.message : String(err)}`)),
         }),
       finishRun: (runId, details, drafted) => activity.updateDetails(runId, details, drafted),
       now: () => new Date(),
@@ -182,13 +221,17 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     listJobs: later((filter = {}) => jobs.list(filter.statuses ? { statuses: filter.statuses } : undefined).filter((j) => matchesFilter(j, filter))),
     getJob: later(getJob),
     getDraft: later((jobId) => drafts.get(jobId) ?? null),
-    updateCoverLetter: later((jobId, coverLetter) => {
+    updateCoverLetter: async (jobId, coverLetter) => {
       const draft = drafts.get(jobId);
       if (!draft) throw new Error(`No draft for job ${jobId}`);
       const next = { ...draft, coverLetter, edited: true };
       drafts.save(next);
+      // What's on disk must match what gets sent, so the letter file follows the edit.
+      const job = getJob(jobId);
+      const folder = jobFolder(job);
+      if (folder) writeFileSync(join(folder, letterName(next)), await letterFile(job, next));
       return next;
-    }),
+    },
 
     getProfile: later(profile.getProfile),
     saveFact: later(profile.saveFact),
@@ -242,9 +285,17 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     },
 
     openJobFolder: async (jobId) => {
-      const { folderPath } = getJob(jobId);
-      if (!folderPath) throw new Error('This job has no folder yet');
-      await openWithShell(folderPath, "This job's folder isn't on disk yet. Applio creates it when it saves the application.");
+      const job = getJob(jobId);
+      if (!job.folderPath) throw new Error('This job has no folder yet');
+      await openWithShell(jobFolder(job) ?? job.folderPath, "This job's folder isn't on disk yet. Applio creates it when it saves the application.");
+    },
+
+    openDraftFile: async (jobId, file) => {
+      const job = getJob(jobId);
+      const draft = drafts.get(jobId);
+      const folder = jobFolder(job);
+      if (!draft || !folder) throw new Error("This job's files aren't saved yet.");
+      await openWithShell(join(folder, file === 'resume' ? 'resume.pdf' : letterName(draft)), 'That file is missing from the job folder. Open the folder to check it.');
     },
 
     openOutputFolder: async () => {

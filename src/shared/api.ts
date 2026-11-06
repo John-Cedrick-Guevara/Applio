@@ -61,6 +61,8 @@ export interface ApplioApi {
   // OS integration
   openExternal(url: string): Promise<void>;
   openJobFolder(jobId: string): Promise<void>;
+  /** Opens the job's résumé or letter (PDF, or proposal.md) in the system viewer. */
+  openDraftFile(jobId: string, file: 'resume' | 'letter'): Promise<void>;
   chooseFolder(): Promise<string | null>;
   openOutputFolder(): Promise<void>;
 
@@ -106,7 +108,7 @@ export const API_METHODS = [
   'listJobs', 'getJob', 'getDraft', 'updateCoverLetter', 'approveDraft', 'skipJob', 'markApplied', 'setStatus',
   'sendFollowUp', 'getInterviewPrep',
   'getStatus', 'runDiscovery', 'setAutomationPaused',
-  'openExternal', 'openJobFolder', 'chooseFolder', 'openOutputFolder',
+  'openExternal', 'openJobFolder', 'openDraftFile', 'chooseFolder', 'openOutputFolder',
   'analyzeJob', 'addJob',
   'getProfile', 'saveFact', 'deleteFact', 'saveAnswer', 'deleteAnswer', 'savePreferences', 'importResume',
   'listSources', 'updateSource',

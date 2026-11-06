@@ -3,6 +3,7 @@ import type { Preferences, Settings, Source } from './types';
 /** What a fresh install starts with (PR-10 AC-5). The mock seeds from these too, so both stay in step. */
 export const DEFAULT_SETTINGS: Omit<Settings, 'secretsSet'> = {
   outputFolder: '~/Applio',
+  fullName: '',
   aiEngine: 'claude-code',
   gmailAddress: '',
   telegramChatId: '',

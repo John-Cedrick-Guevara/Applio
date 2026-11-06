@@ -72,6 +72,7 @@ const PreferencesSchema = z.strictObject({
 /** Everything `saveSettings` may patch. `secretsSet` is derived in main, never written by the page. */
 const SettingsPatchSchema = z.strictObject({
   outputFolder: z.string().min(1).max(1024).optional(),
+  fullName: z.string().trim().max(120).optional(),
   aiEngine: AiEngineSchema.optional(),
   gmailAddress: z.union([z.literal(''), z.string().max(320).regex(EMAIL_PATTERN, 'is not an email address')]).optional(),
   telegramChatId: short.optional(),
@@ -110,6 +111,7 @@ export const API_ARGS = {
 
   openExternal: z.tuple([url]),
   openJobFolder: z.tuple([id]),
+  openDraftFile: z.tuple([id, z.enum(['resume', 'letter'])]),
   chooseFolder: none,
   openOutputFolder: none,
 

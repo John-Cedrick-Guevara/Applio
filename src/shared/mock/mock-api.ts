@@ -178,6 +178,7 @@ export function createMockApi({ latencyMs = 250, now = () => new Date() }: MockO
     // OS methods are no-ops here; Electron main and the browser dev build swap in real ones.
     openExternal: () => respond(undefined),
     openJobFolder: () => respond(undefined),
+    openDraftFile: () => respond(undefined),
     chooseFolder: () => respond('~/JobApps'),
     openOutputFolder: () => respond(undefined),
 
