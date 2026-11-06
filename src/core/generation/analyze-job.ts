@@ -3,7 +3,7 @@ import { describeRoute } from '../../shared/apply-route';
 import { AppError } from '../../shared/errors';
 import type { ApplyChannel, Job, JobPreview, JobStatus } from '../../shared/types';
 import type { AiRequest } from '../ai/ai-service';
-import type { AiReply } from '../ai/engine';
+import { budgetTokens, type AiReply } from '../ai/engine';
 import { detectChannel } from '../apply/channel';
 
 const ANALYZE_SYSTEM = `You read one job post a job seeker pasted, and score it for them, using Applio's tools.
@@ -85,7 +85,7 @@ export async function analyzePost(
     company: a.company, title: a.title, sourceName, tags: a.tags, score: a.score, summary: a.roleSummary,
     channel: route.channel, channelLabel: described.channelLabel,
     route: dupe ? `Already in Applio (${dupe.status}). Adding it again is refused.` : described.route,
-    applyTarget: route.applyTarget, maxAutonomy: described.maxAutonomy, tokensUsed: reply.inputTokens + reply.outputTokens,
+    applyTarget: route.applyTarget, maxAutonomy: described.maxAutonomy, tokensUsed: budgetTokens(reply),
   };
   const job: AnalyzedJob = {
     sourceName, company: a.company, title: a.title, url: route.applyUrl ?? '', location: a.location, ...(a.salary ? { salary: a.salary } : {}),

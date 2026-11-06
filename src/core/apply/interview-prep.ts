@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { AppError } from '../../shared/errors';
 import type { InterviewPrep } from '../../shared/types';
 import type { AiRequest } from '../ai/ai-service';
-import type { AiReply } from '../ai/engine';
+import { budgetTokens, type AiReply } from '../ai/engine';
 
 const PREP_SYSTEM = `You prepare a job seeker for a reply or interview, using Applio's tools.
 Call get_jobs for the posting and get_profile for the fact bank. The user message has what was sent.
@@ -53,7 +53,7 @@ export async function interviewPrep(jobId: string, ports: PrepPorts): Promise<In
   });
   const parsed = PrepSchema.safeParse(firstObject(reply.text));
   if (!parsed.success) throw new AppError('prep_unreadable', "Claude's prep couldn't be read. Try again.");
-  const prep: InterviewPrep = { ...parsed.data, tokens: reply.inputTokens + reply.outputTokens };
+  const prep: InterviewPrep = { ...parsed.data, tokens: budgetTokens(reply) };
   ports.save(jobId, prep);
   return prep;
 }

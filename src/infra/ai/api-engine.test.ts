@@ -52,8 +52,8 @@ describe('Anthropic API engine', () => {
     });
   });
 
-  it('returns the text and counts cached input tokens as input', async () => {
-    expect(await setup().engine.complete({ prompt: 'x', jobIds: [] })).toEqual({ text: '{"score":82}', inputTokens: 150, outputTokens: 40 });
+  it('returns the text, with cache reads apart from fresh input and cache writes', async () => {
+    expect(await setup().engine.complete({ prompt: 'x', jobIds: [] })).toEqual({ text: '{"score":82}', inputTokens: 120, outputTokens: 40, cacheReadTokens: 30 });
   });
 
   it('never puts the key in the request it sends', async () => {
@@ -96,7 +96,7 @@ describe('Anthropic API engine', () => {
     ];
     const scopes: (readonly string[])[] = [];
     const { engine, sent } = setup(async () => turns.shift()!, () => KEY, (ids) => (scopes.push(ids), [echo]));
-    expect(await engine.complete({ prompt: 'Score', jobIds: ['j1'] })).toEqual({ text: '{"score":82}', inputTokens: 300, outputTokens: 80 });
+    expect(await engine.complete({ prompt: 'Score', jobIds: ['j1'] })).toEqual({ text: '{"score":82}', inputTokens: 240, outputTokens: 80, cacheReadTokens: 60 });
     expect(scopes).toEqual([['j1']]);
     expect(sent[0]!.tools).toEqual([{ name: 'get_jobs', description: 'Jobs', input_schema: { type: 'object', properties: {} } }]);
     expect(sent[1]!.messages.at(-1)).toEqual({ role: 'user', content: [

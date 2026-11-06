@@ -136,4 +136,14 @@ describe('activity repository', () => {
       step: 'score', tokens: 140, input_tokens: 100, output_tokens: 40, run_id: 3, job_id: 'j1',
     });
   });
+
+  it('keeps cache reads apart, and estimates a step from its last five calls', () => {
+    const db = openDatabase(':memory:');
+    const activity = createActivityRepo(db);
+    expect(activity.recentCost('score')).toBeUndefined();
+    for (const tokens of [100, 1000, 2000, 3000, 4000, 5000]) activity.recordUsage({ at: `2026-11-04T0${tokens % 9}:00:00.000Z`, step: 'score', tokens, cacheReadTokens: 50 });
+    activity.recordUsage({ at: '2026-11-04T09:00:00.000Z', step: 'tailor', tokens: 9999 });
+    expect(activity.recentCost('score')).toBe(3000);
+    expect(db.prepare('SELECT cache_read_tokens FROM usage_records LIMIT 1').get()).toEqual({ cache_read_tokens: 50 });
+  });
 });

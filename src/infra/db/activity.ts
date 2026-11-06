@@ -11,6 +11,7 @@ export interface UsageRecord {
   tokens: number;
   inputTokens?: number;
   outputTokens?: number;
+  cacheReadTokens?: number;
   jobId?: string;
   runId?: number;
 }
@@ -24,6 +25,8 @@ export interface ActivityRepo {
   /** Undefined when there's no run yet, or the last one predates run details. */
   latestRunDetails(): RunDetails | undefined;
   recordUsage(record: UsageRecord): void;
+  /** The mean budget tokens of the step's last 5 calls, or undefined with none: the pre-flight estimate. */
+  recentCost(step: UsageStep): number | undefined;
   /** Token totals per step at or after `since` (ISO time), steps in name order. */
   tokensByStep(since: string): { step: UsageStep; tokens: number }[];
   /** Each usage row at or after `since`, oldest first, for the usage page. */
@@ -36,8 +39,9 @@ export interface ActivityRepo {
 export function createActivityRepo(db: DatabaseSync): ActivityRepo {
   const insertRun = db.prepare('INSERT INTO run_summaries (at, found, new_after_dedup, passed_filters, drafted, details) VALUES (?, ?, ?, ?, ?, ?)');
   const selectLatest = db.prepare('SELECT * FROM run_summaries ORDER BY at DESC, id DESC LIMIT 1');
-  const insertUsage = db.prepare('INSERT INTO usage_records (at, step, tokens, input_tokens, output_tokens, job_id, run_id) VALUES (?, ?, ?, ?, ?, ?, ?)');
+  const insertUsage = db.prepare('INSERT INTO usage_records (at, step, tokens, input_tokens, output_tokens, cache_read_tokens, job_id, run_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
   const rowsSince = db.prepare('SELECT at, step, tokens FROM usage_records WHERE at >= ? ORDER BY at, id');
+  const recentFor = db.prepare('SELECT COUNT(*) AS n, AVG(tokens) AS avg FROM (SELECT tokens FROM usage_records WHERE step = ? ORDER BY id DESC LIMIT 5)');
   const setDetails = db.prepare('UPDATE run_summaries SET details = ?, drafted = ? WHERE id = ?');
   const sumSince = db.prepare('SELECT COALESCE(SUM(tokens), 0) AS tokens FROM usage_records WHERE at >= ?');
   const sumByStep = db.prepare('SELECT step, SUM(tokens) AS tokens FROM usage_records WHERE at >= ? GROUP BY step ORDER BY step');
@@ -56,7 +60,11 @@ export function createActivityRepo(db: DatabaseSync): ActivityRepo {
       const details = selectLatest.get()?.details;
       return details == null ? undefined : json<RunDetails>(details);
     },
-    recordUsage: (u) => void insertUsage.run(u.at, u.step, u.tokens, u.inputTokens ?? 0, u.outputTokens ?? 0, nullable(u.jobId), nullable(u.runId)),
+    recordUsage: (u) => void insertUsage.run(u.at, u.step, u.tokens, u.inputTokens ?? 0, u.outputTokens ?? 0, u.cacheReadTokens ?? 0, nullable(u.jobId), nullable(u.runId)),
+    recentCost: (step) => {
+      const row = recentFor.get(step);
+      return row?.n ? Math.round(Number(row.avg)) : undefined;
+    },
     usageSince: (since) => rowsSince.all(since).map((r) => ({ at: String(r.at), step: String(r.step) as UsageStep, tokens: Number(r.tokens) })),
     tokensSince: (since) => Number(sumSince.get(since)?.tokens ?? 0),
     tokensByStep: (since) => sumByStep.all(since).map((r) => ({ step: String(r.step) as UsageStep, tokens: Number(r.tokens) })),

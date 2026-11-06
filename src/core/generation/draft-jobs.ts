@@ -1,6 +1,6 @@
 import type { Autonomy, Draft, Job } from '../../shared/types';
 import { QuotaExceededError, type AiRequest } from '../ai/ai-service';
-import type { AiReply } from '../ai/engine';
+import { budgetTokens, type AiReply } from '../ai/engine';
 import { AutomationPausedError } from '../jobs/scheduler';
 
 /** The drafting instructions. Static, so prompt caching reuses them across jobs. */
@@ -72,7 +72,7 @@ export async function draftJobs(
           step: 'tailor', system: DRAFT_SYSTEM, prompt: `Draft a ${kindOf(job)} application for job ${id}.`, jobIds: [id],
           ...(runId !== undefined ? { runId } : {}), trigger,
         });
-        ports.addTokens(id, reply.inputTokens + reply.outputTokens);
+        ports.addTokens(id, budgetTokens(reply));
       } catch (err) {
         if (err instanceof QuotaExceededError || err instanceof AutomationPausedError) result.stopped = err.message;
         else failure = err instanceof Error ? err.message : String(err);

@@ -191,4 +191,12 @@ export const MIGRATIONS: readonly Migration[] = [
       ALTER TABLE sends ADD COLUMN message_id TEXT;
     `,
   },
+  {
+    version: 8,
+    name: 'cache reads',
+    sql: `
+      -- Input read from Claude's prompt cache, kept apart: it counts a tenth against the budget.
+      ALTER TABLE usage_records ADD COLUMN cache_read_tokens INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
 ];

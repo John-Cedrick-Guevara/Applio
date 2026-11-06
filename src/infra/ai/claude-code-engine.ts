@@ -89,8 +89,9 @@ export function createClaudeCodeEngine(options: Options): AiEngine {
       const usage = (result.usage ?? {}) as Record<string, unknown>;
       return {
         text: String(result.result ?? ''),
-        inputTokens: count(usage.input_tokens) + count(usage.cache_creation_input_tokens) + count(usage.cache_read_input_tokens),
+        inputTokens: count(usage.input_tokens) + count(usage.cache_creation_input_tokens),
         outputTokens: count(usage.output_tokens),
+        cacheReadTokens: count(usage.cache_read_input_tokens),
       };
     },
 

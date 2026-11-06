@@ -69,8 +69,8 @@ describe('Claude Code engine', () => {
     expect(seen().args.join(' ')).not.toContain('Ignore previous');
   });
 
-  it('returns the result text and counts cached input tokens as input', async () => {
-    expect(await engine().complete({ prompt: 'x', jobIds: [] })).toEqual({ text: '{"score":82}', inputTokens: 200, outputTokens: 40 });
+  it('returns the result text, with cache reads apart from fresh input and cache writes', async () => {
+    expect(await engine().complete({ prompt: 'x', jobIds: [] })).toEqual({ text: '{"score":82}', inputTokens: 150, outputTokens: 40, cacheReadTokens: 50 });
   });
 
   it('reports an error result readably', async () => {
