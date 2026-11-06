@@ -52,6 +52,10 @@ const withSeededJobs = (deps: BackendDeps) => {
   for (const job of seedJobs(new Date('2026-11-04T09:00:00.000Z'))) repo.insert(job, { dedupKey: job.id, createdAt: '2026-11-04T09:00:00.000Z' });
 };
 
+/** Messages "sent" through the fake SMTP transport, newest last. */
+let outbox: { to?: unknown; subject?: unknown; text?: unknown; attachments?: unknown }[] = [];
+beforeEach(() => (outbox = []));
+
 let dir = '';
 /** A backend over a temp Applio folder; call again with the same folder to simulate a restart. */
 const backendIn = (folder = (dir = mkdtempSync(join(tmpdir(), 'applio-backend-')))) => {
@@ -64,6 +68,8 @@ const backendIn = (folder = (dir = mkdtempSync(join(tmpdir(), 'applio-backend-')
     setLaunchAtLogin: vi.fn(),
     // Stands in for printToPDF: the "PDF" is the page's HTML, so tests can read what was printed.
     printPdf: vi.fn(async (html: string) => new TextEncoder().encode(html)),
+    // Stands in for Gmail's SMTP: records each message instead of sending it.
+    mailTransport: () => ({ sendMail: async (m) => void outbox.push(m) }),
     engines: {
       'claude-code': fakeEngine(false, "Claude Code isn't signed in. Run `claude auth login` in a terminal, or switch to an Anthropic API key below."),
       'api-key': fakeEngine(true, 'The Anthropic API accepted the key.'),
@@ -392,5 +398,73 @@ describe('createBackend discovery', () => {
     const [job] = await b.api.listJobs({ statuses: ['drafted'] });
     expect(job!.history.at(-1)?.note).toBe("Couldn't save the files: printing failed");
     expect(existsSync(join(home.dir, 'Applio'))).toBe(false);
+  });
+
+  const PASSWORD = 'abcd efgh ijkl mnop';
+  /** A drafted job switched to the email channel, with Gmail set up. */
+  const emailJob = async () => {
+    const b = await draftedBackend();
+    b.deps.db.prepare("UPDATE jobs SET channel = 'email', apply_target = 'jobs@acme.com' WHERE id = ?").run(b.job.id);
+    await b.api.saveSettings({ gmailAddress: 'sam@gmail.com' });
+    await b.api.setSecret('gmailAppPassword', PASSWORD);
+    return b;
+  };
+
+  it('sends an approved email application with the résumé, logs it in sent.md, and marks it applied', async () => {
+    const { api, job } = await emailJob();
+    expect(await api.approveDraft(job.id)).toMatchObject({ status: 'applied', sentBy: 'you-app' });
+    expect(outbox).toHaveLength(1);
+    expect(outbox[0]).toMatchObject({ to: 'jobs@acme.com', subject: 'Application: Senior Backend Engineer — Sam Rivera', text: 'Dear team' });
+    expect(readFileSync(join(job.folderPath!, 'sent.md'), 'utf8')).toContain('To: jobs@acme.com');
+  });
+
+  it('never sends twice, even on a double click', async () => {
+    const { api, job } = await emailJob();
+    const results = await Promise.allSettled([api.approveDraft(job.id), api.approveDraft(job.id)]);
+    expect(results.map((r) => r.status).sort()).toEqual(['fulfilled', 'rejected']);
+    expect(outbox).toHaveLength(1);
+  });
+
+  it('keeps the app password out of the database and every file it writes', async () => {
+    const { api, job, deps, folder } = await emailJob();
+    await api.approveDraft(job.id);
+    deps.db.close();
+    const files = [...readdirSync(folder).map((f) => join(folder, f)), ...readdirSync(job.folderPath!).map((f) => join(job.folderPath!, f))];
+    for (const f of files) expect(readFileSync(f).toString('latin1')).not.toContain(PASSWORD);
+  });
+
+  it('approves a career-site job without sending anything', async () => {
+    const { api, job } = await draftedBackend();
+    expect((await api.approveDraft(job.id)).status).toBe('approved');
+    expect(outbox).toEqual([]);
+  });
+
+  it('logs a manual application and a job the operator chose not to apply to', async () => {
+    const { api, job } = await draftedBackend();
+    await api.approveDraft(job.id);
+    expect(await api.markApplied(job.id)).toMatchObject({ status: 'applied', sentBy: 'you-manual' });
+    await expect(api.skipJob(job.id)).rejects.toThrow(`Job ${job.id} is already applied, so it can't be skipped`);
+  });
+
+  it('skips a drafted job', async () => {
+    const { api, job } = await draftedBackend();
+    expect((await api.skipJob(job.id)).status).toBe('skipped');
+  });
+
+  it('sends a test email to the operator’s own address', async () => {
+    const { api } = backendIn();
+    await api.saveSettings({ gmailAddress: 'sam@gmail.com' });
+    await api.setSecret('gmailAppPassword', PASSWORD);
+    expect(await api.testConnection('gmail')).toEqual({ ok: true, message: 'Test email sent to sam@gmail.com' });
+    expect(outbox[0]).toMatchObject({ to: 'sam@gmail.com', subject: 'Applio test email' });
+  });
+
+  it('keeps a sent application exactly as sent: its letter can no longer be edited', async () => {
+    const { api, job } = await emailJob();
+    await api.approveDraft(job.id);
+    const sentMd = readFileSync(join(job.folderPath!, 'sent.md'), 'utf8');
+    await expect(api.updateCoverLetter(job.id, 'A different letter')).rejects.toThrow('This application was already sent, so its letter stays as sent.');
+    expect((await api.getDraft(job.id))?.coverLetter).toBe('Dear team');
+    expect(readFileSync(join(job.folderPath!, 'sent.md'), 'utf8')).toBe(sentMd);
   });
 });

@@ -6,6 +6,7 @@ import { basename, join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { createAi } from '../core/ai/ai-service';
 import type { AiEngine } from '../core/ai/engine';
+import { approveDraft, type ApplyPorts } from '../core/apply/send-application';
 import { folderFor, jobMarkdown } from '../core/generation/application-folder';
 import { draftJobs } from '../core/generation/draft-jobs';
 import { discover } from '../core/jobs/discover';
@@ -16,8 +17,9 @@ import { createProfileService } from '../core/profile/profile-service';
 import { scoreJobs } from '../core/scoring/score-jobs';
 import { createSettingsService } from '../core/settings/settings-service';
 import {
-  createActivityRepo, createDraftsRepo, createJobsRepo, createPollsRepo, createProfileRepo, createSettingsRepo, createSourcesRepo, transaction,
+  createActivityRepo, createDraftsRepo, createJobsRepo, createSendsRepo, createPollsRepo, createProfileRepo, createSettingsRepo, createSourcesRepo, transaction,
 } from '../infra/db';
+import { createGmail, type MailTransport } from '../infra/email/gmail';
 import { findJobFolder, writeApplication } from '../infra/fs/application-files';
 import { readResumeText } from '../infra/resume/read-resume';
 import type { SecretStore } from '../infra/secrets/secret-store';
@@ -43,6 +45,8 @@ export interface BackendDeps {
   setLaunchAtLogin: (open: boolean) => void;
   /** Renders one template page to PDF (Electron's printToPDF in the app). */
   printPdf: (html: string) => Promise<Uint8Array>;
+  /** SMTP for Gmail; the real one in the app, a recorder in tests. */
+  mailTransport?: (auth: { user: string; pass: string }) => MailTransport;
   /** One engine per Settings choice (SPEC §2). */
   engines: Record<EngineKind, AiEngine>;
 }
@@ -51,6 +55,12 @@ export interface BackendDeps {
 export type Backend = ApplioApi & { tick(): Promise<void> };
 
 const PAUSED_KEY = 'automationPaused';
+/** Gmail sends per day before Applio stops (SPEC F10 default; Gmail itself allows about 500). */
+const GMAIL_DAILY_CAP = 100;
+/** Statuses a job can be skipped from: anything before it was sent. */
+const SKIPPABLE = new Set(['found', 'scored', 'drafted', 'approved']);
+/** Statuses the operator can log a manual application from (SPEC F5 manual handoff). */
+const MANUAL_APPLY_FROM = new Set(['scored', 'drafted', 'approved']);
 
 /**
  * The backend the IPC layer serves. Profile, sources, settings and secrets are
@@ -58,11 +68,12 @@ const PAUSED_KEY = 'automationPaused';
  * in-memory store until their PRs land. OS integration is real.
  * ponytail: remaining in-memory data resets on restart — replace with SQLite-backed services per feature.
  */
-export function createBackend(getWindow: () => BrowserWindow | null, { db, secrets, sources, httpFor, onStatus, setLaunchAtLogin, printPdf, engines }: BackendDeps): Backend {
+export function createBackend(getWindow: () => BrowserWindow | null, { db, secrets, sources, httpFor, onStatus, setLaunchAtLogin, printPdf, mailTransport, engines }: BackendDeps): Backend {
   const store = createMockApi({ latencyMs: 0 });
   const kv = createSettingsRepo(db);
   const jobs = createJobsRepo(db);
   const drafts = createDraftsRepo(db);
+  const sends = createSendsRepo(db);
   const activity = createActivityRepo(db);
   const polls = createPollsRepo(db);
   const sourcesRepo = createSourcesRepo(db);
@@ -181,6 +192,43 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     return result;
   };
 
+  /** Gmail with the saved address and app password. @throws when either is missing. */
+  const gmail = () => {
+    const user = settings.getSettings().gmailAddress;
+    const pass = secrets.get('gmailAppPassword');
+    if (!user || !pass) throw new Error('Set up Gmail in Settings first: your address and an app password.');
+    return createGmail({ user, pass, ...(mailTransport ? { transport: mailTransport } : {}) });
+  };
+
+  const localMidnight = () => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  };
+
+  const applyPorts: ApplyPorts = {
+    job: getJob,
+    draft: (id) => drafts.get(id),
+    transition: (id, status, extra) =>
+      transaction(db, () => {
+        if (extra?.sentBy) jobs.update(id, { sentBy: extra.sentBy });
+        return jobs.transition(id, { status, at: new Date().toISOString(), ...(extra?.note ? { note: extra.note } : {}) });
+      }),
+    note,
+    sendLog: sends,
+    sendEmail: (message) => gmail().send(message),
+    folder: (job) => jobFolder(job),
+    fileExists: existsSync,
+    writeFile: (path, text) => writeFileSync(path, text),
+    owner,
+    // ponytail: Gmail's cap is SPEC F10's default; the editable quota table comes with PR-24.
+    caps: () => ({ gmailDaily: GMAIL_DAILY_CAP, perChannel: settings.getSettings().maxPerChannelPerDay }),
+    dayStart: localMidnight,
+    now: () => new Date(),
+    saveAiAnswers: (answers) => {
+      for (const a of answers) profile.saveAnswer(a);
+    },
+  };
+
   const getStatus = (): AppStatus => {
     const { aiEngine, secretsSet, dailyTokenBudget } = settings.getSettings();
     // Until the first check returns, a saved key (or Claude Code, the default) counts as ready.
@@ -224,6 +272,8 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     updateCoverLetter: async (jobId, coverLetter) => {
       const draft = drafts.get(jobId);
       if (!draft) throw new Error(`No draft for job ${jobId}`);
+      // What went out stays as it went out (email-apply MNB-3): the folder must keep matching sent.md.
+      if (!['found', 'scored', 'drafted', 'approved'].includes(getJob(jobId).status)) throw new Error('This application was already sent, so its letter stays as sent.');
       const next = { ...draft, coverLetter, edited: true };
       drafts.save(next);
       // What's on disk must match what gets sent, so the letter file follows the edit.
@@ -258,6 +308,20 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       return next;
     }),
 
+    approveDraft: (jobId) => approveDraft(jobId, applyPorts),
+
+    markApplied: later((jobId) => {
+      const job = getJob(jobId);
+      if (!MANUAL_APPLY_FROM.has(job.status)) throw new Error(`Job ${jobId} cannot be marked applied from ${job.status}`);
+      return applyPorts.transition(jobId, 'applied', { sentBy: 'you-manual' });
+    }),
+
+    skipJob: later((jobId) => {
+      const job = getJob(jobId);
+      if (!SKIPPABLE.has(job.status)) throw new Error(`Job ${jobId} is already ${job.status}, so it can't be skipped`);
+      return applyPorts.transition(jobId, 'skipped');
+    }),
+
     getStatus: later(getStatus),
     runDiscovery: () => scheduler.runNow(),
     setAutomationPaused: later((paused) => {
@@ -267,14 +331,23 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     }),
     tick: () => scheduler.tick(),
 
-    // AI is a live check. Gmail and Telegram check saved credentials; their live test comes with their PRs.
+    // AI and Gmail are live checks. Telegram checks saved credentials; its live test comes with PR-22.
     testConnection: async (kind) => {
       if (kind === 'ai') {
         const { ready, message } = await checkEngine();
         return { ok: ready, message };
       }
       const { secretsSet, gmailAddress, telegramChatId } = settings.getSettings();
-      const ready = kind === 'gmail' ? secretsSet.gmailAppPassword && !!gmailAddress : secretsSet.telegramBotToken && !!telegramChatId;
+      if (kind === 'gmail') {
+        if (!secretsSet.gmailAppPassword || !gmailAddress) return { ok: false, message: 'Missing credentials. Fill in the fields above first.' };
+        try {
+          await gmail().sendTest();
+          return { ok: true, message: `Test email sent to ${gmailAddress}` };
+        } catch (err) {
+          return { ok: false, message: err instanceof Error ? err.message : String(err) };
+        }
+      }
+      const ready = secretsSet.telegramBotToken && !!telegramChatId;
       if (!ready) return { ok: false, message: 'Missing credentials. Fill in the fields above first.' };
       return { ok: true, message: 'Credentials saved. A live test arrives with this integration.' };
     },
