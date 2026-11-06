@@ -156,4 +156,23 @@ export const MIGRATIONS: readonly Migration[] = [
       ALTER TABLE usage_records ADD COLUMN output_tokens INTEGER NOT NULL DEFAULT 0;
     `,
   },
+  {
+    version: 5,
+    name: 'send log',
+    sql: `
+      -- One row per job that was (or is being) sent: the double-send guard and the record of exactly what went out (SPEC F7).
+      CREATE TABLE sends (
+        job_id TEXT PRIMARY KEY REFERENCES jobs (id) ON DELETE CASCADE,
+        channel TEXT NOT NULL,
+        state TEXT NOT NULL,
+        claimed_at TEXT NOT NULL,
+        sent_at TEXT,
+        recipient TEXT,
+        subject TEXT,
+        body TEXT,
+        attachments TEXT
+      );
+      CREATE INDEX sends_channel_claimed ON sends (channel, claimed_at);
+    `,
+  },
 ];
