@@ -23,12 +23,24 @@ const setup = ({ today = 0, month = 0, paused = false } = {}) => {
   return { ai: createAi(ports), engine, recorded, ports };
 };
 
-const request = { step: 'score' as const, prompt: 'Score these jobs', trigger: 'scheduled' as const };
+const request = { step: 'score' as const, prompt: 'Score these jobs', jobIds: ['j1', 'j2'], trigger: 'scheduled' as const };
 
 describe('AI service', () => {
+  it('passes the call\'s jobs to the engine as the tools\' scope', async () => {
+    const { ai, engine } = setup();
+    await ai.run(request);
+    expect(engine.complete).toHaveBeenCalledWith({ system: undefined, prompt: 'Score these jobs', jobIds: ['j1', 'j2'] });
+  });
+
+  it('records a batched call against its run only', async () => {
+    const { ai, recorded } = setup();
+    await ai.run({ ...request, runId: 7 });
+    expect(recorded[0]).not.toHaveProperty('jobId');
+  });
+
   it('returns the reply and records its tokens against the run, job and step', async () => {
     const { ai, recorded } = setup();
-    expect(await ai.run({ ...request, runId: 7, jobId: 'j1' })).toEqual({ text: 'ok', inputTokens: 300, outputTokens: 100 });
+    expect(await ai.run({ ...request, runId: 7, jobIds: ['j1'] })).toEqual({ text: 'ok', inputTokens: 300, outputTokens: 100 });
     expect(recorded).toEqual([{ at: NOW.toISOString(), step: 'score', inputTokens: 300, outputTokens: 100, runId: 7, jobId: 'j1' }]);
   });
 
