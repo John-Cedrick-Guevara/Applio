@@ -2,13 +2,12 @@ import { BrowserWindow } from 'electron';
 import type { ReadForm } from '../../core/apply/ats-form';
 import { planFill, type FillInput, type FillStep } from '../../core/apply/ats-plan';
 import type { AtsOutcome } from '../../core/apply/send-application';
+import { looksSubmitted } from './confirmation';
 import { extractForm } from './extract-form';
 import { click, pageText, setValue } from './page-scripts';
 
 const FORM_WAIT_MS = 20_000;
 const CONFIRM_WAIT_MS = 30_000;
-const DONE_URL = /thank|confirm|success|submitted|application-received/i;
-const DONE_TEXT = /thank(s| you) for (applying|your (application|interest))|application (was |has been )?(received|submitted)|we('ve| have) received your application/i;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -36,9 +35,7 @@ const apply = async (win: BrowserWindow, step: FillStep) => {
  * Fills and submits one ATS form in Applio's own window (SPEC F5 channel 2). It
  * stops and hands the visible window to the operator for a CAPTCHA, a question
  * with no saved answer, or a page with no form. It reports submitted only when
- * a thank-you page or message appears.
- * ponytail: success is read from common thank-you wording and URLs; add per-ATS
- * signals if a board's confirmation goes unnoticed.
+ * a thank-you page or message appears that wasn't there before Submit.
  */
 export async function submitAtsForm({ url, input, visible }: { url: string; input: FillInput; visible: boolean }): Promise<AtsOutcome> {
   const win = new BrowserWindow({
@@ -68,12 +65,11 @@ export async function submitAtsForm({ url, input, visible }: { url: string; inpu
     for (const step of plan.steps) await apply(win, step);
     if (plan.missing.length > 0) return handoff(`It asks things Applio has no saved answer for: ${plan.missing.slice(0, 3).join('; ')}${plan.missing.length > 3 ? '; …' : ''}.`);
 
-    const before = win.webContents.getURL();
+    const before = { url: win.webContents.getURL(), text: await inPage<string>(win, pageText).catch(() => '') };
     await inPage(win, click, form.submit);
     for (const start = Date.now(); Date.now() - start < CONFIRM_WAIT_MS; await sleep(1000)) {
-      const now = win.webContents.getURL();
-      const text = await inPage<string>(win, pageText).catch(() => '');
-      if ((now !== before && DONE_URL.test(now)) || DONE_TEXT.test(text)) {
+      const now = { url: win.webContents.getURL(), text: await inPage<string>(win, pageText).catch(() => '') };
+      if (looksSubmitted(before, now)) {
         const screenshot = (await win.webContents.capturePage()).toPNG();
         win.destroy();
         return { kind: 'submitted', filled: plan.steps, screenshot };

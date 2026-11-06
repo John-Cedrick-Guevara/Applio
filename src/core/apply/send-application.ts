@@ -77,6 +77,9 @@ export interface ApplyPorts {
   submitAts: (request: { url: string; input: FillInput; visible: boolean }) => Promise<AtsOutcome>;
 }
 
+/** The From header: the name quoted, so a comma or other address character in it can't split it into two addresses. */
+export const fromHeader = (name: string, email: string) => (name ? `"${name.replace(/["\\]/g, '')}" <${email}>` : email);
+
 const join = (dir: string, file: string) => `${dir.replace(/\/+$/, '')}/${file}`;
 
 /** `sent.md`: what was submitted, the channel, the time and the tokens (SPEC F8). */
@@ -152,7 +155,7 @@ export async function sendByEmail(jobId: string, sentBy: SentBy, ports: ApplyPor
 
   const { name, email } = ports.owner();
   const message: EmailMessage = {
-    from: name ? `${name} <${email}>` : email,
+    from: fromHeader(name, email),
     to: job.applyTarget,
     subject: name ? `Application: ${job.title} — ${name}` : `Application: ${job.title}`,
     text: draft.coverLetter,

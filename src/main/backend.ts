@@ -427,6 +427,8 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     updateCoverLetter: async (jobId, coverLetter) => {
       const draft = drafts.get(jobId);
       if (!draft) throw new Error(`No draft for job ${jobId}`);
+      // What went out stays as it went out (email-apply MNB-3): the folder must keep matching sent.md.
+      if (!['found', 'scored', 'drafted', 'approved'].includes(getJob(jobId).status)) throw new Error('This application was already sent, so its letter stays as sent.');
       const next = { ...draft, coverLetter, edited: true };
       drafts.save(next);
       // What's on disk must match what gets sent, so the letter file follows the edit.

@@ -710,4 +710,13 @@ describe('createBackend discovery', () => {
     expect(job).toMatchObject({ company: 'Brightline Studio', score: 84 });
     await expect(api.addJob({ ...preview, previewId: 'unknown' })).rejects.toThrow('Analyze the post again, then add it.');
   });
+
+  it('keeps a sent application exactly as sent: its letter can no longer be edited', async () => {
+    const { api, job } = await emailJob();
+    await api.approveDraft(job.id);
+    const sentMd = readFileSync(join(job.folderPath!, 'sent.md'), 'utf8');
+    await expect(api.updateCoverLetter(job.id, 'A different letter')).rejects.toThrow('This application was already sent, so its letter stays as sent.');
+    expect((await api.getDraft(job.id))?.coverLetter).toBe('Dear team');
+    expect(readFileSync(join(job.folderPath!, 'sent.md'), 'utf8')).toBe(sentMd);
+  });
 });

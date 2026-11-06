@@ -30,7 +30,7 @@ describe('sendFollowUp', () => {
     const { ports } = setup();
     await sendFollowUp('j1', 'Hi again, still keen.', ports);
     expect(ports.sendEmail).toHaveBeenCalledWith({
-      from: 'Sam Rivera <sam@gmail.com>', to: 'jobs@acme.com', subject: 'Re: Application: Engineer — Sam Rivera', text: 'Hi again, still keen.',
+      from: '"Sam Rivera" <sam@gmail.com>', to: 'jobs@acme.com', subject: 'Re: Application: Engineer — Sam Rivera', text: 'Hi again, still keen.',
       attachments: [], messageId: '<j1.2@applio.local>', inReplyTo: '<j1.1@applio.local>', references: '<j1.1@applio.local>',
     });
   });

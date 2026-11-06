@@ -24,6 +24,7 @@ Fill and submit standard ATS forms (Greenhouse, Lever, Ashby, Workable) in Appli
 - Jobs now store their apply link (migration 6). The form page is derived from it: Lever and Workable `/apply`, Ashby `/application`, Greenhouse the job page.
 
 ## Found while building
+- Found in review: thank-you wording already on the form page ("Thank you for your interest…") would have read as a confirmation, even after a submit that failed validation. Now only wording that appears after Submit, or a move to a confirmation URL, counts (`confirmation.test.ts`).
 - Lever's live apply page shows an hCaptcha frame, so Lever applications will be filled and handed to you to finish. That's the intended "CAPTCHA → hand off" rule (SPEC F5).
 - Workable's sample form includes an attention-check question ("Did you start your first answer with the exact phrase…"). The planner leaves it for you, as it should.
 - Verified by hand: the reader, sent into the live Lever page, read all 40 fields, so it's self-contained in a real page. Nothing was filled or submitted.

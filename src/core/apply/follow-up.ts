@@ -1,5 +1,5 @@
 import type { Job } from '../../shared/types';
-import { SendBlockedError, type EmailMessage } from './send-application';
+import { fromHeader, SendBlockedError, type EmailMessage } from './send-application';
 
 export interface FollowUpPorts {
   job: (id: string) => Job;
@@ -31,7 +31,7 @@ export async function sendFollowUp(jobId: string, text: string, ports: FollowUpP
   const { name, email } = ports.owner();
   const subject = `Re: ${original?.subject ?? `Application: ${job.title}`}`;
   await ports.sendEmail({
-    from: name ? `${name} <${email}>` : email,
+    from: fromHeader(name, email),
     to: job.applyTarget,
     subject,
     text,
