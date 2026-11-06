@@ -61,9 +61,16 @@ describe('MCP tools', () => {
 
   it('save a match for a job in scope', () => {
     const { call, ports } = setup();
-    const match = { jobId: inScope.id, score: 82, roleSummary: 'Backend APIs', descriptionSummary: 'Remote, Node', strengths: ['Node'], gaps: [] };
+    const match = { jobId: inScope.id, score: 82, roleSummary: 'Backend APIs', descriptionSummary: 'Remote, Node', strengths: [{ text: 'Low-latency APIs', factId: 'f1' }], gaps: ['Go'] };
     expect(call('save_match', match)).toBe('Saved.');
-    expect(ports.saveMatch).toHaveBeenCalledWith(inScope.id, { score: 82, roleSummary: 'Backend APIs', descriptionSummary: 'Remote, Node', strengths: ['Node'], gaps: [] });
+    expect(ports.saveMatch).toHaveBeenCalledWith(inScope.id, { score: 82, roleSummary: 'Backend APIs', descriptionSummary: 'Remote, Node', strengths: ['Low-latency APIs'], gaps: ['Go'] });
+  });
+
+  it('reject a strength citing a fact that is not in the bank', () => {
+    const { call, ports } = setup();
+    const match = { jobId: inScope.id, score: 82, roleSummary: 'r', descriptionSummary: 'd', strengths: [{ text: 'Led 50 people', factId: 'f9' }], gaps: [] };
+    expect(() => call('save_match', match)).toThrow('These fact IDs are not in the fact bank: f9. Use only facts from get_profile.');
+    expect(ports.saveMatch).not.toHaveBeenCalled();
   });
 
   it.each([
