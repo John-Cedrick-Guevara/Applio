@@ -6,7 +6,8 @@ import { basename, join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { createAi } from '../core/ai/ai-service';
 import type { AiEngine } from '../core/ai/engine';
-import { approveDraft, type ApplyPorts } from '../core/apply/send-application';
+import { approveDraft, type ApplyPorts, type AtsOutcome } from '../core/apply/send-application';
+import type { FillInput } from '../core/apply/ats-plan';
 import { folderFor, jobMarkdown } from '../core/generation/application-folder';
 import { draftJobs } from '../core/generation/draft-jobs';
 import { discover } from '../core/jobs/discover';
@@ -47,6 +48,8 @@ export interface BackendDeps {
   printPdf: (html: string) => Promise<Uint8Array>;
   /** SMTP for Gmail; the real one in the app, a recorder in tests. */
   mailTransport?: (auth: { user: string; pass: string }) => MailTransport;
+  /** Fills and submits an ATS form in Applio's own window (SPEC F5 channel 2). */
+  submitAts: (request: { url: string; input: FillInput }) => Promise<AtsOutcome>;
   /** One engine per Settings choice (SPEC §2). */
   engines: Record<EngineKind, AiEngine>;
 }
@@ -68,7 +71,7 @@ const MANUAL_APPLY_FROM = new Set(['scored', 'drafted', 'approved']);
  * in-memory store until their PRs land. OS integration is real.
  * ponytail: remaining in-memory data resets on restart — replace with SQLite-backed services per feature.
  */
-export function createBackend(getWindow: () => BrowserWindow | null, { db, secrets, sources, httpFor, onStatus, setLaunchAtLogin, printPdf, mailTransport, engines }: BackendDeps): Backend {
+export function createBackend(getWindow: () => BrowserWindow | null, { db, secrets, sources, httpFor, onStatus, setLaunchAtLogin, printPdf, mailTransport, submitAts, engines }: BackendDeps): Backend {
   const store = createMockApi({ latencyMs: 0 });
   const kv = createSettingsRepo(db);
   const jobs = createJobsRepo(db);
@@ -227,6 +230,8 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     saveAiAnswers: (answers) => {
       for (const a of answers) profile.saveAnswer(a);
     },
+    bankAnswers: () => profile.getProfile().answers.map(({ question, answer }) => ({ question, answer })),
+    submitAts,
   };
 
   const getStatus = (): AppStatus => {
