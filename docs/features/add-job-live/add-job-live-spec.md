@@ -20,6 +20,9 @@ Let any job the operator finds anywhere enter the pipeline by pasting its post o
 - Duplicates (AC-3): Add refuses a company + title Applio already has, naming the existing one and its status. Analyze already notes it in the route line.
 - Add saves the job as Scored, under the Clipped source, then drafts it in the same call as a run would (files included), even while paused. It never sends on its own, because Clipped is capped at Draft → Approve (MNB-2).
 
+## Found in review
+- Redirects were followed automatically, so a short link could lead onto a LinkedIn page. Redirects are now followed by hand, at most 5, and every hop is checked against the https and platform rules.
+
 ## Known risks
 - Platforms may still restrict accounts that use automation (warned in Settings).
 
