@@ -141,3 +141,14 @@
 }
 
 .schedule-select { width: auto; }
+
+.sign-in-command {
+  margin-top: var(--space-2);
+}
+
+.sign-in-command code {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+  word-break: break-all;
+}

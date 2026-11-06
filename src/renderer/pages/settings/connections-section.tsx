@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ConnectionKind, SecretKey, Settings } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { Button } from '../../components/button';
+import { CopyButton } from '../../components/copy-button';
 import { Card } from '../../components/card';
 import { useToast } from '../../components/toast';
 import { useAction } from '../../hooks/use-action';
@@ -77,6 +78,12 @@ function EngineRow({ settings, onChange }: Props) {
           <span className={ready ? 'badge badge-success' : 'badge badge-warning'}>{ready ? 'Ready' : 'Needs setup'}</span>
         </div>
         {check.data && !check.data.ok ? <div className="cell-sub settings-desc">{check.data.message}</div> : null}
+        {check.data && !check.data.ok && check.data.command ? (
+          <div className="row sign-in-command">
+            <code className="mono">{check.data.command}</code>
+            <CopyButton text={check.data.command} what="the sign-in command" />
+          </div>
+        ) : null}
         <div className="cell-sub settings-desc">
           {isApi
             ? 'Anthropic API with your own key. Pay per token; budget caps still apply.'
