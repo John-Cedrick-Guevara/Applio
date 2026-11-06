@@ -47,7 +47,7 @@ describe('Anthropic API engine', () => {
       model: 'claude-opus-5-5',
       betas: ['server-side-fallback-2026-07-01'],
       fallbacks: 'default',
-      system: 'You score jobs.',
+      system: [{ type: 'text', text: 'You score jobs.', cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: 'Score this' }],
     });
   });
@@ -115,5 +115,17 @@ describe('Anthropic API engine', () => {
   it('reports an answer cut off at the output limit instead of using it', async () => {
     const { engine } = setup(async () => message({ stop_reason: 'max_tokens' }));
     await expect(engine.complete({ prompt: 'x', jobIds: [] })).rejects.toThrow("Claude's answer was cut off before it finished. Try again.");
+  });
+
+  it('marks the system prompt for caching, so the fixed prefix is read cheaply on later calls', async () => {
+    const { engine, sent } = setup();
+    await engine.complete({ system: 'PREFIX', prompt: 'x', jobIds: [] });
+    expect(sent[0]!.system).toEqual([{ type: 'text', text: 'PREFIX', cache_control: { type: 'ephemeral' } }]);
+  });
+
+  it('offers no tools on a tool-free call', async () => {
+    const { engine, sent } = setup(undefined, () => KEY, () => [echo]);
+    await engine.complete({ prompt: 'x', jobIds: ['j1'], tools: false });
+    expect(sent[0]!.tools).toBeUndefined();
   });
 });

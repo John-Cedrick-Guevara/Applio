@@ -104,4 +104,11 @@ describe('Claude Code engine', () => {
     const { args } = seen();
     expect(JSON.parse(args[args.indexOf('--settings') + 1]!)).toEqual({ disableAllHooks: true });
   });
+
+  it('runs a tool-free call with no MCP server and no tools allowed', async () => {
+    await engine().complete({ prompt: 'x', jobIds: ['j1'], tools: false });
+    const { args } = seen();
+    expect(args[args.indexOf('--mcp-config') + 1]).toBe('{"mcpServers":{}}');
+    expect(args).not.toContain('--allowedTools');
+  });
 });

@@ -62,9 +62,9 @@ export function createApiEngine({ apiKey, client = (key) => new Anthropic({ apiK
   };
 
   return {
-    async complete({ system, prompt, jobIds }) {
+    async complete({ system, prompt, jobIds, tools: useTools = true }) {
       const api = connect();
-      const tools = toolsFor?.(jobIds) ?? [];
+      const tools = useTools ? (toolsFor?.(jobIds) ?? []) : [];
       const definitions = tools.map((t): BetaTool => ({ name: t.name, description: t.description, input_schema: t.inputSchema as BetaTool['input_schema'] }));
       const messages: BetaMessageParam[] = [{ role: 'user', content: prompt }];
       let inputTokens = 0;
@@ -80,7 +80,8 @@ export function createApiEngine({ apiKey, client = (key) => new Anthropic({ apiK
             // On a policy decline, the API retries on a fallback model inside the same call.
             betas: ['server-side-fallback-2026-07-01'],
             fallbacks: 'default',
-            ...(system ? { system } : {}),
+            // The system prompt is the fixed prefix (instructions, fact bank); marked so later calls read it from cache.
+            ...(system ? { system: [{ type: 'text' as const, text: system, cache_control: { type: 'ephemeral' as const } }] } : {}),
             ...(definitions.length > 0 ? { tools: definitions } : {}),
             messages: [...messages],
           })

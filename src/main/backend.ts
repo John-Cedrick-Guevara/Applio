@@ -25,7 +25,10 @@ import type { HttpGet, JobSource } from '../core/jobs/source';
 import { createProfileService } from '../core/profile/profile-service';
 import { draftReady, followUpDue, newMatch, quotaWarning, replyArrived, sentOnItsOwn, type BotMessage } from '../core/notify/messages';
 import { createTelegramBot } from '../core/notify/telegram-bot';
+import { jobCard } from '../core/scoring/job-card';
+import { scoringPrefix } from '../core/scoring/prefix';
 import { scoreJobs } from '../core/scoring/score-jobs';
+import { createToolPorts } from '../mcp/db-ports';
 import { buildUsage } from '../core/usage/build-usage';
 import { quotaLevel } from '../shared/quota';
 import { createBotApi } from '../infra/telegram/bot-api';
@@ -247,7 +250,19 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
           return activity.addRun(summary, details);
         }),
       score: async (jobIds, runId) => {
-        const result = await scoreJobs(jobIds, { runId, draftThreshold: settings.getSettings().draftThreshold }, { ai: ai.run, score: (id) => jobs.get(id)?.score, note });
+        const result = await scoreJobs(jobIds, { runId, draftThreshold: settings.getSettings().draftThreshold }, {
+          ai: (request) => ai.run(request),
+          prefix: () => scoringPrefix(profile.getProfile()),
+          cards: (ids) => ids.flatMap((id) => {
+            const job = jobs.get(id);
+            return job ? [jobCard(job)] : [];
+          }),
+          factIds: () => new Set(profile.getProfile().facts.map((f) => f.id)),
+          // The same save as the MCP tool: score, summaries and the found → scored move, together.
+          save: (id, match) => createToolPorts(db, [id], () => new Date()).saveMatch(id, match),
+          score: (id) => jobs.get(id)?.score,
+          note,
+        });
         // Strong matches from Notify-only sources are never drafted, so this message is all the operator gets.
         for (const id of result.toDraft) {
           const job = jobs.get(id);
