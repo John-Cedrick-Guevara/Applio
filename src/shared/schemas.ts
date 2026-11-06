@@ -46,6 +46,7 @@ const JobFilterSchema = z.strictObject({
 });
 
 const JobPreviewSchema = z.strictObject({
+  previewId: id,
   company: short,
   title: short,
   sourceName: short,

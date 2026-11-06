@@ -335,21 +335,30 @@ Wire real data behind the same `ApplioApi`. Each PR replaces part of the mock st
   - [x] tests with a fake bot API
   - _decided:_ summaries only, never letters; no library (fetch); stored update offset and notification keys, so nothing repeats
 
-- [ ] **PR-23 — Add job and assisted fill**  Real paste/link analysis; optional platform pre-fill.
+- [x] **PR-23a — Add job, live**  Real paste/link analysis and add.
   - _branch:_ `feat/add-job-live`
-  - _PR title:_ `feat: analyze pasted jobs and add assisted fill`
-  - _why:_ jobs from anywhere enter the pipeline (SPEC F2 Clip), and platform forms can be pre-filled, never submitted (F5 channel 3)
-  - _depends on:_ PR-17
-  - [ ] spec: `docs/features/add-job-live/add-job-live-spec.md`
-  - [ ] real `analyzeJob` / `addJob` via the AI engine
-  - [ ] assisted fill in the operator's signed-in session; operator clicks Submit
+  - _PR title:_ `feat: analyze and add pasted jobs`
+  - _why:_ jobs from anywhere enter the pipeline (SPEC F2 Clip)
+  - _depends on:_ PR-22
+  - [x] spec: `docs/features/add-job-live/add-job-live-spec.md`
+  - [x] real `analyzeJob` / `addJob` via the AI engine; public pages only, platform links never fetched
+  - [x] tests
+  - _decided:_ split from PR-23 (size); paste only, no extension; analyses held by preview id so Add saves exactly what was analyzed
+
+- [ ] **PR-23b — Assisted fill**  Optional platform pre-fill; the operator clicks Submit.
+  - _branch:_ `feat/assisted-fill`
+  - _PR title:_ `feat: pre-fill platform forms for the operator`
+  - _why:_ platform forms can be pre-filled, never submitted (F5 channels 3–4)
+  - _depends on:_ PR-23a
+  - [ ] spec: `docs/features/assisted-fill/assisted-fill-spec.md`
+  - [ ] assisted fill in the operator's signed-in session; operator clicks Submit; Upwork Connects line
   - [ ] tests
 
 - [ ] **PR-24 — Real usage and mock removal**  Usage dashboard from recorded data; mock store out of main.
   - _branch:_ `feat/usage-live`
   - _PR title:_ `feat: report real usage and remove the mock backend`
   - _why:_ the free-limit guard must show real numbers (SPEC F10); nothing in the app should run on fake data
-  - _depends on:_ PR-14, PR-22, PR-23
+  - _depends on:_ PR-14, PR-22, PR-23b
   - [ ] spec: `docs/features/usage-live/usage-live-spec.md`
   - [ ] real `getUsage` (tiles, guard table, steps, 7-day chart)
   - [ ] delete the mock spread from `src/main/backend.ts`; keep `src/shared/mock/` for browser dev and tests only

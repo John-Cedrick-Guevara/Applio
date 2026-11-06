@@ -64,7 +64,7 @@ describe('API argument schemas', () => {
 
     it('accepts a preview and rejects one with a score above 100', () => {
       const preview = {
-        company: 'Acme', title: 'Engineer', sourceName: 'Clipped', tags: ['Remote'], score: 80, summary: 'Builds things.',
+        previewId: 'p1', company: 'Acme', title: 'Engineer', sourceName: 'Clipped', tags: ['Remote'], score: 80, summary: 'Builds things.',
         channel: null, channelLabel: 'No apply route', route: 'None found', applyTarget: '', maxAutonomy: 'draft', tokensUsed: 900,
       };
       expect(parseApiArgs('addJob', [preview])).toHaveLength(1);

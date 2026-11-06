@@ -55,6 +55,10 @@ const withSeededJobs = (deps: BackendDeps) => {
   for (const job of seedJobs(new Date('2026-11-04T09:00:00.000Z'))) repo.insert(job, { dedupKey: job.id, createdAt: '2026-11-04T09:00:00.000Z' });
 };
 
+/** URLs the fake web was asked for. */
+let pages: string[] = [];
+beforeEach(() => (pages = []));
+
 /** Bot API calls made, and button presses waiting for the next getUpdates. */
 let telegram: { method: string; body: Record<string, unknown> }[] = [];
 let telegramUpdates: unknown[] = [];
@@ -98,6 +102,11 @@ const backendIn = (folder = (dir = mkdtempSync(join(tmpdir(), 'applio-backend-')
       return new Response(JSON.stringify({ ok: true, result }), { status: 200 });
     }),
     showRoute: vi.fn(),
+    // Stands in for the web: one public careers page, and a record of every URL asked for.
+    pageFetch: vi.fn(async (url: string) => {
+      pages.push(url);
+      return new Response('<html><body><h1>Senior TypeScript Engineer</h1><p>Email hiring@brightline.io</p></body></html>', { status: 200, headers: { 'content-type': 'text/html' } });
+    }),
     submitAts: vi.fn(async ({ input }) => ({ kind: 'submitted' as const, filled: [{ selector: '#email', label: 'Email', action: 'type' as const, value: input.applicant.email }] })),
     engines: {
       'claude-code': fakeEngine(false, "Claude Code isn't signed in. Run `claude auth login` in a terminal, or switch to an Anthropic API key below."),
@@ -641,6 +650,65 @@ describe('createBackend discovery', () => {
     const { api } = backendIn();
     expect(await (api as Backend).telegramPoll()).toBe(false);
     expect(telegram).toEqual([]);
+  });
+
+  /** Plays Claude: reads a pasted post into JSON for analysis, and drafts through the tools when asked. */
+  const analyzingBackend = async () => {
+    const b = backendIn();
+    const fact = await b.api.saveFact({ group: 'Acme', text: 'Built Node APIs' });
+    b.deps.engines['claude-code'] = {
+      check: async () => ({ ready: true, message: 'ok' }),
+      complete: async ({ prompt, jobIds }) => {
+        if (prompt.startsWith('Analyze')) {
+          return { text: JSON.stringify({ company: 'Brightline Studio', title: 'Senior TypeScript Engineer', location: 'Remote', employmentType: 'contract', salary: null, tags: ['Contract'], roleSummary: 'TypeScript back end.', descriptionSummary: 'Async.', applyEmail: 'hiring@brightline.io', applyUrl: null, score: 84, strengths: [{ text: 'Node APIs', factId: fact.id }], gaps: [] }), inputTokens: 900, outputTokens: 100 };
+        }
+        const call = (name: string, input: unknown) => createTools(createToolPorts(b.deps.db, jobIds, () => new Date())).find((t) => t.name === name)!.call(input);
+        for (const jobId of jobIds) call('save_draft', { jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ heading: 'A', items: [{ text: 'Built Node APIs', factId: fact.id }] }], coverLetter: 'Dear team', answers: [] });
+        return { text: 'done', inputTokens: 500, outputTokens: 100 };
+      },
+    };
+    return b;
+  };
+
+  it('analyzes a pasted post, then adds it, drafted and in Review, without sending it', async () => {
+    const { api } = await analyzingBackend();
+    const preview = await api.analyzeJob({ kind: 'text', value: 'Brightline is hiring a Senior TypeScript Engineer. Email hiring@brightline.io' });
+    expect(preview).toMatchObject({ company: 'Brightline Studio', score: 84, channel: 'email', route: 'Sends from your Gmail to hiring@brightline.io', sourceName: 'pasted by you' });
+    const job = await api.addJob(preview);
+    expect(job).toMatchObject({ status: 'drafted', sourceId: 'clip', channel: 'email', score: 84 });
+    expect((await api.listJobs({ statuses: ['drafted'] })).map((j) => j.id)).toContain(job.id);
+    expect(outbox).toEqual([]);
+  });
+
+  it('reads a public page from a pasted link, and never opens a platform page', async () => {
+    const { api } = await analyzingBackend();
+    expect((await api.analyzeJob({ kind: 'link', value: 'https://careers.brightline.io/jobs/1' })).sourceName).toBe('from careers.brightline.io');
+    expect(pages).toEqual(['https://careers.brightline.io/jobs/1']);
+    await expect(api.analyzeJob({ kind: 'link', value: 'https://www.linkedin.com/jobs/view/123' })).rejects.toThrow("Applio doesn't open pages on that site.");
+    expect(pages).toHaveLength(1);
+  });
+
+  it('takes a post copied from LinkedIn as a platform job, from its text alone', async () => {
+    const { api } = await analyzingBackend();
+    const preview = await api.analyzeJob({ kind: 'text', value: 'Senior TypeScript Engineer at Brightline. https://www.linkedin.com/jobs/view/123' });
+    expect(preview).toMatchObject({ channel: 'platform', sourceName: 'clipped from LinkedIn', maxAutonomy: 'draft' });
+    expect(pages).toEqual([]);
+  });
+
+  it('refuses to add a job Applio already has, naming it', async () => {
+    const { api } = await analyzingBackend();
+    await api.addJob(await api.analyzeJob({ kind: 'text', value: 'post' }));
+    const again = await api.analyzeJob({ kind: 'text', value: 'post' });
+    expect(again.route).toMatch(/^Already in Applio \(drafted\)/);
+    await expect(api.addJob(again)).rejects.toThrow('Senior TypeScript Engineer at Brightline Studio is already in Applio (drafted).');
+  });
+
+  it('adds only what it analyzed, whatever the page sends back', async () => {
+    const { api } = await analyzingBackend();
+    const preview = await api.analyzeJob({ kind: 'text', value: 'post' });
+    const job = await api.addJob({ ...preview, score: 100, company: 'Tampered' });
+    expect(job).toMatchObject({ company: 'Brightline Studio', score: 84 });
+    await expect(api.addJob({ ...preview, previewId: 'unknown' })).rejects.toThrow('Analyze the post again, then add it.');
   });
 
   it('keeps a sent application exactly as sent: its letter can no longer be edited', async () => {
