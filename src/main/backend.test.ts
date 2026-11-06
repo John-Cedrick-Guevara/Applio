@@ -24,7 +24,8 @@ import { seedJobs } from '../shared/mock/fixtures';
 import type { Job } from '../shared/types';
 import { createToolPorts } from '../mcp/db-ports';
 import { createTools } from '../mcp/tools';
-import { createBackend, type BackendDeps } from './backend';
+import type { ApplioApi } from '../shared/api';
+import { createBackend, type Backend, type BackendDeps } from './backend';
 
 const fakeEncryptor: Encryptor = {
   isEncryptionAvailable: () => true,
@@ -53,6 +54,11 @@ const withSeededJobs = (deps: BackendDeps) => {
   const repo = createJobsRepo(deps.db);
   for (const job of seedJobs(new Date('2026-11-04T09:00:00.000Z'))) repo.insert(job, { dedupKey: job.id, createdAt: '2026-11-04T09:00:00.000Z' });
 };
+
+/** Bot API calls made, and button presses waiting for the next getUpdates. */
+let telegram: { method: string; body: Record<string, unknown> }[] = [];
+let telegramUpdates: unknown[] = [];
+beforeEach(() => ((telegram = []), (telegramUpdates = [])));
 
 /** Messages "sent" through the fake SMTP transport, newest last. */
 let outbox: { to?: unknown; subject?: unknown; text?: unknown; attachments?: unknown }[] = [];
@@ -84,6 +90,14 @@ const backendIn = (folder = (dir = mkdtempSync(join(tmpdir(), 'applio-backend-')
     mailTransport: () => ({ sendMail: async (m) => void outbox.push(m) }),
     // Stands in for Applio's form window: "submits" and reports what it filled.
     inbox: fakeInbox(),
+    // Stands in for api.telegram.org: answers like the Bot API and records each call.
+    telegramFetch: vi.fn(async (url: string, init: RequestInit) => {
+      const method = url.split('/').at(-1)!;
+      telegram.push({ method, body: JSON.parse(String(init.body)) });
+      const result = method === 'getUpdates' ? telegramUpdates.splice(0) : {};
+      return new Response(JSON.stringify({ ok: true, result }), { status: 200 });
+    }),
+    showRoute: vi.fn(),
     submitAts: vi.fn(async ({ input }) => ({ kind: 'submitted' as const, filled: [{ selector: '#email', label: 'Email', action: 'type' as const, value: input.applicant.email }] })),
     engines: {
       'claude-code': fakeEngine(false, "Claude Code isn't signed in. Run `claude auth login` in a terminal, or switch to an Anthropic API key below."),
@@ -564,6 +578,69 @@ describe('createBackend discovery', () => {
     })();
     await after.tick();
     expect((await after.getJob(job.id)).history.at(-1)).toMatchObject({ status: 'interview', note: "Reply from maria@acme.com: We'd love to schedule an interview next week." });
+  });
+
+  const TOKEN = '123456:ABC-secret-token';
+  const withTelegram = async (api: ApplioApi) => {
+    await api.saveSettings({ telegramChatId: '42' });
+    await api.setSecret('telegramBotToken', TOKEN);
+  };
+
+  it('tells Telegram about a draft waiting for approval, with Approve, Open and Skip', async () => {
+    const b = await searchingBackend();
+    await withTelegram(b.api);
+    const fact = await b.api.saveFact({ group: 'Acme', text: 'Shipped APIs' });
+    b.deps.engines['claude-code'] = {
+      check: async () => ({ ready: true, message: 'ok' }),
+      complete: async ({ prompt, jobIds }) => {
+        const call = (name: string, input: unknown) => createTools(createToolPorts(b.deps.db, jobIds, () => new Date())).find((t) => t.name === name)!.call(input);
+        for (const jobId of jobIds) {
+          if (prompt.startsWith('Score')) call('save_match', { jobId, score: 90, roleSummary: 'Builds APIs.', descriptionSummary: 'd', strengths: [], gaps: [] });
+          else call('save_draft', { jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ heading: 'A', items: [{ text: 'Shipped APIs', factId: fact.id }] }], coverLetter: 'Dear team, this letter stays private.', answers: [] });
+        }
+        return { text: 'done', inputTokens: 1, outputTokens: 1 };
+      },
+    };
+    await b.api.runDiscovery();
+    await vi.waitFor(() => expect(telegram.some((t) => t.method === 'sendMessage')).toBe(true));
+    const message = telegram.find((t) => t.method === 'sendMessage')!.body;
+    expect(message).toMatchObject({ chat_id: '42', text: expect.stringContaining('Draft ready · 90%') });
+    expect(JSON.stringify(message)).not.toContain('this letter stays private');
+    expect(message.reply_markup).toEqual({ inline_keyboard: [[expect.objectContaining({ text: 'Approve' }), expect.objectContaining({ text: 'Open' }), expect.objectContaining({ text: 'Skip' })]] });
+  });
+
+  it('approves from Telegram exactly as in the app, recorded as sent by you on Telegram, and posts the result', async () => {
+    const { api, job } = await emailJob();
+    await withTelegram(api);
+    telegramUpdates.push({ update_id: 5, callback_query: { id: 'cb', data: `approve:${job.id}`, message: { chat: { id: 42 } } } });
+    expect(await (api as Backend).telegramPoll()).toBe(true);
+    expect(await api.getJob(job.id)).toMatchObject({ status: 'applied', sentBy: 'you-telegram' });
+    expect(telegram.at(-1)).toMatchObject({ method: 'sendMessage', body: { text: 'Sent to jobs@acme.com.' } });
+  });
+
+  it('approves a career-site job from Telegram without sending, and brings Applio up on the handoff', async () => {
+    const { api, job, deps } = await draftedBackend();
+    await withTelegram(api);
+    telegramUpdates.push({ update_id: 5, callback_query: { id: 'cb', data: `approve:${job.id}`, message: { chat: { id: 42 } } } });
+    await (api as Backend).telegramPoll();
+    expect((await api.getJob(job.id)).status).toBe('approved');
+    expect(deps.showRoute).toHaveBeenCalledWith(`/handoff/${job.id}`);
+    expect(outbox).toEqual([]);
+  });
+
+  it('sends a real test message to the saved chat, and never logs the token', async () => {
+    const { api } = backendIn();
+    await withTelegram(api);
+    const logged = vi.spyOn(console, 'error');
+    expect(await api.testConnection('telegram')).toEqual({ ok: true, message: 'Test message delivered to Telegram' });
+    expect(telegram.at(-1)).toMatchObject({ method: 'sendMessage', body: { chat_id: '42' } });
+    expect(JSON.stringify(logged.mock.calls)).not.toContain(TOKEN);
+  });
+
+  it('does nothing on Telegram until a token and chat are saved', async () => {
+    const { api } = backendIn();
+    expect(await (api as Backend).telegramPoll()).toBe(false);
+    expect(telegram).toEqual([]);
   });
 
   it('keeps a sent application exactly as sent: its letter can no longer be edited', async () => {

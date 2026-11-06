@@ -9,6 +9,7 @@ import { printPdf } from '../infra/pdf/print-pdf';
 import { createSecretStore } from '../infra/secrets/secret-store';
 import { createToolPorts } from '../mcp/db-ports';
 import { createTools } from '../mcp/tools';
+import { runPolling } from '../core/notify/poll-loop';
 import { createAllSources, createPoliteHttp, SOURCE_HOSTS } from '../infra/sources';
 import { STATUS_CHANNEL } from '../shared/ipc';
 import { createBackend } from './backend';
@@ -119,6 +120,11 @@ app.whenReady().then(() => {
     },
     setLaunchAtLogin: (openAtLogin) => app.setLoginItemSettings({ openAtLogin }),
     printPdf,
+    showRoute: (route) => {
+      show();
+      // A route from a Telegram button; JSON-quoted, so it can only ever be a hash.
+      void mainWindow?.webContents.executeJavaScript(`location.hash = ${JSON.stringify(`#${route}`)}`);
+    },
     // Approved sends fill in view; autonomous ones run hidden (the core decides which).
     submitAts: submitAtsForm,
     engines: {
@@ -155,6 +161,17 @@ app.whenReady().then(() => {
   void backend.getStatus().then((s) => {
     paused = s.paused;
     refreshTray();
+  });
+
+  // Telegram long polling (SPEC F9): one request at a time, idling while it isn't set up.
+  const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+  void runPolling({
+    poll: async () => {
+      if (!(await backend.telegramPoll())) await sleep(30_000);
+    },
+    sleep,
+    running: () => !quitting,
+    log: console.error,
   });
 
   // Catch-up: a run missed while asleep starts on the first tick after wake (or launch).

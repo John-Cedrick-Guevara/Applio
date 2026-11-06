@@ -245,7 +245,7 @@ export async function sendByAts(jobId: string, sentBy: SentBy, ports: ApplyPorts
  * AI-written answers join the answer bank, and an email or ATS job is sent.
  * Platform and career-site jobs go to the manual handoff and are never sent from here.
  */
-export async function approveDraft(jobId: string, ports: ApplyPorts): Promise<Job> {
+export async function approveDraft(jobId: string, ports: ApplyPorts, approvedBy: SentBy = 'you-app'): Promise<Job> {
   let job = ports.job(jobId);
   if (job.status !== 'drafted' && job.status !== 'approved') throw new SendBlockedError(`Job ${jobId} is not awaiting approval`);
   if (job.status === 'drafted') {
@@ -253,7 +253,7 @@ export async function approveDraft(jobId: string, ports: ApplyPorts): Promise<Jo
     const fresh = (ports.draft(jobId)?.answers ?? []).filter((a) => a.origin === 'ai').map(({ question, answer }) => ({ question, answer }));
     if (fresh.length > 0) ports.saveAiAnswers(fresh);
   }
-  if (job.channel === 'email') return sendByEmail(jobId, 'you-app', ports);
-  if (job.channel === 'ats') return sendByAts(jobId, 'you-app', ports);
+  if (job.channel === 'email') return sendByEmail(jobId, approvedBy, ports);
+  if (job.channel === 'ats') return sendByAts(jobId, approvedBy, ports);
   return job;
 }

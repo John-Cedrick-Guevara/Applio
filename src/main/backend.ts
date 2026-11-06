@@ -21,7 +21,10 @@ import { localDay, runSources } from '../core/jobs/run-sources';
 import { createScheduler } from '../core/jobs/scheduler';
 import type { HttpGet, JobSource } from '../core/jobs/source';
 import { createProfileService } from '../core/profile/profile-service';
+import { draftReady, followUpDue, newMatch, quotaWarning, replyArrived, sentOnItsOwn, type BotMessage } from '../core/notify/messages';
+import { createTelegramBot } from '../core/notify/telegram-bot';
 import { scoreJobs } from '../core/scoring/score-jobs';
+import { createBotApi } from '../infra/telegram/bot-api';
 import { createSettingsService } from '../core/settings/settings-service';
 import {
   createActivityRepo, createDraftsRepo, createJobsRepo, createSendsRepo, createPollsRepo, createProfileRepo, createSettingsRepo, createSourcesRepo, transaction,
@@ -56,6 +59,10 @@ export interface BackendDeps {
   printPdf: (html: string) => Promise<Uint8Array>;
   /** SMTP for Gmail; the real one in the app, a recorder in tests. */
   mailTransport?: (auth: { user: string; pass: string }) => MailTransport;
+  /** HTTPS for the Telegram Bot API; global fetch in the app. */
+  telegramFetch?: (url: string, init: RequestInit) => Promise<Response>;
+  /** Brings the app window up on a route, e.g. from a Telegram button. */
+  showRoute?: (route: string) => void;
   /** IMAP for reply tracking; the real Gmail one in the app, a fake in tests. */
   inbox?: (auth: { user: string; pass: string }) => InboxClient;
   /** Fills and submits an ATS form in Applio's own window (SPEC F5 channel 2). */
@@ -65,7 +72,11 @@ export interface BackendDeps {
 }
 
 /** The API, plus the scheduler tick main runs every minute and on wake. */
-export type Backend = ApplioApi & { tick(): Promise<void> };
+/**
+ * The API, plus what main drives: the scheduler tick (every minute and on wake), and
+ * one Telegram long-poll (false, without waiting, when Telegram isn't set up).
+ */
+export type Backend = ApplioApi & { tick(): Promise<void>; telegramPoll(): Promise<boolean> };
 
 const PAUSED_KEY = 'automationPaused';
 /** Gmail sends per day before Applio stops (SPEC F10 default; Gmail itself allows about 500). */
@@ -81,7 +92,7 @@ const MANUAL_APPLY_FROM = new Set(['scored', 'drafted', 'approved']);
  * in-memory store until their PRs land. OS integration is real.
  * ponytail: remaining in-memory data resets on restart — replace with SQLite-backed services per feature.
  */
-export function createBackend(getWindow: () => BrowserWindow | null, { db, secrets, sources, httpFor, onStatus, setLaunchAtLogin, printPdf, mailTransport, submitAts, inbox = gmailImap, engines }: BackendDeps): Backend {
+export function createBackend(getWindow: () => BrowserWindow | null, { db, secrets, sources, httpFor, onStatus, setLaunchAtLogin, printPdf, mailTransport, submitAts, inbox = gmailImap, telegramFetch = (url, init) => fetch(url, init), showRoute = () => {}, engines }: BackendDeps): Backend {
   const store = createMockApi({ latencyMs: 0 });
   const kv = createSettingsRepo(db);
   const jobs = createJobsRepo(db);
@@ -105,12 +116,44 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     record: (u) => activity.recordUsage({ ...u, tokens: u.inputTokens + u.outputTokens }),
     isPaused,
     now: () => new Date(),
-    // ponytail: logged and shown through status; Telegram picks warnings up in PR-22.
     warn: (message) => {
       console.warn('[budget]', message);
+      tell(`quota:${message}:${localMidnight()}`, quotaWarning(message));
       pushStatus();
     },
   });
+
+  // Telegram (SPEC F9): built from the saved token and chat each time, so a settings change applies at once.
+  const telegram = () => {
+    const chatId = settings.getSettings().telegramChatId;
+    const token = secrets.get('telegramBotToken');
+    if (!chatId || !token) return undefined;
+    const api = createBotApi(token, telegramFetch);
+    const bot = createTelegramBot(api, {
+      chatId,
+      offset: () => kv.get('telegramOffset') as number | undefined,
+      saveOffset: (offset) => kv.set('telegramOffset', offset),
+      wasNotified: (key) => kv.get(`notified:${key}`) === true,
+      markNotified: (key) => kv.set(`notified:${key}`, true),
+      approve: async (jobId) => {
+        const job = await approveDraft(jobId, applyPorts, 'you-telegram');
+        if (job.status === 'applied') return job.channel === 'email' ? `Sent to ${job.applyTarget}.` : 'Form submitted.';
+        // Platform and career-site jobs are never sent from here (MNB-1): the operator finishes them in the app.
+        showRoute(`/handoff/${jobId}`);
+        return "Approved. This one is applied to by hand, so it's waiting for you in Applio.";
+      },
+      skip: async (jobId) => {
+        skipJob(jobId);
+        return 'Skipped.';
+      },
+      open: (jobId) => showRoute(`/review/${jobId}`),
+    });
+    return { api, chatId, bot };
+  };
+  /** Sends a notification if Telegram is set up; its failures are logged, never thrown into the work that triggered it. */
+  const tell = (key: string, message: BotMessage) => {
+    void telegram()?.bot.notify(key, message).catch((err: unknown) => console.error('[telegram] notify failed', err instanceof Error ? err.message : err));
+  };
 
   /** A note on a job's timeline that leaves its status as it is. */
   const note = (id: string, text: string) => {
@@ -166,8 +209,15 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
           for (const { job, dedupKey } of found) jobs.insert(job, { dedupKey, createdAt: summary.at });
           return activity.addRun(summary, details);
         }),
-      score: (jobIds, runId) =>
-        scoreJobs(jobIds, { runId, draftThreshold: settings.getSettings().draftThreshold }, { ai: ai.run, score: (id) => jobs.get(id)?.score, note }),
+      score: async (jobIds, runId) => {
+        const result = await scoreJobs(jobIds, { runId, draftThreshold: settings.getSettings().draftThreshold }, { ai: ai.run, score: (id) => jobs.get(id)?.score, note });
+        // Strong matches from Notify-only sources are never drafted, so this message is all the operator gets.
+        for (const id of result.toDraft) {
+          const job = jobs.get(id);
+          if (job && sourcesRepo.get(job.sourceId)?.autonomy === 'notify') tell(`match:${id}`, newMatch(job));
+        }
+        return result;
+      },
       draft: (jobIds, runId) =>
         draftJobs(jobIds, { runId }, {
           ai: ai.run,
@@ -264,10 +314,12 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     // A source's own ceiling (clipped jobs, Upwork) caps what it asks for.
     const asked = source?.autonomy ?? 'draft';
     const sourceAutonomy = source?.maxAutonomy && AUTONOMY_LEVELS.indexOf(source.maxAutonomy) < AUTONOMY_LEVELS.indexOf(asked) ? source.maxAutonomy : asked;
-    await autoSend(job, { sourceAutonomy, autoSendThreshold, blocklist, paused: isPaused(), budgetStop: ai.budgetStop() }, {
+    const outcome = await autoSend(job, { sourceAutonomy, autoSendThreshold, blocklist, paused: isPaused(), budgetStop: ai.budgetStop() }, {
       send: (id) => (job.channel === 'email' ? sendByEmail(id, 'autonomous', applyPorts) : sendByAts(id, 'autonomous', applyPorts)),
       note,
     });
+    const now = getJob(jobId);
+    tell(outcome === 'sent' ? `sent:${jobId}` : `draft:${jobId}`, outcome === 'sent' ? sentOnItsOwn(now) : draftReady(now));
   };
 
   // Reply tracking (SPEC F7): read new inbox mail every 15 minutes; it reads only and sends nothing, so pause doesn't stop it.
@@ -286,20 +338,35 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
           return { id: j.id, company: j.company, applyTarget: j.applyTarget, status: j.status, messageIds: row?.state === 'sent' && row.messageId ? [row.messageId] : [] };
         }),
       ownAddress: user,
-      move: (id, status, text, at) => void jobs.transition(id, { status, at, note: text }),
+      move: (id, status, text, at) => {
+        tell(`reply:${id}:${at}`, replyArrived(jobs.transition(id, { status, at, note: text }), text));
+      },
       note: (id, text, at) => {
         const job = jobs.get(id);
-        if (job) jobs.transition(id, { status: job.status, at, note: text });
+        if (job) tell(`reply:${id}:${at}`, replyArrived(jobs.transition(id, { status: job.status, at, note: text }), text));
       },
     });
     kv.set('inboxLastUid', lastUid);
   };
 
-  /** Moves silent applications to No reply (SPEC F7); runs on every scheduler tick. */
+  /** Moves silent applications to No reply (SPEC F7), and tells Telegram about follow-ups coming due; runs on every tick. */
   const markNoReply = () => {
-    for (const id of silentApplications(jobs.list({ statuses: ['applied'] }), new Date())) {
+    const waiting = jobs.list({ statuses: ['applied'] });
+    for (const id of silentApplications(waiting, new Date())) {
       jobs.transition(id, { status: 'ghosted', at: new Date().toISOString(), note: 'No reply in 21 days' });
     }
+    const { followUpDays } = settings.getSettings();
+    for (const job of waiting) {
+      const last = job.history.at(-1)?.at ?? '';
+      // Keyed by the last contact, so each waiting period gets one nudge.
+      if (Date.now() - Date.parse(last) > followUpDays * 86_400_000) tell(`followup:${job.id}:${last}`, followUpDue(job, followUpDays));
+    }
+  };
+
+  const skipJob = (jobId: string) => {
+    const job = getJob(jobId);
+    if (!SKIPPABLE.has(job.status)) throw new Error(`Job ${jobId} is already ${job.status}, so it can't be skipped`);
+    return applyPorts.transition(jobId, 'skipped');
   };
 
   const getStatus = (): AppStatus => {
@@ -389,11 +456,14 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       return applyPorts.transition(jobId, 'applied', { sentBy: 'you-manual' });
     }),
 
-    skipJob: later((jobId) => {
-      const job = getJob(jobId);
-      if (!SKIPPABLE.has(job.status)) throw new Error(`Job ${jobId} is already ${job.status}, so it can't be skipped`);
-      return applyPorts.transition(jobId, 'skipped');
-    }),
+    skipJob: later(skipJob),
+
+    telegramPoll: async () => {
+      const t = telegram();
+      if (!t) return false;
+      await t.bot.poll();
+      return true;
+    },
 
     getStatus: later(getStatus),
     runDiscovery: () => scheduler.runNow(),
@@ -441,7 +511,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       return jobs.transition(jobId, { status, at: new Date().toISOString(), ...(statusNote ? { note: statusNote } : {}) });
     }),
 
-    // AI and Gmail are live checks. Telegram checks saved credentials; its live test comes with PR-22.
+    // Every connection test is live: AI readiness, a Gmail test email, a Telegram test message.
     testConnection: async (kind) => {
       if (kind === 'ai') {
         const { ready, message } = await checkEngine();
@@ -457,9 +527,14 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
           return { ok: false, message: err instanceof Error ? err.message : String(err) };
         }
       }
-      const ready = secretsSet.telegramBotToken && !!telegramChatId;
-      if (!ready) return { ok: false, message: 'Missing credentials. Fill in the fields above first.' };
-      return { ok: true, message: 'Credentials saved. A live test arrives with this integration.' };
+      const t = secretsSet.telegramBotToken && telegramChatId ? telegram() : undefined;
+      if (!t) return { ok: false, message: 'Missing credentials. Fill in the fields above first.' };
+      try {
+        await t.api.sendMessage(t.chatId, 'Applio is connected. Matches, drafts and replies will show up here.');
+        return { ok: true, message: 'Test message delivered to Telegram' };
+      } catch (err) {
+        return { ok: false, message: err instanceof Error ? err.message : String(err) };
+      }
     },
 
     openExternal: async (url) => {
