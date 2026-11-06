@@ -69,6 +69,8 @@ export function createClaudeCodeEngine(options: Options): AiEngine {
         '-p', '--output-format', 'stream-json', '--verbose', '--strict-mcp-config',
         '--mcp-config', options.mcpConfig(jobIds),
         '--tools', '',
+        // Print mode denies any tool needing a permission prompt, so pre-allow Applio's server (`applio`) and nothing else.
+        '--allowedTools', 'mcp__applio',
         '--no-session-persistence',
         ...(system ? ['--system-prompt', system] : []),
       ];
