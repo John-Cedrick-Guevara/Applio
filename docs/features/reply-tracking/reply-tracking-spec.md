@@ -19,10 +19,10 @@ Keep the application log current without manual work: detect replies and what th
 - Open question: AI classification of replies (costs tokens) vs keyword rules. Recommended: rules first, AI only when unsure.
 
 ## Test plan
-- AC-1: Tests with a fake mailbox: thread match, domain match, no match.
-- AC-2: Fixture emails for invite and rejection.
-- AC-3: Test asserts unmatched email not stored.
-- MNB-1: Test inspects stored fields.
+- AC-1: `replies.test.ts` (thread, domain, company, webmail, closed); `inbox.test.ts` with a fake IMAP client; `backend.test.ts` › "reads a reply in the application's thread from Gmail and moves the application to Interview".
+- AC-2: `replies.test.ts` › classifyReply; `track-replies.test.ts` moves to Interview and Rejected, and only notes a reply that would move backwards.
+- AC-3: `track-replies.test.ts` › "ignores mail that matches no application, and the operator's own mail, keeping nothing of it".
+- MNB-1: `track-replies.test.ts`: the only write is the timeline note with sender and summary; `replies.test.ts` caps the summary at 200 characters.
 
 ## Out of scope
 - Telegram alerts for replies (PR-22).

@@ -314,14 +314,15 @@ Wire real data behind the same `ApplioApi`. Each PR replaces part of the mock st
   - [x] tests with a fake clock and Gmail
   - _decided:_ split from PR-21 (size); every email gets a stored Message-ID; "Correct status" menu in the application detail
 
-- [ ] **PR-21b — Reply tracking**  IMAP watcher matches replies and moves applications on.
+- [x] **PR-21b — Reply tracking**  IMAP watcher matches replies and moves applications on.
   - _branch:_ `feat/reply-tracking`
   - _PR title:_ `feat: track replies in gmail`
   - _why:_ replies move the log without manual work (SPEC F7)
   - _depends on:_ PR-21a
-  - [ ] spec: `docs/features/reply-tracking/reply-tracking-spec.md`
-  - [ ] IMAP matches replies to applications by thread, domain or company; Replied, Interview, Rejected
-  - [ ] tests with a fake mailbox
+  - [x] spec: `docs/features/reply-tracking/reply-tracking-spec.md`
+  - [x] IMAP matches replies to applications by thread, domain or company; Replied, Interview, Rejected
+  - [x] tests with a fake mailbox
+  - _decided:_ keyword rules, no AI; read-only IMAP every 15 min via `imapflow`; only sender, date and a 200-character summary are kept
 
 - [ ] **PR-22 — Telegram notifications**  Alerts and one-tap approvals.
   - _branch:_ `feat/telegram-notify`

@@ -18,6 +18,7 @@ import { createJobsRepo, openDatabase } from '../infra/db';
 import type { AiEngine } from '../core/ai/engine';
 import type { JobSource } from '../core/jobs/source';
 import { discovered } from '../core/triage/test-jobs';
+import type { InboxClient } from '../infra/email/inbox';
 import { createSecretStore, type Encryptor } from '../infra/secrets/secret-store';
 import { seedJobs } from '../shared/mock/fixtures';
 import type { Job } from '../shared/types';
@@ -57,6 +58,16 @@ const withSeededJobs = (deps: BackendDeps) => {
 let outbox: { to?: unknown; subject?: unknown; text?: unknown; attachments?: unknown }[] = [];
 beforeEach(() => (outbox = []));
 
+/** A fake Gmail inbox holding the given messages, so no test reaches real IMAP. */
+const fakeInbox = (messages: { uid: number; envelope: object; headers?: Buffer; bodyStructure?: object }[] = []) => (): InboxClient =>
+  ({
+    connect: async () => {},
+    getMailboxLock: async () => ({ release: () => {} }),
+    fetch: () => (async function* () { yield* messages; })(),
+    download: async () => ({ content: (await import('node:stream')).Readable.from([Buffer.from("We'd love to schedule an interview next week.")]) }),
+    logout: async () => {},
+  }) as unknown as InboxClient;
+
 let dir = '';
 /** A backend over a temp Applio folder; call again with the same folder to simulate a restart. */
 const backendIn = (folder = (dir = mkdtempSync(join(tmpdir(), 'applio-backend-')))) => {
@@ -72,6 +83,7 @@ const backendIn = (folder = (dir = mkdtempSync(join(tmpdir(), 'applio-backend-')
     // Stands in for Gmail's SMTP: records each message instead of sending it.
     mailTransport: () => ({ sendMail: async (m) => void outbox.push(m) }),
     // Stands in for Applio's form window: "submits" and reports what it filled.
+    inbox: fakeInbox(),
     submitAts: vi.fn(async ({ input }) => ({ kind: 'submitted' as const, filled: [{ selector: '#email', label: 'Email', action: 'type' as const, value: input.applicant.email }] })),
     engines: {
       'claude-code': fakeEngine(false, "Claude Code isn't signed in. Run `claude auth login` in a terminal, or switch to an Anthropic API key below."),
@@ -537,5 +549,20 @@ describe('createBackend discovery', () => {
     createJobsRepo(deps.db).insert(old, { dedupKey: 'old', createdAt: old.history[0]!.at });
     await (api as unknown as { tick: () => Promise<void> }).tick();
     expect((await api.getJob('old')).status).toBe('ghosted');
+  });
+
+  it("reads a reply in the application's thread from Gmail and moves the application to Interview", async () => {
+    const { api, job, deps } = await emailJob();
+    await api.approveDraft(job.id);
+    const sentId = (outbox[0] as { messageId: string }).messageId;
+    deps.inbox = fakeInbox([{ uid: 7, envelope: { from: [{ name: 'Maria', address: 'maria@acme.com' }], subject: 'Re: Application', date: new Date(), inReplyTo: sentId }, bodyStructure: { type: 'text/plain', part: '1' } }]);
+    // The inbox is chosen when the backend is built, so rebuild over the same folder, as a restart would.
+    deps.db.close();
+    const after = (() => {
+      const d: BackendDeps = { ...deps, db: openDatabase(join(dir, 'applio.db')) };
+      return createBackend(() => null, d);
+    })();
+    await after.tick();
+    expect((await after.getJob(job.id)).history.at(-1)).toMatchObject({ status: 'interview', note: "Reply from maria@acme.com: We'd love to schedule an interview next week." });
   });
 });
