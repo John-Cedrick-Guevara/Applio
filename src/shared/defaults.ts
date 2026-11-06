@@ -36,11 +36,11 @@ const source = (id: string, name: string, kind: Source['kind'], autonomy: Source
 export const DEFAULT_SOURCES: readonly Source[] = [
   source('remoteok', 'RemoteOK', 'board', 'draft', 'Public JSON API · 4 polls a day'),
   source('remotive', 'Remotive', 'board', 'draft', 'Public JSON API · 4 polls a day'),
-  source('himalayas', 'Himalayas', 'board', 'autonomous', 'Public JSON API'),
+  source('himalayas', 'Himalayas', 'board', 'draft', 'Public JSON API'),
   source('wwr', 'WeWorkRemotely', 'board', 'draft', 'RSS feed'),
   source('jobicy', 'Jobicy', 'board', 'notify', 'Public JSON API'),
   source('arbeitnow', 'Arbeitnow', 'board', 'draft', 'Public JSON API · 4 polls a day'),
-  source('ats', 'ATS watchlist', 'ats-watchlist', 'autonomous', 'Greenhouse, Lever, Ashby, Workable · 14 companies'),
+  source('ats', 'ATS watchlist', 'ats-watchlist', 'draft', 'Greenhouse, Lever, Ashby, Workable · 14 companies'),
   source('hn', 'HN Who is hiring', 'api', 'draft', 'Monthly thread via Algolia API'),
   source('upwork', 'Upwork', 'api', 'draft', 'Official API · proposals cost Connects', { maxAutonomy: 'draft' }),
   source('clip', 'Clipped jobs', 'clip', 'draft', 'LinkedIn, Indeed, JobStreet, Facebook, anything you clip', { maxAutonomy: 'draft' }),
