@@ -7,6 +7,7 @@ describe('connectsCost', () => {
     ['Required Connects to submit a proposal: 8', 8],
     ['This job costs 1 Connect', 1],
     ['No mention here', undefined],
+    ['Connect with us at 5551234', undefined],
   ])('reads %j', (text, cost) => {
     expect(connectsCost(text)).toBe(cost);
   });

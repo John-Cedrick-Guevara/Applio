@@ -229,9 +229,11 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
   // Add job (SPEC F2 Clip): analyses wait here, by preview id, until the operator adds one.
   const analyses = new Map<string, AnalyzedJob>();
   const PLATFORM_NAMES: [RegExp, string][] = [[/linkedin\./, 'LinkedIn'], [/indeed\./, 'Indeed'], [/jobstreet\./, 'JobStreet'], [/upwork\./, 'Upwork'], [/facebook\./, 'Facebook']];
+  /** The first platform link in a pasted post, kept so the handoff can open it and assisted fill can fill it. */
   const platformIn = (text: string) => {
     const url = text.match(/https:\/\/[^\s<>"]+/g)?.find(isPlatformUrl);
-    return url ? PLATFORM_NAMES.find(([re]) => re.test(url))?.[1] : undefined;
+    const name = url ? PLATFORM_NAMES.find(([re]) => re.test(url))?.[1] : undefined;
+    return url && name ? { name, url } : undefined;
   };
 
   const runDiscovery = () =>
@@ -471,7 +473,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       // A platform link is never opened (MNB-1); its page is refused before any request.
       const text = input.kind === 'link' ? await fetchPublicPage(input.value, pageFetch) : input.value;
       const platform = input.kind === 'text' ? platformIn(text) : undefined;
-      const sourceName = input.kind === 'link' ? `from ${new URL(input.value).hostname}` : platform ? `clipped from ${platform}` : 'pasted by you';
+      const sourceName = input.kind === 'link' ? `from ${new URL(input.value).hostname}` : platform ? `clipped from ${platform.name}` : 'pasted by you';
       const { preview, job } = await analyzePost({ text, sourceName, ...(platform ? { platform } : {}) }, {
         ai: (request) => ai.run(request),
         factIds: () => new Set(profile.getProfile().facts.map((f) => f.id)),

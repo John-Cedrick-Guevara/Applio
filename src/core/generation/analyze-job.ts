@@ -59,7 +59,7 @@ const firstObject = (text: string): unknown => {
  * @throws AppError when Claude's answer can't be used.
  */
 export async function analyzePost(
-  { text, sourceName, platform }: { text: string; sourceName: string; platform?: string },
+  { text, sourceName, platform }: { text: string; sourceName: string; platform?: { name: string; url: string } },
   ports: AnalyzePorts,
 ): Promise<{ preview: Omit<JobPreview, 'previewId'>; job: AnalyzedJob }> {
   const reply = await ports.ai({ step: 'score', system: ANALYZE_SYSTEM, prompt: `Analyze this job post.\n<post>\n${text}\n</post>`, jobIds: [], trigger: 'operator' });
@@ -72,7 +72,7 @@ export async function analyzePost(
 
   // A platform link (or a post from one) applies there; otherwise the post's own email or link decides.
   const route: { channel: ApplyChannel | null; applyTarget: string; applyUrl?: string; platform?: string } = platform
-    ? { channel: 'platform', applyTarget: 'Platform apply', platform }
+    ? { channel: 'platform', applyTarget: 'Platform apply', platform: platform.name, applyUrl: platform.url }
     : a.applyEmail
       ? { channel: 'email', applyTarget: a.applyEmail, applyUrl: `mailto:${a.applyEmail}` }
       : a.applyUrl

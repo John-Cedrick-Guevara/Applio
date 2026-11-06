@@ -39,7 +39,7 @@ describe('analyzePost', () => {
   it.each([
     [{ applyEmail: null, applyUrl: 'https://jobs.lever.co/acme/1' }, undefined, 'ats'],
     [{ applyEmail: null, applyUrl: null }, undefined, null],
-    [{ applyEmail: null, applyUrl: null }, 'LinkedIn', 'platform'],
+    [{ applyEmail: null, applyUrl: null }, { name: 'LinkedIn', url: 'https://www.linkedin.com/jobs/view/1' }, 'platform'],
   ] as const)('finds the channel (%j, from %s)', async (over, platform, channel) => {
     const { ports } = setup(answer(over));
     expect((await analyzePost({ text: 'post', sourceName: 'x', ...(platform ? { platform } : {}) }, ports)).preview.channel).toBe(channel);

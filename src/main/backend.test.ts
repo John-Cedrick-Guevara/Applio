@@ -695,6 +695,8 @@ describe('createBackend discovery', () => {
     const preview = await api.analyzeJob({ kind: 'text', value: 'Senior TypeScript Engineer at Brightline. https://www.linkedin.com/jobs/view/123' });
     expect(preview).toMatchObject({ channel: 'platform', sourceName: 'clipped from LinkedIn', maxAutonomy: 'draft' });
     expect(pages).toEqual([]);
+    // The link stays with the job, so the handoff can open it and assisted fill can fill it.
+    expect(await api.addJob(preview)).toMatchObject({ url: 'https://www.linkedin.com/jobs/view/123', applyUrl: 'https://www.linkedin.com/jobs/view/123', platform: 'LinkedIn' });
   });
 
   it('refuses to add a job Applio already has, naming it', async () => {
