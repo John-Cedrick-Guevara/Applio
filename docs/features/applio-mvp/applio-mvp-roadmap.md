@@ -345,14 +345,15 @@ Wire real data behind the same `ApplioApi`. Each PR replaces part of the mock st
   - [x] tests
   - _decided:_ split from PR-23 (size); paste only, no extension; analyses held by preview id so Add saves exactly what was analyzed
 
-- [ ] **PR-23b — Assisted fill**  Optional platform pre-fill; the operator clicks Submit.
+- [x] **PR-23b — Assisted fill**  Optional platform pre-fill; the operator clicks Submit.
   - _branch:_ `feat/assisted-fill`
   - _PR title:_ `feat: pre-fill platform forms for the operator`
   - _why:_ platform forms can be pre-filled, never submitted (F5 channels 3–4)
   - _depends on:_ PR-23a
-  - [ ] spec: `docs/features/assisted-fill/assisted-fill-spec.md`
-  - [ ] assisted fill in the operator's signed-in session; operator clicks Submit; Upwork Connects line
-  - [ ] tests
+  - [x] spec: `docs/features/assisted-fill/assisted-fill-spec.md`
+  - [x] assisted fill in the operator's signed-in session; operator clicks Submit; Upwork Connects line
+  - [x] tests
+  - _decided:_ `persist:platform` session the operator signs in to once; no submit step exists in the fill path; Connects read from the pasted post
 
 - [ ] **PR-24 — Real usage and mock removal**  Usage dashboard from recorded data; mock store out of main.
   - _branch:_ `feat/usage-live`

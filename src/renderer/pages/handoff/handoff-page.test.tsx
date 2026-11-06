@@ -1,6 +1,7 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { createMockApi } from '../../../shared/mock/mock-api';
 import { renderWithApp } from '../../../test/render';
 import HandoffPage from './handoff-page';
 
@@ -35,5 +36,30 @@ describe('HandoffPage', () => {
     await userEvent.click(await screen.findByRole('button', { name: "I didn't apply" }));
     expect(await screen.findByText(/Marked as not applied/)).toBeInTheDocument();
     expect((await api.getJob('j3')).status).toBe('skipped');
+  });
+
+  it('fills the form in Applio when assisted fill is on, and says what is left for the operator', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    await api.saveSettings({ assistedFill: { platform: true, custom: false } });
+    const assistFill = vi.spyOn(api, 'assistFill');
+    renderWithApp(<HandoffPage params={{ id: 'j3' }} />, api);
+    await userEvent.click(await screen.findByRole('button', { name: 'Fill it in Applio' }));
+    expect(assistFill).toHaveBeenCalledWith('j3');
+    expect(await screen.findByText('Filled 6 fields. Check them in the window, then click Submit yourself.')).toBeInTheDocument();
+    expect(screen.getByText('Current company')).toBeInTheDocument();
+  });
+
+  it('stays a manual handoff when assisted fill is off', async () => {
+    renderWithApp(<HandoffPage params={{ id: 'j3' }} />);
+    expect(await screen.findByText(/Assisted fill is off for/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Fill it in Applio' })).not.toBeInTheDocument();
+  });
+
+  it('shows the Connects an Upwork proposal costs before the operator proceeds', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const job = await api.getJob('j3');
+    vi.spyOn(api, 'getJob').mockResolvedValue({ ...job, platform: 'Upwork', description: 'Send a proposal for: 16 Connects' });
+    renderWithApp(<HandoffPage params={{ id: 'j3' }} />, api);
+    expect(await screen.findByText('This proposal costs 16 Connects on Upwork.')).toBeInTheDocument();
   });
 });

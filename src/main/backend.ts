@@ -64,6 +64,8 @@ export interface BackendDeps {
   mailTransport?: (auth: { user: string; pass: string }) => MailTransport;
   /** HTTPS for the Telegram Bot API; global fetch in the app. */
   telegramFetch?: (url: string, init: RequestInit) => Promise<Response>;
+  /** Opens a platform or career-site form in the operator's own session and fills it; it never submits. */
+  fillPlatformForm: (request: { url: string; input: FillInput }) => Promise<{ filled: number; missing: string[] }>;
   /** HTTPS for reading a job page the operator pasted a link to; global fetch in the app. */
   pageFetch?: (url: string, init: RequestInit) => Promise<Response>;
   /** Brings the app window up on a route, e.g. from a Telegram button. */
@@ -97,7 +99,7 @@ const MANUAL_APPLY_FROM = new Set(['scored', 'drafted', 'approved']);
  * in-memory store until their PRs land. OS integration is real.
  * ponytail: remaining in-memory data resets on restart — replace with SQLite-backed services per feature.
  */
-export function createBackend(getWindow: () => BrowserWindow | null, { db, secrets, sources, httpFor, onStatus, setLaunchAtLogin, printPdf, mailTransport, submitAts, inbox = gmailImap, telegramFetch = (url, init) => fetch(url, init), showRoute = () => {}, pageFetch = (url, init) => fetch(url, init), engines }: BackendDeps): Backend {
+export function createBackend(getWindow: () => BrowserWindow | null, { db, secrets, sources, httpFor, onStatus, setLaunchAtLogin, printPdf, mailTransport, submitAts, fillPlatformForm, inbox = gmailImap, telegramFetch = (url, init) => fetch(url, init), showRoute = () => {}, pageFetch = (url, init) => fetch(url, init), engines }: BackendDeps): Backend {
   const store = createMockApi({ latencyMs: 0 });
   const kv = createSettingsRepo(db);
   const jobs = createJobsRepo(db);
@@ -593,6 +595,30 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       const job = getJob(jobId);
       if (!job.folderPath) throw new Error('This job has no folder yet');
       await openWithShell(jobFolder(job) ?? job.folderPath, "This job's folder isn't on disk yet. Applio creates it when it saves the application.");
+    },
+
+    assistFill: async (jobId) => {
+      const job = getJob(jobId);
+      if (job.channel !== 'platform' && job.channel !== 'custom') throw new Error('Assisted fill is only for platform and career-site jobs.');
+      const name = job.channel === 'platform' ? 'platform apply' : 'career sites';
+      if (!settings.getSettings().assistedFill[job.channel]) throw new Error(`Assisted fill is off for ${name}. Turn it on in Settings → Apply channels, or apply by hand.`);
+      const url = job.applyUrl ?? job.url;
+      if (!url.startsWith('https://')) throw new Error("This job has no form link to open. Apply by hand from the handoff.");
+      const draft = drafts.get(jobId);
+      const folder = jobFolder(job);
+      if (!draft || !folder) throw new Error("This job's files aren't saved yet.");
+      const coverLetter = join(folder, 'cover-letter.pdf');
+      const result = await fillPlatformForm({
+        url,
+        input: {
+          applicant: { fullName: owner().name, email: owner().email },
+          files: { resume: join(folder, 'resume.pdf'), ...(existsSync(coverLetter) ? { coverLetter } : {}) },
+          letter: draft.coverLetter,
+          answers: [...draft.answers.map(({ question, answer }) => ({ question, answer })), ...applyPorts.bankAnswers()],
+        },
+      });
+      note(jobId, `Assisted fill: ${result.filled} fields filled. You check them and click Submit.`);
+      return result;
     },
 
     openDraftFile: async (jobId, file) => {

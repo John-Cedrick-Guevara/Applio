@@ -4,7 +4,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { createApiEngine } from '../infra/ai/api-engine';
 import { createClaudeCodeEngine } from '../infra/ai/claude-code-engine';
 import { openDatabase } from '../infra/db';
-import { submitAtsForm } from '../infra/browser/ats-window';
+import { fillPlatformForm, submitAtsForm } from '../infra/browser/ats-window';
 import { printPdf } from '../infra/pdf/print-pdf';
 import { createSecretStore } from '../infra/secrets/secret-store';
 import { createToolPorts } from '../mcp/db-ports';
@@ -127,6 +127,7 @@ app.whenReady().then(() => {
     },
     // Approved sends fill in view; autonomous ones run hidden (the core decides which).
     submitAts: submitAtsForm,
+    fillPlatformForm,
     engines: {
       'claude-code': createClaudeCodeEngine({
         command: 'claude',

@@ -26,6 +26,23 @@ const attachFile = async (win: BrowserWindow, selector: string, path: string) =>
   await dbg.sendCommand('DOM.setFileInputFiles', { nodeId, files: [path] });
 };
 
+/** Waits up to 20 s for a form with a submit control to show, as pages often build it late. */
+const readForm = async (win: BrowserWindow): Promise<ReadForm> => {
+  let form: ReadForm = { fields: [], captcha: false };
+  for (const start = Date.now(); Date.now() - start < FORM_WAIT_MS; await sleep(500)) {
+    form = await inPage<ReadForm>(win, extractForm, null).catch(() => form);
+    if (form.fields.length > 0 && form.submit) break;
+  }
+  return form;
+};
+
+/** A window for one application, isolated from the app and from Node, in the given session. */
+const formWindow = (partition: string, visible: boolean, title: string) => {
+  const win = new BrowserWindow({ width: 1100, height: 900, show: visible, title, webPreferences: { partition, sandbox: true, contextIsolation: true, nodeIntegration: false } });
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  return win;
+};
+
 const apply = async (win: BrowserWindow, step: FillStep) => {
   if (step.action === 'file') return attachFile(win, step.selector, step.value);
   if (step.action === 'check') return void (await inPage(win, click, step.value));
@@ -41,12 +58,8 @@ const apply = async (win: BrowserWindow, step: FillStep) => {
  * signals if a board's confirmation goes unnoticed.
  */
 export async function submitAtsForm({ url, input, visible }: { url: string; input: FillInput; visible: boolean }): Promise<AtsOutcome> {
-  const win = new BrowserWindow({
-    width: 1100, height: 900, show: visible, title: 'Applio — applying',
-    // Its own session: the ATS's cookies never mix with the app's, and nothing here can reach Node.
-    webPreferences: { partition: 'persist:ats', sandbox: true, contextIsolation: true, nodeIntegration: false },
-  });
-  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  // Its own session: the ATS's cookies never mix with the app's, and nothing here can reach Node.
+  const win = formWindow('persist:ats', visible, 'Applio — applying');
   // Approved sends leave the window to the operator; a hidden autonomous run closes it, and the job waits in Review.
   const release = () => (visible ? win.show() : win.destroy());
   const handoff = (reason: string): AtsOutcome => {
@@ -56,11 +69,7 @@ export async function submitAtsForm({ url, input, visible }: { url: string; inpu
 
   try {
     await win.loadURL(url);
-    let form: ReadForm = { fields: [], captcha: false };
-    for (const start = Date.now(); Date.now() - start < FORM_WAIT_MS; await sleep(500)) {
-      form = await inPage<ReadForm>(win, extractForm, null).catch(() => form);
-      if (form.fields.length > 0 && form.submit) break;
-    }
+    const form = await readForm(win);
     if (form.fields.length === 0 || !form.submit) return handoff("Applio couldn't find the application form on this page.");
     if (form.captcha) return handoff('The form shows a CAPTCHA, which only you can answer.');
 
@@ -87,4 +96,20 @@ export async function submitAtsForm({ url, input, visible }: { url: string; inpu
     release();
     throw err;
   }
+}
+
+/**
+ * Assisted fill (SPEC F5 channels 3–4): opens a platform or career-site form in
+ * the operator's own signed-in session (`persist:platform`, where they sign in
+ * once) and fills what it can. It never presses Submit (MNB-1): there is no
+ * submit step here at all, and the window is left to the operator.
+ */
+export async function fillPlatformForm({ url, input }: { url: string; input: FillInput }): Promise<{ filled: number; missing: string[] }> {
+  const win = formWindow('persist:platform', true, 'Applio — check the form, then click Submit yourself');
+  await win.loadURL(url);
+  const form = await readForm(win);
+  if (form.fields.length === 0) return { filled: 0, missing: ['Applio found no form on this page. Sign in or open the application step in the window, then click Fill again.'] };
+  const plan = planFill(form.fields, input);
+  for (const step of plan.steps) await apply(win, step);
+  return { filled: plan.steps.length, missing: plan.missing };
 }
