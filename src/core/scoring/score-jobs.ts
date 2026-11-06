@@ -75,6 +75,9 @@ export async function scoreJobs(jobIds: readonly string[], { runId, draftThresho
     for (const id of missing()) ports.note(id, `Not scored: ${failure ?? "Claude didn't save a score."}`);
   }
 
+  // A stop leaves the rest unscored for good (they aren't retried), so they get the reason too.
+  if (stopped) for (const id of todo) if (ports.score(id) === undefined) ports.note(id, `Not scored: ${stopped}`);
+
   const scores = todo.flatMap((id) => {
     const s = ports.score(id);
     return s === undefined ? [] : [{ id, s }];

@@ -111,4 +111,9 @@ describe('Anthropic API engine', () => {
     await expect(engine.complete({ prompt: 'x', jobIds: [] })).rejects.toThrow('Claude kept calling tools without finishing.');
     expect(sent).toHaveLength(12);
   });
+
+  it('reports an answer cut off at the output limit instead of using it', async () => {
+    const { engine } = setup(async () => message({ stop_reason: 'max_tokens' }));
+    await expect(engine.complete({ prompt: 'x', jobIds: [] })).rejects.toThrow("Claude's answer was cut off before it finished. Try again.");
+  });
 });
