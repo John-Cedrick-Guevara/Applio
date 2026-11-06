@@ -97,8 +97,9 @@ describe('activity repository', () => {
     const activity = createActivityRepo(openDatabase(':memory:'));
     const base = { duplicates: 0, dropped: { blocklist: 0, type: 0, remote: 0, role: 0, pay: 0, hours: 0 }, sources: [] };
     const id = activity.addRun({ at: '2026-11-06T06:00:00.000Z', found: 1, newAfterDedup: 1, passedFilters: 1, drafted: 0 }, base);
-    activity.updateDetails(id, { ...base, scoring: { scored: 1, toDraft: ['j1'], belowThreshold: 0, notScored: 0 } });
+    activity.updateDetails(id, { ...base, scoring: { scored: 1, toDraft: ['j1'], belowThreshold: 0, notScored: 0 } }, 1);
     expect(activity.latestRunDetails()?.scoring).toEqual({ scored: 1, toDraft: ['j1'], belowThreshold: 0, notScored: 0 });
+    expect(activity.latestRun()?.drafted).toBe(1);
   });
 
   it('totals all tokens since a given time', () => {

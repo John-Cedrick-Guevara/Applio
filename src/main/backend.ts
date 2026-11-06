@@ -6,6 +6,7 @@ import { basename } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { createAi } from '../core/ai/ai-service';
 import type { AiEngine } from '../core/ai/engine';
+import { draftJobs } from '../core/generation/draft-jobs';
 import { discover } from '../core/jobs/discover';
 import { localDay, runSources } from '../core/jobs/run-sources';
 import { createScheduler } from '../core/jobs/scheduler';
@@ -14,7 +15,7 @@ import { createProfileService } from '../core/profile/profile-service';
 import { scoreJobs } from '../core/scoring/score-jobs';
 import { createSettingsService } from '../core/settings/settings-service';
 import {
-  createActivityRepo, createJobsRepo, createPollsRepo, createProfileRepo, createSettingsRepo, createSourcesRepo, transaction,
+  createActivityRepo, createDraftsRepo, createJobsRepo, createPollsRepo, createProfileRepo, createSettingsRepo, createSourcesRepo, transaction,
 } from '../infra/db';
 import { readResumeText } from '../infra/resume/read-resume';
 import type { SecretStore } from '../infra/secrets/secret-store';
@@ -56,6 +57,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
   const store = createMockApi({ latencyMs: 0 });
   const kv = createSettingsRepo(db);
   const jobs = createJobsRepo(db);
+  const drafts = createDraftsRepo(db);
   const activity = createActivityRepo(db);
   const polls = createPollsRepo(db);
   const sourcesRepo = createSourcesRepo(db);
@@ -105,7 +107,16 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
         }),
       score: (jobIds, runId) =>
         scoreJobs(jobIds, { runId, draftThreshold: settings.getSettings().draftThreshold }, { ai: ai.run, score: (id) => jobs.get(id)?.score, note }),
-      saveScoring: (runId, details) => activity.updateDetails(runId, details),
+      draft: (jobIds, runId) =>
+        draftJobs(jobIds, { runId }, {
+          ai: ai.run,
+          hasDraft: (id) => drafts.get(id) !== undefined,
+          job: (id) => jobs.get(id),
+          autonomy: (sourceId) => sourcesRepo.get(sourceId)?.autonomy ?? 'draft',
+          note,
+          addTokens: (id, tokens) => jobs.update(id, { tokensUsed: (jobs.get(id)?.tokensUsed ?? 0) + tokens }),
+        }),
+      finishRun: (runId, details, drafted) => activity.updateDetails(runId, details, drafted),
       now: () => new Date(),
       newId: randomUUID,
     });
@@ -167,9 +178,17 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
   return {
     ...store,
 
-    // Jobs come from SQLite; drafts and the send flow stay mock until PR-17/18.
+    // Jobs and drafts come from SQLite; the send flow stays mock until PR-18.
     listJobs: later((filter = {}) => jobs.list(filter.statuses ? { statuses: filter.statuses } : undefined).filter((j) => matchesFilter(j, filter))),
     getJob: later(getJob),
+    getDraft: later((jobId) => drafts.get(jobId) ?? null),
+    updateCoverLetter: later((jobId, coverLetter) => {
+      const draft = drafts.get(jobId);
+      if (!draft) throw new Error(`No draft for job ${jobId}`);
+      const next = { ...draft, coverLetter, edited: true };
+      drafts.save(next);
+      return next;
+    }),
 
     getProfile: later(profile.getProfile),
     saveFact: later(profile.saveFact),

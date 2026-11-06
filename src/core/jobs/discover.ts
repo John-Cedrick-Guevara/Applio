@@ -1,6 +1,7 @@
 import { AppError } from '../../shared/errors';
 import type { Job, Preferences, RunSummary } from '../../shared/types';
 import { detectChannel } from '../apply/channel';
+import type { DraftResult } from '../generation/draft-jobs';
 import type { ScoreResult } from '../scoring/score-jobs';
 import { triage, type KeyedJob, type TriageReport } from '../triage';
 import type { RunSourcesResult, SourceResult } from './run-sources';
@@ -22,7 +23,9 @@ export interface RunDetails {
   sources: SourceResult[];
   /** How scoring went (SPEC F3.3); absent until scoring finishes. */
   scoring?: ScoreResult;
-  /** Set when scoring failed as a whole; the run and its jobs are kept. */
+  /** How drafting went (SPEC F4); absent until drafting finishes. */
+  drafting?: DraftResult;
+  /** Set when scoring or drafting failed as a whole; the run and its jobs are kept. */
   scoringError?: string;
 }
 
@@ -35,8 +38,10 @@ export interface DiscoverPorts {
   save: (jobs: { job: Job; dedupKey: string }[], details: RunDetails, summary: RunSummary) => number;
   /** Scores the new jobs, charging their tokens to the run. */
   score: (jobIds: readonly string[], runId: number) => Promise<ScoreResult>;
-  /** Replaces the run's stored details once scoring is done. */
-  saveScoring: (runId: number, details: RunDetails) => void;
+  /** Drafts the strong matches, charging their tokens to the run. */
+  draft: (jobIds: readonly string[], runId: number) => Promise<DraftResult>;
+  /** Replaces the run's stored details and drafted count once its AI work is done. */
+  finishRun: (runId: number, details: RunDetails, drafted: number) => void;
   now: () => Date;
   newId: () => string;
 }
@@ -68,8 +73,8 @@ const toJob = (j: KeyedJob, id: string, at: string): Job => ({
 
 /**
  * One discovery run (SPEC F2–F3): poll every source, drop duplicates and
- * misfits for free, store what's left as found jobs, then score them.
- * Drafting joins in PR-17, so `drafted` is 0 for now.
+ * misfits for free, store what's left as found jobs, score them, and draft
+ * the strong matches.
  * @throws NoTargetRolesError before polling when no target role is set.
  */
 export async function discover(ports: DiscoverPorts): Promise<RunSummary> {
@@ -83,10 +88,13 @@ export async function discover(ports: DiscoverPorts): Promise<RunSummary> {
   const details: RunDetails = { duplicates: report.duplicates, dropped: report.dropped, sources: polled.sources };
   const runId = ports.save(jobs, details, summary);
   try {
-    ports.saveScoring(runId, { ...details, scoring: await ports.score(jobs.map((j) => j.job.id), runId) });
+    const scoring = await ports.score(jobs.map((j) => j.job.id), runId);
+    const drafting = await ports.draft(scoring.toDraft, runId);
+    ports.finishRun(runId, { ...details, scoring, drafting }, drafting.drafted);
+    return { ...summary, drafted: drafting.drafted };
   } catch (err) {
-    // The jobs are saved already; a later run won't re-find them, so record why they're unscored.
-    ports.saveScoring(runId, { ...details, scoringError: err instanceof Error ? err.message : String(err) });
+    // The jobs are saved already; a later run won't re-find them, so record why their AI work stopped.
+    ports.finishRun(runId, { ...details, scoringError: err instanceof Error ? err.message : String(err) }, 0);
+    return summary;
   }
-  return summary;
 }
