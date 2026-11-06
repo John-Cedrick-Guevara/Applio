@@ -123,7 +123,8 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       return { daily: dailyTokenBudget, monthly: monthlyTokenBudget };
     },
     tokensSince: (since) => activity.tokensSince(since),
-    record: (u) => activity.recordUsage({ ...u, tokens: u.inputTokens + u.outputTokens }),
+    record: (u) => activity.recordUsage(u),
+    recentCost: (step) => activity.recentCost(step),
     isPaused,
     now: () => new Date(),
     warn: (message) => {

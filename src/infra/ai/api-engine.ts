@@ -69,6 +69,7 @@ export function createApiEngine({ apiKey, client = (key) => new Anthropic({ apiK
       const messages: BetaMessageParam[] = [{ role: 'user', content: prompt }];
       let inputTokens = 0;
       let outputTokens = 0;
+      let cacheReadTokens = 0;
 
       for (let turn = 0; turn < MAX_TURNS; turn++) {
         const reply = await api.beta.messages
@@ -87,13 +88,14 @@ export function createApiEngine({ apiKey, client = (key) => new Anthropic({ apiK
           })
           .catch((err: unknown) => Promise.reject(readable(err)));
         const u = reply.usage;
-        inputTokens += u.input_tokens + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0);
+        inputTokens += u.input_tokens + (u.cache_creation_input_tokens ?? 0);
         outputTokens += u.output_tokens;
+        cacheReadTokens += u.cache_read_input_tokens ?? 0;
         if (reply.stop_reason === 'refusal') throw new EngineError('Claude declined this request.');
         // A cut-off answer is incomplete JSON or a half-saved batch; better reported than used.
         if (reply.stop_reason === 'max_tokens') throw new EngineError("Claude's answer was cut off before it finished. Try again.");
         if (reply.stop_reason !== 'tool_use') {
-          return { text: reply.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join(''), inputTokens, outputTokens };
+          return { text: reply.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join(''), inputTokens, outputTokens, cacheReadTokens };
         }
         // The whole content goes back unchanged (thinking and fallback blocks included), then all results in one message.
         messages.push({ role: 'assistant', content: reply.content }, { role: 'user', content: runTools(reply.content, tools) });

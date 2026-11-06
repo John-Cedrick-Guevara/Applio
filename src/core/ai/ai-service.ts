@@ -1,7 +1,7 @@
 import { AppError } from '../../shared/errors';
 import type { UsageStep } from '../../shared/types';
 import { AutomationPausedError } from '../jobs/scheduler';
-import type { AiEngine, AiReply } from './engine';
+import { budgetTokens, type AiEngine, type AiReply } from './engine';
 
 const WARN_AT = 0.8;
 
@@ -31,6 +31,9 @@ export interface UsageEntry {
   step: UsageStep;
   inputTokens: number;
   outputTokens: number;
+  cacheReadTokens: number;
+  /** What counts against the budget: see `budgetTokens`. */
+  tokens: number;
   runId?: number;
   jobId?: string;
 }
@@ -39,8 +42,10 @@ export interface AiPorts {
   /** The engine selected in Settings, read per call so switching applies at once. */
   engine: () => AiEngine;
   budgets: () => { daily: number; monthly: number };
-  /** All recorded tokens at or after an ISO time. */
+  /** All recorded budget tokens at or after an ISO time. */
   tokensSince: (since: string) => number;
+  /** The mean budget tokens of the step's last few calls, or undefined with no history: the pre-flight estimate. */
+  recentCost: (step: UsageStep) => number | undefined;
   record: (entry: UsageEntry) => void;
   isPaused: () => boolean;
   now: () => Date;
@@ -60,8 +65,8 @@ export function createAi(ports: AiPorts) {
     const now = ports.now();
     const { daily, monthly } = ports.budgets();
     return [
-      { name: 'daily', since: new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString(), limit: daily, over: `Today's Claude token budget is used up`, resumes: 'tomorrow' },
-      { name: 'monthly', since: new Date(now.getFullYear(), now.getMonth(), 1).toISOString(), limit: monthly, over: `This month's Claude token budget is used up`, resumes: 'next month' },
+      { name: 'daily', since: new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString(), limit: daily, over: `Today's Claude token budget is used up`, which: "today's", resumes: 'tomorrow' },
+      { name: 'monthly', since: new Date(now.getFullYear(), now.getMonth(), 1).toISOString(), limit: monthly, over: `This month's Claude token budget is used up`, which: "this month's", resumes: 'next month' },
     ];
   };
 
@@ -84,6 +89,14 @@ export function createAi(ports: AiPorts) {
       const before = usage();
       const full = before.find((p) => p.used >= p.limit);
       if (full) throw new QuotaExceededError(stopMessage(full));
+      // Pre-flight: stop before a call that would go over, not after (QA: 95k used against a 60k cap).
+      const estimate = ports.recentCost(request.step);
+      const tight = estimate === undefined ? undefined : before.find((p) => p.used + estimate > p.limit);
+      if (tight && estimate !== undefined) {
+        throw new QuotaExceededError(
+          `This call would go over ${tight.which} Claude token budget: about ${fmt(estimate)} tokens, with ${fmt(tight.limit - tight.used)} of ${fmt(tight.limit)} left. AI resumes ${tight.resumes}, or raise the budget in Settings.`,
+        );
+      }
 
       const reply = await ports.engine().complete({ system: request.system, prompt: request.prompt, jobIds: request.jobIds, ...(request.tools === false ? { tools: false } : {}) });
       ports.record({
@@ -91,6 +104,8 @@ export function createAi(ports: AiPorts) {
         step: request.step,
         inputTokens: reply.inputTokens,
         outputTokens: reply.outputTokens,
+        cacheReadTokens: reply.cacheReadTokens ?? 0,
+        tokens: budgetTokens(reply),
         ...(request.runId !== undefined ? { runId: request.runId } : {}),
         ...(request.jobIds.length === 1 ? { jobId: request.jobIds[0] } : {}),
       });
