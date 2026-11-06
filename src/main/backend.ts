@@ -193,7 +193,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       [letterName(draft)]: await letterFile(job, draft),
       'job.md': jobMarkdown(job),
     };
-    jobs.update(jobId, { folderPath: writeApplication(outputRoot(), folderFor(job, new Date()), files) });
+    jobs.update(jobId, { folderPath: writeApplication(outputRoot(), folderFor(job, new Date()), files, jobId) });
   };
 
   /** The job's folder on disk, re-linked by job id if it was renamed or moved under the output folder. */
