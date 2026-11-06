@@ -26,6 +26,8 @@ import { createProfileService } from '../core/profile/profile-service';
 import { draftReady, followUpDue, newMatch, quotaWarning, replyArrived, sentOnItsOwn, type BotMessage } from '../core/notify/messages';
 import { createTelegramBot } from '../core/notify/telegram-bot';
 import { scoreJobs } from '../core/scoring/score-jobs';
+import { buildUsage } from '../core/usage/build-usage';
+import { quotaLevel } from '../shared/quota';
 import { createBotApi } from '../infra/telegram/bot-api';
 import { fetchPublicPage, isPlatformUrl } from '../infra/web/fetch-page';
 import { createSettingsService } from '../core/settings/settings-service';
@@ -42,7 +44,6 @@ import { AUTONOMY_LEVELS } from '../shared/autonomy';
 import { nextStatuses } from '../shared/status';
 import { matchesFilter } from '../shared/job-filter';
 import { letterBody, pageHtml, resumeBody } from '../shared/templates/application-documents';
-import { createMockApi } from '../shared/mock/mock-api';
 import { isSafeExternalUrl } from './security';
 
 /** Expands a leading `~` so stored folder paths work with the OS shell. */
@@ -100,7 +101,6 @@ const MANUAL_APPLY_FROM = new Set(['scored', 'drafted', 'approved']);
  * ponytail: remaining in-memory data resets on restart — replace with SQLite-backed services per feature.
  */
 export function createBackend(getWindow: () => BrowserWindow | null, { db, secrets, sources, httpFor, onStatus, setLaunchAtLogin, printPdf, mailTransport, submitAts, fillPlatformForm, inbox = gmailImap, telegramFetch = (url, init) => fetch(url, init), showRoute = () => {}, pageFetch = (url, init) => fetch(url, init), engines }: BackendDeps): Backend {
-  const store = createMockApi({ latencyMs: 0 });
   const kv = createSettingsRepo(db);
   const jobs = createJobsRepo(db);
   const drafts = createDraftsRepo(db);
@@ -125,7 +125,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     now: () => new Date(),
     warn: (message) => {
       console.warn('[budget]', message);
-      tell(`quota:${message}:${localMidnight()}`, quotaWarning(message));
+      tell(`quota:tokens:${message.includes('monthly') ? 'month' : 'day'}:${localMidnight()}`, quotaWarning(message));
       pushStatus();
     },
   });
@@ -380,6 +380,37 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     }
   };
 
+  /** The Usage page (SPEC F10), from what's recorded: AI usage, sends, drafts and today's polls. */
+  const usageFor = (period: 'today' | 'month') => {
+    const now = new Date();
+    const weekAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const from = (weekAgo < monthStart ? weekAgo : monthStart).toISOString();
+    const today = localDay(now);
+    // perf: reads every job to find sent ones; fine for a personal log of a few thousand applications.
+    const sent = jobs.list().flatMap((j) => {
+      const appliedAt = j.history.find((e) => e.status === 'applied')?.at;
+      return j.sentBy && appliedAt ? [{ at: appliedAt, sentBy: j.sentBy, channel: j.channel, tokens: j.tokensUsed }] : [];
+    });
+    return buildUsage(period, {
+      now,
+      usage: activity.usageSince(from),
+      sent,
+      bankAnswersReused: drafts.createdSince(from).map((d) => ({ at: d.createdAt, count: d.answers.filter((a) => a.origin === 'bank').length })),
+      polls: sources.filter((s) => sourcesRepo.get(s.id)?.enabled).map((s) => ({ id: s.id, name: sourcesRepo.get(s.id)?.name ?? s.name, used: polls.count(s.id, today), limit: s.dailyPollLimit })),
+      settings: settings.getSettings(),
+      gmailDailyCap: GMAIL_DAILY_CAP,
+    });
+  };
+
+  /** One Telegram warning per limit per day at 80% (SPEC F10); tokens already warn from the AI guard. */
+  const warnLimits = () => {
+    for (const q of usageFor('today').quotas) {
+      if (q.off || q.unit === 'tokens' || q.unit === 'polls' || quotaLevel(q) !== 'warn') continue;
+      tell(`quota:${q.id}:${localMidnight()}`, quotaWarning(`${q.label}: ${q.used} of ${q.limit} ${q.unit} used today. Applio stops at ${q.limit}.`));
+    }
+  };
+
   const skipJob = (jobId: string) => {
     const job = getJob(jobId);
     if (!SKIPPABLE.has(job.status)) throw new Error(`Job ${jobId} is already ${job.status}, so it can't be skipped`);
@@ -420,8 +451,6 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
   };
 
   return {
-    ...store,
-
     // Jobs and drafts come from SQLite; the send flow stays mock until PR-18.
     listJobs: later((filter = {}) => jobs.list(filter.statuses ? { statuses: filter.statuses } : undefined).filter((j) => matchesFilter(j, filter))),
     getJob: later(getJob),
@@ -464,6 +493,8 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     }),
 
     approveDraft: (jobId) => approveDraft(jobId, applyPorts),
+
+    getUsage: later(usageFor),
 
     analyzeJob: async (input) => {
       // A platform link is never opened (MNB-1); its page is refused before any request.
@@ -524,6 +555,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     tick: async () => {
       await scheduler.tick();
       markNoReply();
+      warnLimits();
       await checkReplies().catch((err: unknown) => console.error('[replies] inbox check failed', err));
     },
 

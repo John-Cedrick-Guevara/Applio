@@ -729,4 +729,42 @@ describe('createBackend discovery', () => {
     await api.saveSettings({ assistedFill: { platform: true, custom: true } });
     await expect(api.assistFill(job.id)).rejects.toThrow('Assisted fill is only for platform and career-site jobs.');
   });
+
+  it('reports real usage: tokens, the split by step, sends and every limit', async () => {
+    const { api, job } = await emailJob();
+    await api.approveDraft(job.id);
+    const usage = await api.getUsage('today');
+    // One scoring call and one drafting call, 1,000 tokens each.
+    expect(usage.summary).toMatchObject({ tokens: 2000, sent: 1, sentBreakdown: { autonomous: 0, approved: 1, manual: 0 } });
+    expect(usage.tokensByStep.find((s) => s.step === 'score')?.tokens).toBe(1000);
+    expect(usage.tokensByDay.at(-1)?.tokens).toBe(2000);
+    expect(usage.quotas.find((q) => q.id === 'gmail')).toMatchObject({ used: 1, limit: 100 });
+    expect(usage.quotas.find((q) => q.id === 'remotive')).toMatchObject({ used: 1, limit: 4 });
+  });
+
+  it('resumes AI work as soon as the operator raises a used-up budget, without a restart', async () => {
+    const { api, job, deps } = await draftedBackend();
+    await api.saveSettings({ dailyTokenBudget: 1000, monthlyTokenBudget: 3_000_000 });
+    deps.engines['claude-code'] = { complete: async () => ({ text: '{"told":[],"likelyQuestions":["Q"],"askThem":[]}', inputTokens: 10, outputTokens: 10 }), check: async () => ({ ready: true, message: 'ok' }) };
+    await expect(api.getInterviewPrep(job.id)).rejects.toThrow(/budget is used up/);
+    await api.saveSettings({ dailyTokenBudget: 100_000 });
+    expect((await api.getInterviewPrep(job.id)).likelyQuestions).toEqual(['Q']);
+  });
+
+  it('warns on Telegram once when the daily token budget passes 80%', async () => {
+    const { api, job, deps } = await draftedBackend();
+    await withTelegram(api);
+    // 2,000 used of 2,600 is 77%; the next call takes it past 80%.
+    await api.saveSettings({ dailyTokenBudget: 2600, monthlyTokenBudget: 3_000_000 });
+    deps.engines['claude-code'] = { complete: async () => ({ text: '{"told":[],"likelyQuestions":["Q"],"askThem":[]}', inputTokens: 50, outputTokens: 50 }), check: async () => ({ ready: true, message: 'ok' }) };
+    await api.getInterviewPrep(job.id);
+    await (api as Backend).tick();
+    await vi.waitFor(() => expect(telegram.filter((t) => String(t.body.text).startsWith('Budget · Claude tokens')).length).toBe(1));
+  });
+
+  it('serves every API method from real data: the main process never imports the mock', () => {
+    for (const file of readdirSync(__dirname).filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))) {
+      expect(readFileSync(join(__dirname, file), 'utf8'), file).not.toMatch(/shared\/mock/);
+    }
+  });
 });
