@@ -35,4 +35,13 @@ describe('Telegram Bot API client', () => {
     expect((err as Error).message).toBe("Couldn't reach Telegram.");
     expect(JSON.stringify(err) + (err as Error).message + String((err as Error).cause)).not.toContain(TOKEN);
   });
+
+  it('gives up on a request that hangs, so long polling can recover after a stalled connection', async () => {
+    const fetch = vi.fn(async (_url: string, init: RequestInit) => {
+      expect(init.signal).toBeInstanceOf(AbortSignal);
+      return ok([]);
+    });
+    await createBotApi(TOKEN, fetch).getUpdates();
+    expect(fetch).toHaveBeenCalled();
+  });
 });
