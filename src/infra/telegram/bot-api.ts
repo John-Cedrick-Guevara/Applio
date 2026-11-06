@@ -34,7 +34,9 @@ export function createBotApi(token: string, fetch: Fetch): BotApi {
       throw new TelegramError("Couldn't reach Telegram.");
     }
     const data = (await res.json().catch(() => ({}))) as { ok?: boolean; result?: T; description?: string };
-    if (res.status === 401) throw new TelegramError('Telegram rejected the bot token. Copy it from @BotFather and save it again.');
+    // A malformed token makes the URL unknown, so Telegram answers 404 rather than 401.
+    if (res.status === 401 || res.status === 404) throw new TelegramError('Telegram rejected the bot token. Copy it from @BotFather and save it again.');
+    if (/chat not found/i.test(data.description ?? '')) throw new TelegramError("Telegram can't find that chat. Open your bot in Telegram, press Start, then check the chat ID and test again.");
     if (!data.ok) throw new TelegramError(`Telegram refused: ${data.description ?? `HTTP ${res.status}`}`);
     return data.result as T;
   };

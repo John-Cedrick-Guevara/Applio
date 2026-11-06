@@ -60,7 +60,8 @@ export function createSettingsService({ kv, sources, secrets }: SettingsPorts): 
     },
 
     setSecret: (key, value) => {
-      secrets.set(key, value);
+      // Copying from @BotFather or Google often brings a space or line break along, which breaks every request.
+      secrets.set(key, value.trim());
       return getSettings();
     },
 
