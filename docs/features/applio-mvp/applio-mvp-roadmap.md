@@ -272,16 +272,17 @@ Wire real data behind the same `ApplioApi`. Each PR replaces part of the mock st
   - [x] real `openJobFolder`; Review previews from the same template; Open PDF
   - _decided:_ `job.md` front matter holds the job id; a "Name on your documents" setting; `openDraftFile` API method
 
-- [ ] **PR-18 — Email apply**  Send approved email applications through Gmail.
+- [x] **PR-18 — Email apply**  Send approved email applications through Gmail.
   - _branch:_ `feat/email-apply`
   - _PR title:_ `feat: send email applications via gmail`
   - _why:_ first real send channel (SPEC F5 channel 1)
   - _depends on:_ PR-17b
-  - [ ] spec: `docs/features/email-apply/email-apply-spec.md`
-  - [ ] SMTP send with app password; `sent.md` written; double-send guard
-  - [ ] real `approveDraft` for email, `markApplied`, `skipJob`, `testConnection('gmail')`
-  - [ ] Gmail daily cap enforced
-  - [ ] tests with a fake SMTP transport
+  - [x] spec: `docs/features/email-apply/email-apply-spec.md`
+  - [x] SMTP send with app password; `sent.md` written; double-send guard
+  - [x] real `approveDraft` for email, `markApplied`, `skipJob`, `testConnection('gmail')`
+  - [x] Gmail daily cap enforced
+  - [x] tests with a fake SMTP transport
+  - _decided:_ `nodemailer` for SMTP; a `sends` table is the double-send guard and the record of what went out; a crash mid-send blocks any resend
 
 - [ ] **PR-19 — ATS apply**  Fill and submit standard ATS forms in the app's own window.
   - _branch:_ `feat/ats-apply`
