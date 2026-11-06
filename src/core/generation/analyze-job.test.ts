@@ -51,8 +51,26 @@ describe('analyzePost', () => {
     expect((await analyzePost({ text: 'post', sourceName: 'x' }, ports)).preview.route).toMatch(/^Already in Applio \(applied\)\./);
   });
 
-  it('refuses an answer that cannot be read, or that cites a fact not in the bank', async () => {
-    await expect(analyzePost({ text: 'post', sourceName: 'x' }, setup('Sorry, no.').ports)).rejects.toThrow("Claude's reading of the post couldn't be used. Try again.");
-    await expect(analyzePost({ text: 'post', sourceName: 'x' }, setup(answer({ strengths: [{ text: 'x', factId: 'f9' }] })).ports)).rejects.toThrow("Claude's reading of the post couldn't be used. Try again.");
+  it('refuses an answer that cannot be read, or that has no company, title or score', async () => {
+    const refused = "Claude's reading of the post couldn't be used. Try again.";
+    await expect(analyzePost({ text: 'post', sourceName: 'x' }, setup('Sorry, no.').ports)).rejects.toThrow(refused);
+    await expect(analyzePost({ text: 'post', sourceName: 'x' }, setup(answer({ company: '' })).ports)).rejects.toThrow(refused);
+    await expect(analyzePost({ text: 'post', sourceName: 'x' }, setup(answer({ score: 'high' })).ports)).rejects.toThrow(refused);
+  });
+
+  it('drops a strength citing a fact not in the bank, keeping the rest of the job', async () => {
+    const { ports } = setup(answer({ strengths: [{ text: 'Node APIs', factId: 'f1' }, { text: 'Made up', factId: 'f9' }] }));
+    expect((await analyzePost({ text: 'post', sourceName: 'x' }, ports)).job.strengths).toEqual(['Node APIs']);
+  });
+
+  it('keeps a job whose optional details come back loose', async () => {
+    const { ports } = setup(answer({
+      location: null, employmentType: 'Part-time', applyEmail: 'see post', applyUrl: 'Easy Apply', score: 71.6,
+      tags: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'], roleSummary: 'x'.repeat(500),
+    }));
+    const { job } = await analyzePost({ text: 'post', sourceName: 'x' }, ports);
+    expect(job).toMatchObject({ location: 'Not stated', employmentType: 'contract', score: 72, applyTarget: 'Manual' });
+    expect(job.tags).toHaveLength(8);
+    expect(job.roleSummary).toHaveLength(400);
   });
 });
