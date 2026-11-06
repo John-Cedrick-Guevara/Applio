@@ -324,15 +324,16 @@ Wire real data behind the same `ApplioApi`. Each PR replaces part of the mock st
   - [x] tests with a fake mailbox
   - _decided:_ keyword rules, no AI; read-only IMAP every 15 min via `imapflow`; only sender, date and a 200-character summary are kept
 
-- [ ] **PR-22 — Telegram notifications**  Alerts and one-tap approvals.
+- [x] **PR-22 — Telegram notifications**  Alerts and one-tap approvals.
   - _branch:_ `feat/telegram-notify`
   - _PR title:_ `feat: add telegram notifications`
   - _why:_ approve drafts and see replies away from the desk (SPEC F9)
   - _depends on:_ PR-20, PR-21b
-  - [ ] spec: `docs/features/telegram-notify/telegram-notify-spec.md`
-  - [ ] long-polling bot; new matches, drafts with Approve / Open / Skip, replies, follow-ups due, quota warnings
-  - [ ] real `testConnection('telegram')`
-  - [ ] tests with a fake bot API
+  - [x] spec: `docs/features/telegram-notify/telegram-notify-spec.md`
+  - [x] long-polling bot; new matches, drafts with Approve / Open / Skip, replies, follow-ups due, quota warnings
+  - [x] real `testConnection('telegram')`
+  - [x] tests with a fake bot API
+  - _decided:_ summaries only, never letters; no library (fetch); stored update offset and notification keys, so nothing repeats
 
 - [ ] **PR-23 — Add job and assisted fill**  Real paste/link analysis; optional platform pre-fill.
   - _branch:_ `feat/add-job-live`
