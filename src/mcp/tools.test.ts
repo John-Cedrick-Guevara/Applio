@@ -30,7 +30,7 @@ const setup = () => {
 const draftInput = {
   jobId: inScope.id, kind: 'cover-letter', headline: 'Backend engineer', summary: 'Ships fast APIs.',
   resume: [{ heading: 'Acme', items: [{ text: 'Cut API latency 40%', factId: 'f1' }] }],
-  coverLetter: 'Dear team…', answers: [{ question: 'Why us?', answer: 'Your API work.' }],
+  coverLetter: 'Dear team…', answers: [{ question: 'Why us?', answer: 'Your API work.' }, { question: 'Notice period?', answerId: 'a1' }],
 };
 
 describe('MCP tools', () => {
@@ -94,8 +94,30 @@ describe('MCP tools', () => {
   it('save a draft whose bullets all cite real facts', () => {
     const { call, ports } = setup();
     expect(call('save_draft', draftInput)).toBe('Saved.');
-    const saved = vi.mocked(ports.saveDraft).mock.calls[0]![0] as Draft;
-    expect(saved).toMatchObject({ jobId: inScope.id, edited: false, createdAt: NOW.toISOString(), answers: [{ question: 'Why us?', answer: 'Your API work.', origin: 'ai', tokens: 0 }] });
+    const [saved, reused] = vi.mocked(ports.saveDraft).mock.calls[0]! as [Draft, string[]];
+    expect(saved).toMatchObject({ jobId: inScope.id, edited: false, createdAt: NOW.toISOString() });
+    expect(reused).toEqual(['a1']);
+  });
+
+  it("store a bank answer with the bank's own text and no tokens, and mark a new one as AI-written", () => {
+    const { call, ports } = setup();
+    call('save_draft', draftInput);
+    expect((vi.mocked(ports.saveDraft).mock.calls[0]![0] as Draft).answers).toEqual([
+      { question: 'Why us?', answer: 'Your API work.', origin: 'ai', tokens: 0 },
+      { question: 'Notice period?', answer: 'Two weeks', origin: 'bank', tokens: 0 },
+    ]);
+  });
+
+  it('reject an answer id that is not in the answer bank', () => {
+    const { call } = setup();
+    expect(() => call('save_draft', { ...draftInput, answers: [{ question: 'Salary?', answerId: 'a9' }] })).toThrow('Answer a9 is not in the answer bank. Use get_answers, or write a new answer.');
+  });
+
+  it('reject a line whose number is not in the fact it cites, so metrics stay exactly as written', () => {
+    const { call, ports } = setup();
+    const inflated = { ...draftInput, resume: [{ heading: 'Acme', items: [{ text: 'Cut API latency 45%', factId: 'f1' }] }] };
+    expect(() => call('save_draft', inflated)).toThrow('"Cut API latency 45%" has 45, which fact f1 doesn\'t say. Use its numbers exactly as written.');
+    expect(ports.saveDraft).not.toHaveBeenCalled();
   });
 
   it('reject a draft citing a fact that is not in the bank, naming it', () => {

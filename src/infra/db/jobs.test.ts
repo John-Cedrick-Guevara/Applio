@@ -35,6 +35,15 @@ describe('jobs repository', () => {
     expect(jobs.dedupKeys()).toEqual(new Set(['acme|engineer', 'globex|designer']));
   });
 
+  it("updates a job's counts and folder", () => {
+    const jobs = setup();
+    jobs.insert(first, { dedupKey: 'k1', createdAt: NOW.toISOString() });
+    jobs.update(first.id, { factsUsed: 6, tokensUsed: 4200, folderPath: '~/Applio/2026-11/Acme' });
+    expect(jobs.get(first.id)).toMatchObject({ factsUsed: 6, tokensUsed: 4200, folderPath: '~/Applio/2026-11/Acme' });
+    jobs.update(first.id, { tokensUsed: 5000 });
+    expect(jobs.get(first.id)).toMatchObject({ factsUsed: 6, tokensUsed: 5000 });
+  });
+
   it('saves a match score and its summaries', () => {
     const jobs = setup();
     jobs.insert(first, { dedupKey: 'k1', createdAt: NOW.toISOString() });

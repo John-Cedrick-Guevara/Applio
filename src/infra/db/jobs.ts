@@ -15,6 +15,8 @@ export interface JobsRepo {
   insert(job: Job, meta: JobMeta): void;
   get(id: string): Job | undefined;
   findByDedupKey(dedupKey: string): Job | undefined;
+  /** Sets the given counters and folder; fields left out keep their values. */
+  update(id: string, patch: Partial<Pick<Job, 'factsUsed' | 'tokensUsed' | 'folderPath'>>): void;
   /** Stores a scoring result (SPEC F3.3); the status move is the caller's. */
   saveMatch(id: string, match: Pick<Job, 'roleSummary' | 'descriptionSummary' | 'strengths' | 'gaps'> & { score: number }): void;
   /** Every stored job's dedup key, sent ones included, for triage. */
@@ -71,6 +73,9 @@ export function createJobsRepo(db: DatabaseSync): JobsRepo {
   const selectEvents = db.prepare('SELECT status, at, note FROM status_events WHERE job_id = ? ORDER BY id');
   const selectById = db.prepare('SELECT * FROM jobs WHERE id = ?');
   const selectByKey = db.prepare('SELECT * FROM jobs WHERE dedup_key = ?');
+  const updateCounts = db.prepare(
+    'UPDATE jobs SET facts_used = COALESCE(?, facts_used), tokens_used = COALESCE(?, tokens_used), folder_path = COALESCE(?, folder_path) WHERE id = ?',
+  );
   const updateMatch = db.prepare('UPDATE jobs SET score = ?, role_summary = ?, description_summary = ?, strengths = ?, gaps = ? WHERE id = ?');
   const selectKeys = db.prepare('SELECT dedup_key FROM jobs');
   const updateStatus = db.prepare('UPDATE jobs SET status = ? WHERE id = ?');
@@ -96,6 +101,7 @@ export function createJobsRepo(db: DatabaseSync): JobsRepo {
       }),
 
     get,
+    update: (id, p) => void updateCounts.run(nullable(p.factsUsed), nullable(p.tokensUsed), nullable(p.folderPath), id),
     saveMatch: (id, m) => void updateMatch.run(m.score, nullable(m.roleSummary), nullable(m.descriptionSummary), JSON.stringify(m.strengths), JSON.stringify(m.gaps), id),
     dedupKeys: () => new Set(selectKeys.all().map((r) => String(r.dedup_key))),
 

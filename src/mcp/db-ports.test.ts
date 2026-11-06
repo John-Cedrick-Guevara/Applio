@@ -13,6 +13,7 @@ const setup = () => {
   const job = { ...(seedJobs(NOW)[0] as Job), status: 'found' as const, history: [{ status: 'found' as const, at: NOW.toISOString() }] };
   createJobsRepo(db).insert(job, { dedupKey: 'k', createdAt: NOW.toISOString() });
   createProfileRepo(db).saveFact({ id: 'f1', group: 'Acme', text: 'Cut API latency 40%', tags: [], timesUsed: 0 });
+  createProfileRepo(db).saveAnswer({ id: 'a1', question: 'Notice period?', answer: 'Two weeks', origin: 'you', timesReused: 2 });
   const tools = createTools(createToolPorts(db, [job.id], () => NOW));
   const call = (name: string, input: unknown = {}) => tools.find((t) => t.name === name)!.call(input);
   return { db, job, call, jobs: createJobsRepo(db) };
@@ -29,10 +30,14 @@ describe('tools over the Applio database', () => {
     const { call, db, jobs, job } = setup();
     call('save_draft', {
       jobId: job.id, kind: 'cover-letter', headline: 'h', summary: 's',
-      resume: [{ heading: 'Acme', items: [{ text: 'Cut API latency 40%', factId: 'f1' }] }], coverLetter: 'Dear team', answers: [],
+      resume: [{ heading: 'Acme', items: [{ text: 'Cut API latency 40%', factId: 'f1' }, { text: 'Latency down 40%', factId: 'f1' }] }],
+      coverLetter: 'Dear team', answers: [{ question: 'Notice?', answerId: 'a1' }],
     });
-    expect(jobs.get(job.id)?.status).toBe('drafted');
+    expect(jobs.get(job.id)).toMatchObject({ status: 'drafted', factsUsed: 1 });
     expect(db.prepare('SELECT cover_letter FROM drafts').get()).toEqual({ cover_letter: 'Dear team' });
+    const profile = createProfileRepo(db);
+    expect(profile.listFacts()[0]?.timesUsed).toBe(1);
+    expect(profile.listAnswers()[0]?.timesReused).toBe(3);
   });
 
   it("log a note without changing the job's status", () => {

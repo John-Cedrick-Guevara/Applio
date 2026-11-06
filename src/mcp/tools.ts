@@ -19,7 +19,8 @@ export interface ToolPorts {
   answers: () => Answer[];
   job: (id: string) => Job | undefined;
   saveMatch: (jobId: string, match: Match) => void;
-  saveDraft: (draft: Draft) => void;
+  /** `reusedAnswerIds`: answer-bank entries the draft reused, so their reuse counts go up. */
+  saveDraft: (draft: Draft, reusedAnswerIds: string[]) => void;
   /** A note on the job's timeline; its status stays as it is. */
   logEvent: (jobId: string, message: string) => void;
   now: () => Date;
@@ -54,8 +55,12 @@ const DraftInput = z.strictObject({
   summary: text(1000),
   resume: z.array(z.strictObject({ heading: text(200), items: z.array(z.strictObject({ text: text(400), factId: text(64) })).min(1).max(12) })).min(1).max(10),
   coverLetter: text(6000),
-  answers: z.array(z.strictObject({ question: text(300), answer: text(2000) })).max(20),
+  // A bank answer is cited by id and stored with the bank's own text; anything else is a new, AI-written answer.
+  answers: z.array(z.union([z.strictObject({ question: text(300), answerId: text(64) }), z.strictObject({ question: text(300), answer: text(2000) })])).max(20),
 });
+
+/** Every number in a line ("40%", "1,200", "3.5"), as written, for the metrics check. */
+const numbersIn = (s: string) => s.match(/\d+(?:[.,]\d+)*/g) ?? [];
 
 const EventInput = z.strictObject({ ...JobRef, message: text(500) });
 const NoInput = z.strictObject({});
@@ -116,15 +121,27 @@ export function createTools(ports: ToolPorts): McpTool[] {
       return 'Saved.';
     }),
 
-    tool('save_draft', 'Save the tailored résumé (every bullet cites a fact id), cover letter or proposal, and form answers for one job.', DraftInput, (d) => {
+    tool('save_draft', 'Save the tailored résumé (every line cites a fact id and keeps its numbers exactly), cover letter or proposal, and form answers (answerId for a bank answer) for one job.', DraftInput, (d) => {
       scoped(d.jobId);
-      requireFacts(d.resume.flatMap((s) => s.items.map((i) => i.factId)));
-      ports.saveDraft({
-        ...d,
-        edited: false,
-        answers: d.answers.map((a) => ({ ...a, origin: 'ai', tokens: 0 })),
-        createdAt: ports.now().toISOString(),
+      const items = d.resume.flatMap((s) => s.items);
+      requireFacts(items.map((i) => i.factId));
+      // Never invent: a line's numbers must all appear in the fact it cites (draft-generation MNB-1).
+      const facts = new Map(ports.profile().facts.map((f) => [f.id, f.text]));
+      for (const item of items) {
+        const stated = new Set(numbersIn(facts.get(item.factId) ?? ''));
+        const extra = numbersIn(item.text).find((n) => !stated.has(n));
+        if (extra) throw new ToolInputError(`"${item.text}" has ${extra}, which fact ${item.factId} doesn't say. Use its numbers exactly as written.`);
+      }
+      const bank = new Map(ports.answers().map((a) => [a.id, a.answer]));
+      const reused: string[] = [];
+      const answers = d.answers.map((a) => {
+        if (!('answerId' in a)) return { question: a.question, answer: a.answer, origin: 'ai' as const, tokens: 0 };
+        const answer = bank.get(a.answerId);
+        if (answer === undefined) throw new ToolInputError(`Answer ${a.answerId} is not in the answer bank. Use get_answers, or write a new answer.`);
+        reused.push(a.answerId);
+        return { question: a.question, answer, origin: 'bank' as const, tokens: 0 };
       });
+      ports.saveDraft({ ...d, edited: false, answers, createdAt: ports.now().toISOString() }, reused);
       return 'Saved.';
     }),
 
