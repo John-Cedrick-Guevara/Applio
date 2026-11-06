@@ -4,12 +4,14 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
+import { createAi } from '../core/ai/ai-service';
 import type { AiEngine } from '../core/ai/engine';
 import { discover } from '../core/jobs/discover';
 import { localDay, runSources } from '../core/jobs/run-sources';
 import { createScheduler } from '../core/jobs/scheduler';
 import type { HttpGet, JobSource } from '../core/jobs/source';
 import { createProfileService } from '../core/profile/profile-service';
+import { scoreJobs } from '../core/scoring/score-jobs';
 import { createSettingsService } from '../core/settings/settings-service';
 import {
   createActivityRepo, createJobsRepo, createPollsRepo, createProfileRepo, createSettingsRepo, createSourcesRepo, transaction,
@@ -18,6 +20,7 @@ import { readResumeText } from '../infra/resume/read-resume';
 import type { SecretStore } from '../infra/secrets/secret-store';
 import type { ApplioApi } from '../shared/api';
 import type { AiEngine as EngineKind, AppStatus } from '../shared/types';
+import { matchesFilter } from '../shared/job-filter';
 import { createMockApi } from '../shared/mock/mock-api';
 import { isSafeExternalUrl } from './security';
 
@@ -60,6 +63,36 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
   const profile = createProfileService({ store: createProfileRepo(db), kv, newId: randomUUID, now: () => new Date() });
   const isPaused = () => kv.get(PAUSED_KEY) === true;
 
+  // Every AI call goes through this guard: pause, budgets, usage (SPEC F10).
+  const ai = createAi({
+    engine: () => engines[settings.getSettings().aiEngine],
+    budgets: () => {
+      const { dailyTokenBudget, monthlyTokenBudget } = settings.getSettings();
+      return { daily: dailyTokenBudget, monthly: monthlyTokenBudget };
+    },
+    tokensSince: (since) => activity.tokensSince(since),
+    record: (u) => activity.recordUsage({ ...u, tokens: u.inputTokens + u.outputTokens }),
+    isPaused,
+    now: () => new Date(),
+    // ponytail: logged and shown through status; Telegram picks warnings up in PR-22.
+    warn: (message) => {
+      console.warn('[budget]', message);
+      pushStatus();
+    },
+  });
+
+  /** A note on a job's timeline that leaves its status as it is. */
+  const note = (id: string, text: string) => {
+    const job = jobs.get(id);
+    if (job) jobs.transition(id, { status: job.status, at: new Date().toISOString(), note: text });
+  };
+
+  const getJob = (id: string) => {
+    const job = jobs.get(id);
+    if (!job) throw new Error(`Job ${id} not found`);
+    return job;
+  };
+
   const runDiscovery = () =>
     discover({
       poll: () => runSources({ sources, isEnabled: (id) => sourcesRepo.get(id)?.enabled ?? false, polls, httpFor, today: () => localDay(new Date()) }),
@@ -68,8 +101,11 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       save: (found, details, summary) =>
         transaction(db, () => {
           for (const { job, dedupKey } of found) jobs.insert(job, { dedupKey, createdAt: summary.at });
-          activity.addRun(summary, details);
+          return activity.addRun(summary, details);
         }),
+      score: (jobIds, runId) =>
+        scoreJobs(jobIds, { runId, draftThreshold: settings.getSettings().draftThreshold }, { ai: ai.run, score: (id) => jobs.get(id)?.score, note }),
+      saveScoring: (runId, details) => activity.updateDetails(runId, details),
       now: () => new Date(),
       newId: randomUUID,
     });
@@ -131,6 +167,10 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
   return {
     ...store,
 
+    // Jobs come from SQLite; drafts and the send flow stay mock until PR-17/18.
+    listJobs: later((filter = {}) => jobs.list(filter.statuses ? { statuses: filter.statuses } : undefined).filter((j) => matchesFilter(j, filter))),
+    getJob: later(getJob),
+
     getProfile: later(profile.getProfile),
     saveFact: later(profile.saveFact),
     deleteFact: later(profile.deleteFact),
@@ -183,7 +223,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     },
 
     openJobFolder: async (jobId) => {
-      const { folderPath } = await store.getJob(jobId);
+      const { folderPath } = getJob(jobId);
       if (!folderPath) throw new Error('This job has no folder yet');
       await openWithShell(folderPath, "This job's folder isn't on disk yet. Applio creates it when it saves the application.");
     },

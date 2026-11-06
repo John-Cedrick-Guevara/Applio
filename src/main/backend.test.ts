@@ -14,11 +14,12 @@ vi.mock('node:os', async (original) => ({ ...(await original<typeof import('node
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { openDatabase } from '../infra/db';
+import { createJobsRepo, openDatabase } from '../infra/db';
 import type { AiEngine } from '../core/ai/engine';
 import type { JobSource } from '../core/jobs/source';
 import { discovered } from '../core/triage/test-jobs';
 import { createSecretStore, type Encryptor } from '../infra/secrets/secret-store';
+import { seedJobs } from '../shared/mock/fixtures';
 import { createBackend, type BackendDeps } from './backend';
 
 const fakeEncryptor: Encryptor = {
@@ -42,6 +43,12 @@ const fakeEngine = (ready: boolean, message: string): AiEngine => ({
   complete: async () => Promise.reject(new Error('not used here')),
   check: vi.fn(async () => ({ ready, message })),
 });
+
+/** Stores the prototype's seeded jobs, so tests that need a job with or without a folder have one. */
+const withSeededJobs = (deps: BackendDeps) => {
+  const repo = createJobsRepo(deps.db);
+  for (const job of seedJobs(new Date('2026-11-04T09:00:00.000Z'))) repo.insert(job, { dedupKey: job.id, createdAt: '2026-11-04T09:00:00.000Z' });
+};
 
 let dir = '';
 /** A backend over a temp Applio folder; call again with the same folder to simulate a restart. */
@@ -96,7 +103,8 @@ describe('createBackend OS integration', () => {
   });
 
   it("opens a job's folder with the home directory expanded, and passes on what the OS says when it can't", async () => {
-    const { api } = backendIn();
+    const { api, deps } = backendIn();
+    withSeededJobs(deps);
     const { folderPath } = await api.getJob('j1');
     mkdirSync(join(home.dir, folderPath!.slice(1)), { recursive: true });
     await api.openJobFolder('j1');
@@ -106,7 +114,8 @@ describe('createBackend OS integration', () => {
   });
 
   it("says plainly when a job's folder isn't on disk, without asking the OS", async () => {
-    const { api } = backendIn();
+    const { api, deps } = backendIn();
+    withSeededJobs(deps);
     await expect(api.openJobFolder('j1')).rejects.toThrow(new Error("This job's folder isn't on disk yet. Applio creates it when it saves the application."));
     await expect(api.openJobFolder('j6')).rejects.toThrow(new Error('This job has no folder yet'));
     expect(electron.shell.openPath).not.toHaveBeenCalled();
@@ -253,5 +262,26 @@ describe('createBackend discovery', () => {
   it('reports tokens used today from the usage records', async () => {
     const { api } = backendIn();
     expect((await api.getStatus()).tokensToday).toBe(0);
+  });
+
+  it("scores the run's new jobs through the engine, charging the tokens to today", async () => {
+    const { api, deps } = await searchingBackend();
+    // Stands in for Claude calling save_match through the tools.
+    const complete = vi.fn(async ({ jobIds }: { jobIds: readonly string[] }) => {
+      for (const id of jobIds) createJobsRepo(deps.db).saveMatch(id, { score: 88, roleSummary: 'APIs', descriptionSummary: 'Remote', strengths: [], gaps: [] });
+      return { text: 'done', inputTokens: 900, outputTokens: 100 };
+    });
+    deps.engines['claude-code'] = { complete, check: async () => ({ ready: true, message: 'ok' }) };
+    await api.runDiscovery();
+    const [job] = await api.listJobs({ minScore: 80 });
+    expect(job).toMatchObject({ title: 'Senior Backend Engineer', score: 88 });
+    expect(await api.getJob(job!.id)).toEqual(job);
+    expect((await api.getStatus()).tokensToday).toBe(1000);
+    await api.runDiscovery();
+    expect(complete).toHaveBeenCalledTimes(1);
+  });
+
+  it('says plainly when a job does not exist', async () => {
+    await expect(backendIn().api.getJob('nope')).rejects.toThrow('Job nope not found');
   });
 });
