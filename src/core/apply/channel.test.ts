@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectChannel } from './channel';
+import { atsFormUrl, detectChannel } from './channel';
 
 describe('detectChannel', () => {
   it.each([
@@ -21,5 +21,15 @@ describe('detectChannel', () => {
 
   it('treats an unparseable link as a custom site', () => {
     expect(detectChannel('not a url')).toEqual({ channel: 'custom', applyTarget: 'not a url' });
+  });
+
+  it.each([
+    ['https://jobs.lever.co/acme/123', 'https://jobs.lever.co/acme/123/apply'],
+    ['https://jobs.lever.co/acme/123/apply', 'https://jobs.lever.co/acme/123/apply'],
+    ['https://jobs.ashbyhq.com/acme/abc', 'https://jobs.ashbyhq.com/acme/abc/application'],
+    ['https://apply.workable.com/j/81B46579FE', 'https://apply.workable.com/j/81B46579FE/apply'],
+    ['https://job-boards.greenhouse.io/gitlab/jobs/1', 'https://job-boards.greenhouse.io/gitlab/jobs/1'],
+  ])('opens the form page for %s', (url, form) => {
+    expect(atsFormUrl(url)).toBe(form);
   });
 });

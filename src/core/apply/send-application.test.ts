@@ -15,7 +15,7 @@ const setup = (over: Partial<Job> = {}, opts: { sentToday?: number; perChannel?:
   ] };
   const log = new Map<string, SendLogRow>();
   const outbox: unknown[] = [];
-  const files: Record<string, string> = {};
+  const files: Record<string, string | Uint8Array> = {};
   const ports: ApplyPorts = {
     job: () => job,
     draft: () => draft,
@@ -43,6 +43,8 @@ const setup = (over: Partial<Job> = {}, opts: { sentToday?: number; perChannel?:
     dayStart: () => '2026-11-06T00:00:00.000Z',
     now: () => NOW,
     saveAiAnswers: vi.fn(),
+    bankAnswers: () => [{ question: 'Phone', answer: '+63 917 555 0100' }],
+    submitAts: vi.fn(async () => ({ kind: 'submitted' as const, filled: [{ selector: '#email', label: 'Email', action: 'type' as const, value: 'sam@gmail.com' }] })),
   };
   return { ports, outbox, files, log, job: () => job };
 };
@@ -68,7 +70,7 @@ describe('approveDraft over email', () => {
     const { ports, files, job } = setup();
     expect((await approveDraft('j1', ports)).status).toBe('applied');
     expect(job()).toMatchObject({ status: 'applied', sentBy: 'you-app' });
-    const md = files['/out/acme/sent.md']!;
+    const md = files['/out/acme/sent.md'] as string;
     for (const part of ['To: jobs@acme.com', 'Subject: Application: Senior Backend Engineer — Sam Rivera', 'Channel: email', 'Sent: 2026-11-06T09:00:00.000Z', 'Tokens: 5200', 'Attachments: resume.pdf', 'Dear Acme team,\n\nI build APIs.']) {
       expect(md).toContain(part);
     }
@@ -126,10 +128,61 @@ describe('approveDraft over email', () => {
 });
 
 describe('approveDraft on other channels', () => {
-  it.each(['platform', 'custom', 'ats'] as const)('only approves a %s job; nothing is sent', async (channel) => {
+  it.each(['platform', 'custom'] as const)('only approves a %s job; nothing is sent', async (channel) => {
     const { ports, job } = setup({ channel });
     await approveDraft('j1', ports);
     expect(job().status).toBe('approved');
     expect(ports.sendEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe('approveDraft on a standard ATS form', () => {
+  const ats = (over: Partial<Job> = {}) => setup({ channel: 'ats', applyTarget: 'jobs.lever.co', applyUrl: 'https://jobs.lever.co/acme/123', ...over });
+
+  it("fills and submits the form with the résumé, letter, profile and answers, then logs exactly what was filled", async () => {
+    const { ports, files, job } = ats();
+    expect((await approveDraft('j1', ports)).status).toBe('applied');
+    expect(ports.submitAts).toHaveBeenCalledWith({
+      url: 'https://jobs.lever.co/acme/123/apply',
+      input: {
+        applicant: { fullName: 'Sam Rivera', email: 'sam@gmail.com' },
+        files: { resume: '/out/acme/resume.pdf', coverLetter: '/out/acme/cover-letter.pdf' },
+        letter: 'Dear Acme team,\n\nI build APIs.',
+        answers: [{ question: 'Why us?', answer: 'Your API work.' }, { question: 'Notice?', answer: 'Two weeks' }, { question: 'Phone', answer: '+63 917 555 0100' }],
+      },
+    });
+    expect(job()).toMatchObject({ status: 'applied', sentBy: 'you-app' });
+    expect(files['/out/acme/sent.md']).toContain('Email: sam@gmail.com');
+    expect(files['/out/acme/sent.md']).toContain('To: https://jobs.lever.co/acme/123/apply');
+  });
+
+  it('saves a screenshot of the confirmation page in the job folder', async () => {
+    const { ports, files } = ats();
+    vi.mocked(ports.submitAts).mockResolvedValueOnce({ kind: 'submitted', filled: [], screenshot: new Uint8Array([137, 80, 78, 71]) });
+    await approveDraft('j1', ports);
+    expect(files['/out/acme/confirmation.png']).toEqual(new Uint8Array([137, 80, 78, 71]));
+  });
+
+  it('hands the form over when it asks something Applio has no answer for, and can be approved again later', async () => {
+    const { ports, job, log } = ats();
+    vi.mocked(ports.submitAts).mockResolvedValueOnce({ kind: 'handoff', reason: 'It asks things Applio has no saved answer for: Current company.' });
+    await expect(approveDraft('j1', ports)).rejects.toThrow('Applio filled what it could. Finish the form in its window, then use Mark as applied. It asks things Applio has no saved answer for: Current company.');
+    expect(job().status).toBe('approved');
+    expect(log.has('j1')).toBe(false);
+  });
+
+  it("keeps the claim when Submit was pressed but not confirmed, so it's never submitted twice", async () => {
+    const { ports, log } = ats();
+    vi.mocked(ports.submitAts).mockResolvedValueOnce({ kind: 'unconfirmed', filled: [] });
+    await expect(approveDraft('j1', ports)).rejects.toThrow("Applio pressed Submit but couldn't confirm it went through.");
+    expect(log.get('j1')?.state).toBe('sending');
+    await expect(approveDraft('j1', ports)).rejects.toThrow(/didn't finish/);
+    expect(ports.submitAts).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops at the per-channel cap for ATS forms', async () => {
+    const { ports } = setup({ channel: 'ats', applyUrl: 'https://jobs.lever.co/acme/123' }, { sentToday: 10, perChannel: 10 });
+    await expect(approveDraft('j1', ports)).rejects.toThrow("Today's cap for ATS applications is reached (10). Raise it in Guardrails, or send tomorrow.");
+    expect(ports.submitAts).not.toHaveBeenCalled();
   });
 });

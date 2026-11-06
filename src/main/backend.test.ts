@@ -70,6 +70,8 @@ const backendIn = (folder = (dir = mkdtempSync(join(tmpdir(), 'applio-backend-')
     printPdf: vi.fn(async (html: string) => new TextEncoder().encode(html)),
     // Stands in for Gmail's SMTP: records each message instead of sending it.
     mailTransport: () => ({ sendMail: async (m) => void outbox.push(m) }),
+    // Stands in for Applio's form window: "submits" and reports what it filled.
+    submitAts: vi.fn(async ({ input }) => ({ kind: 'submitted' as const, filled: [{ selector: '#email', label: 'Email', action: 'type' as const, value: input.applicant.email }] })),
     engines: {
       'claude-code': fakeEngine(false, "Claude Code isn't signed in. Run `claude auth login` in a terminal, or switch to an Anthropic API key below."),
       'api-key': fakeEngine(true, 'The Anthropic API accepted the key.'),
@@ -457,6 +459,17 @@ describe('createBackend discovery', () => {
     await api.setSecret('gmailAppPassword', PASSWORD);
     expect(await api.testConnection('gmail')).toEqual({ ok: true, message: 'Test email sent to sam@gmail.com' });
     expect(outbox[0]).toMatchObject({ to: 'sam@gmail.com', subject: 'Applio test email' });
+  });
+
+  it('submits an approved ATS application through the form window and logs what it filled', async () => {
+    const { api, job, deps } = await draftedBackend();
+    deps.db.prepare("UPDATE jobs SET channel = 'ats', apply_target = 'jobs.lever.co', apply_url = 'https://jobs.lever.co/acme/1' WHERE id = ?").run(job.id);
+    await api.saveSettings({ gmailAddress: 'sam@gmail.com' });
+    await api.saveAnswer({ question: 'Phone', answer: '+63 917 555 0100' });
+    expect(await api.approveDraft(job.id)).toMatchObject({ status: 'applied', sentBy: 'you-app' });
+    expect(deps.submitAts).toHaveBeenCalledWith(expect.objectContaining({ url: 'https://jobs.lever.co/acme/1/apply' }));
+    expect(vi.mocked(deps.submitAts).mock.calls[0]![0].input.answers).toContainEqual({ question: 'Phone', answer: '+63 917 555 0100' });
+    expect(readFileSync(join(job.folderPath!, 'sent.md'), 'utf8')).toContain('Email: sam@gmail.com');
   });
 
   it('keeps a sent application exactly as sent: its letter can no longer be edited', async () => {

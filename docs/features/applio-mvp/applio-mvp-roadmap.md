@@ -284,14 +284,15 @@ Wire real data behind the same `ApplioApi`. Each PR replaces part of the mock st
   - [x] tests with a fake SMTP transport
   - _decided:_ `nodemailer` for SMTP; a `sends` table is the double-send guard and the record of what went out; a crash mid-send blocks any resend
 
-- [ ] **PR-19 — ATS apply**  Fill and submit standard ATS forms in the app's own window.
+- [x] **PR-19 — ATS apply**  Fill and submit standard ATS forms in the app's own window.
   - _branch:_ `feat/ats-apply`
   - _PR title:_ `feat: submit standard ats forms`
   - _why:_ second autonomous-capable channel (SPEC F5 channel 2)
   - _depends on:_ PR-18
-  - [ ] spec: `docs/features/ats-apply/ats-apply-spec.md`
-  - [ ] Greenhouse, Lever, Ashby, Workable fillers; CAPTCHA pauses and hands off
-  - [ ] tests against saved form fixtures
+  - [x] spec: `docs/features/ats-apply/ats-apply-spec.md`
+  - [x] Greenhouse, Lever, Ashby, Workable fillers; CAPTCHA pauses and hands off
+  - [x] tests against saved form fixtures
+  - _decided:_ one generic reader and planner for all four; only identity, files, letter and matching saved answers are filled; demographics and checkboxes never; unconfirmed submits are never retried
 
 - [ ] **PR-20 — Autonomous sending**  Send without approval where source, channel and guardrails allow.
   - _branch:_ `feat/autonomous-send`

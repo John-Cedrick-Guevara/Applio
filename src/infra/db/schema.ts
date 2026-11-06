@@ -175,4 +175,12 @@ export const MIGRATIONS: readonly Migration[] = [
       CREATE INDEX sends_channel_claimed ON sends (channel, claimed_at);
     `,
   },
+  {
+    version: 6,
+    name: 'apply url',
+    sql: `
+      -- The ATS form a job is applied through; \`url\` stays the board page that's credited.
+      ALTER TABLE jobs ADD COLUMN apply_url TEXT;
+    `,
+  },
 ];

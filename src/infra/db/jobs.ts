@@ -52,6 +52,7 @@ const toJob = (r: Row, history: StatusEvent[]): Job => ({
   strengths: json<string[]>(r.strengths),
   gaps: json<string[]>(r.gaps),
   applyTarget: String(r.apply_target),
+  ...(r.apply_url == null ? {} : { applyUrl: String(r.apply_url) }),
   platform: optText(r.platform),
   factsUsed: Number(r.facts_used),
   tokensUsed: Number(r.tokens_used),
@@ -67,8 +68,8 @@ export function createJobsRepo(db: DatabaseSync): JobsRepo {
   const insertJob = db.prepare(`
     INSERT INTO jobs (id, dedup_key, source_id, source_name, company, title, url, location, salary, employment_type,
       posted_at, status, channel, description, score, role_summary, description_summary, tags, strengths, gaps,
-      apply_target, platform, facts_used, tokens_used, folder_path, sent_by, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      apply_target, platform, facts_used, tokens_used, folder_path, sent_by, created_at, apply_url)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   const insertEvent = db.prepare('INSERT INTO status_events (job_id, status, at, note) VALUES (?, ?, ?, ?)');
   const selectEvents = db.prepare('SELECT status, at, note FROM status_events WHERE job_id = ? ORDER BY id');
   const selectById = db.prepare('SELECT * FROM jobs WHERE id = ?');
@@ -95,7 +96,7 @@ export function createJobsRepo(db: DatabaseSync): JobsRepo {
           nullable(job.salary), job.employmentType, job.postedAt, job.status, job.channel, job.description,
           nullable(job.score), nullable(job.roleSummary), nullable(job.descriptionSummary), JSON.stringify(job.tags),
           JSON.stringify(job.strengths), JSON.stringify(job.gaps), job.applyTarget, nullable(job.platform),
-          job.factsUsed, job.tokensUsed, nullable(job.folderPath), nullable(job.sentBy), meta.createdAt,
+          job.factsUsed, job.tokensUsed, nullable(job.folderPath), nullable(job.sentBy), meta.createdAt, nullable(job.applyUrl),
         );
         for (const e of job.history) addEvent(job.id, e);
       }),

@@ -4,6 +4,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { createApiEngine } from '../infra/ai/api-engine';
 import { createClaudeCodeEngine } from '../infra/ai/claude-code-engine';
 import { openDatabase } from '../infra/db';
+import { submitAtsForm } from '../infra/browser/ats-window';
 import { printPdf } from '../infra/pdf/print-pdf';
 import { createSecretStore } from '../infra/secrets/secret-store';
 import { createToolPorts } from '../mcp/db-ports';
@@ -118,6 +119,8 @@ app.whenReady().then(() => {
     },
     setLaunchAtLogin: (openAtLogin) => app.setLoginItemSettings({ openAtLogin }),
     printPdf,
+    // The operator approved this send, so they watch it fill; autonomous sends (PR-20) run hidden.
+    submitAts: (request) => submitAtsForm({ ...request, visible: true }),
     engines: {
       'claude-code': createClaudeCodeEngine({
         command: 'claude',
