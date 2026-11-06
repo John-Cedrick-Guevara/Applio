@@ -133,6 +133,8 @@ app.whenReady().then(() => {
         command: 'claude',
         // App data, not a project folder, so no CLAUDE.md or project settings load.
         cwd: app.getPath('userData'),
+        // Applio's own Claude Code profile: the operator's personal setup never loads in its calls.
+        configDir: join(app.getPath('userData'), 'claude'),
         env: { ...process.env, PATH: enginePath() },
         // Only Applio's server; --strict-mcp-config keeps the operator's own MCP servers out.
         mcpConfig: (jobIds) => mcpConfigFor({ execPath: process.execPath, script: join(__dirname, 'mcp.cjs'), dbPath: dbPath() }, jobIds),

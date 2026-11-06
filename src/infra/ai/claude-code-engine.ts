@@ -3,7 +3,7 @@ import type { AiEngine } from '../../core/ai/engine';
 import { AppError } from '../../shared/errors';
 
 const NOT_INSTALLED = "Claude Code isn't installed. Install it from claude.com/claude-code, or switch to an Anthropic API key below.";
-const NOT_SIGNED_IN = "Claude Code isn't signed in. Run `claude auth login` in a terminal, or switch to an Anthropic API key below.";
+const NOT_SIGNED_IN = "Claude Code isn't signed in for Applio yet. Run this once in a terminal, then click Test: it opens your browser to sign in with the same account. Or switch to an Anthropic API key below.";
 const TIMEOUT_MS = 10 * 60_000;
 
 /** Claude Code couldn't run or returned an error. The message is for the operator. */
@@ -18,15 +18,20 @@ interface Options {
   command: string;
   /** Somewhere with no project files, so no `CLAUDE.md` or project settings load. */
   cwd: string;
+  /**
+   * Applio's own Claude Code profile (`CLAUDE_CONFIG_DIR`): the operator's personal hooks,
+   * plugins, skills, settings and memory live in their own profile and never load here.
+   */
+  configDir: string;
   env: NodeJS.ProcessEnv;
   /** Applio's MCP config as JSON for these jobs; nothing else is loaded (`--strict-mcp-config`). */
   mcpConfig: (jobIds: readonly string[]) => string;
 }
 
 /** Runs the binary, feeding `stdin`, and resolves its stdout once it exits 0. */
-const run = ({ command, cwd, env }: Options, args: string[], stdin: string) =>
+const run = ({ command, cwd, env, configDir }: Options, args: string[], stdin: string) =>
   new Promise<string>((resolve, reject) => {
-    const child = spawn(command, args, { cwd, env, stdio: ['pipe', 'pipe', 'pipe'], timeout: TIMEOUT_MS });
+    const child = spawn(command, args, { cwd, env: { ...env, CLAUDE_CONFIG_DIR: configDir }, stdio: ['pipe', 'pipe', 'pipe'], timeout: TIMEOUT_MS });
     let out = '';
     let err = '';
     child.stdout.on('data', (c: Buffer) => (out += c.toString()));
@@ -89,11 +94,12 @@ export function createClaudeCodeEngine(options: Options): AiEngine {
       };
     },
 
-    async check() {
+    async check(): Promise<{ ready: boolean; message: string; command?: string }> {
+      const signIn = `CLAUDE_CONFIG_DIR="${options.configDir}" claude auth login`;
       try {
         const status: unknown = JSON.parse(await run(options, ['auth', 'status', '--json'], ''));
         const loggedIn = !!status && typeof status === 'object' && (status as { loggedIn?: unknown }).loggedIn === true;
-        return loggedIn ? { ready: true, message: 'Claude Code is signed in.' } : { ready: false, message: NOT_SIGNED_IN };
+        return loggedIn ? { ready: true, message: 'Claude Code is signed in.' } : { ready: false, message: NOT_SIGNED_IN, command: signIn };
       } catch (err) {
         return { ready: false, message: err instanceof EngineError ? err.message : NOT_SIGNED_IN };
       }

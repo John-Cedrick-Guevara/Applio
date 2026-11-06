@@ -14,6 +14,9 @@ export interface AiEngine {
   /** `jobIds` are the jobs this call is about; Applio's tools refuse every other job. */
   /** `tools: false` runs the call without Applio's MCP tools: one turn, answer in the text. */
   complete(request: { system?: string; prompt: string; jobIds: readonly string[]; tools?: boolean }): Promise<AiReply>;
-  /** Whether the engine can run now and, if not, what the operator should do. Spends no tokens. */
-  check(): Promise<{ ready: boolean; message: string }>;
+  /**
+   * Whether the engine can run now and, if not, what the operator should do. Spends no tokens.
+   * `command`: a terminal command that fixes it, e.g. signing in Applio's Claude Code profile.
+   */
+  check(): Promise<{ ready: boolean; message: string; command?: string }>;
 }

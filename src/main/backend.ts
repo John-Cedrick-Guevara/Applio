@@ -288,7 +288,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
 
   // Last readiness check per engine. Checks spawn Claude Code or call the API, so they run on
   // start, on an engine or key change, and on Test, not on every status read.
-  const engineChecks: Partial<Record<EngineKind, { ready: boolean; message: string }>> = {};
+  const engineChecks: Partial<Record<EngineKind, { ready: boolean; message: string; command?: string }>> = {};
   const checkEngine = async () => {
     const kind = settings.getSettings().aiEngine;
     const result = await engines[kind].check();
@@ -614,8 +614,8 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     // Every connection test is live: AI readiness, a Gmail test email, a Telegram test message.
     testConnection: async (kind) => {
       if (kind === 'ai') {
-        const { ready, message } = await checkEngine();
-        return { ok: ready, message };
+        const { ready, message, command } = await checkEngine();
+        return { ok: ready, message, ...(command ? { command } : {}) };
       }
       const { secretsSet, gmailAddress, telegramChatId } = settings.getSettings();
       if (kind === 'gmail') {

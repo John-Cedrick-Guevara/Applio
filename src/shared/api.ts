@@ -102,7 +102,8 @@ export interface ApplioApi {
   saveSettings(patch: Partial<Omit<Settings, 'secretsSet'>>): Promise<Settings>;
   /** Write-only: secrets go to the OS keychain and are never returned. */
   setSecret(key: SecretKey, value: string): Promise<Settings>;
-  testConnection(kind: ConnectionKind): Promise<{ ok: boolean; message: string }>;
+  /** `command`: a terminal command that fixes it, when there is one (signing in Applio's Claude Code profile). */
+  testConnection(kind: ConnectionKind): Promise<{ ok: boolean; message: string; command?: string }>;
 }
 
 /**

@@ -15,7 +15,7 @@ const out = process.env.FAKE_LOG;
 let input = '';
 process.stdin.on('data', (c) => (input += c));
 process.stdin.on('end', () => {
-  fs.writeFileSync(out, JSON.stringify({ args: process.argv.slice(2), input }));
+  fs.writeFileSync(out, JSON.stringify({ args: process.argv.slice(2), input, configDir: process.env.CLAUDE_CONFIG_DIR }));
   const mode = process.env.FAKE_MODE;
   const line = (o) => process.stdout.write(JSON.stringify(o) + '\\n');
   if (process.argv[2] === 'auth') {
@@ -44,8 +44,8 @@ beforeEach(() => {
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
 const engine = (mode = 'ok', command = bin) =>
-  createClaudeCodeEngine({ command, cwd: dir, env: { ...process.env, FAKE_MODE: mode, FAKE_LOG: log }, mcpConfig: (ids) => JSON.stringify({ mcpServers: {}, ids }) });
-const seen = () => JSON.parse(readFileSync(log, 'utf8')) as { args: string[]; input: string };
+  createClaudeCodeEngine({ command, cwd: dir, configDir: '/apps/applio/claude', env: { ...process.env, FAKE_MODE: mode, FAKE_LOG: log }, mcpConfig: (ids) => JSON.stringify({ mcpServers: {}, ids }) });
+const seen = () => JSON.parse(readFileSync(log, 'utf8')) as { args: string[]; input: string; configDir?: string };
 
 describe('Claude Code engine', () => {
   it('runs headless with stream-json, only the given MCP config, and no built-in tools', async () => {
@@ -85,11 +85,19 @@ describe('Claude Code engine', () => {
     expect(await engine().check()).toEqual({ ready: true, message: 'Claude Code is signed in.' });
   });
 
-  it('says how to sign in when logged out', async () => {
+  it("tells how to sign in Applio's own profile when it's logged out", async () => {
     expect(await engine('logged-out').check()).toEqual({
       ready: false,
-      message: "Claude Code isn't signed in. Run `claude auth login` in a terminal, or switch to an Anthropic API key below.",
+      message: "Claude Code isn't signed in for Applio yet. Run this once in a terminal, then click Test: it opens your browser to sign in with the same account. Or switch to an Anthropic API key below.",
+      command: 'CLAUDE_CONFIG_DIR="/apps/applio/claude" claude auth login',
     });
+  });
+
+  it("runs every call and check under Applio's own profile, never the operator's", async () => {
+    await engine().complete({ prompt: 'x', jobIds: [] });
+    expect(seen().configDir).toBe('/apps/applio/claude');
+    await engine().check();
+    expect(seen().configDir).toBe('/apps/applio/claude');
   });
 
   it('says it is not installed when the binary is missing', async () => {

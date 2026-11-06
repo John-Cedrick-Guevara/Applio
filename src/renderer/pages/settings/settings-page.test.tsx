@@ -1,6 +1,7 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { createMockApi } from '../../../shared/mock/mock-api';
 import { renderWithApp } from '../../../test/render';
 import SettingsPage from './settings-page';
 
@@ -96,5 +97,14 @@ describe('SettingsPage', () => {
     renderWithApp(<SettingsPage />);
     await userEvent.click(await screen.findByRole('button', { name: 'Send test email' }));
     expect(await screen.findByText(/Missing credentials/)).toBeInTheDocument();
+  });
+
+  it("shows the one-time sign-in command for Applio's Claude Code profile, ready to copy", async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    vi.spyOn(api, 'testConnection').mockResolvedValue({ ok: false, message: "Claude Code isn't signed in for Applio yet.", command: 'CLAUDE_CONFIG_DIR="/x/claude" claude auth login' });
+    renderWithApp(<SettingsPage />, api);
+    expect(await screen.findByText('CLAUDE_CONFIG_DIR="/x/claude" claude auth login')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Copy/ })).toBeInTheDocument();
+    expect(screen.getByText('Needs setup')).toBeInTheDocument();
   });
 });

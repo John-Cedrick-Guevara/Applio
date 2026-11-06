@@ -773,4 +773,10 @@ describe('createBackend discovery', () => {
     expect((await api.getDraft(job.id))?.coverLetter).toBe('Dear team');
     expect(readFileSync(join(job.folderPath!, 'sent.md'), 'utf8')).toBe(sentMd);
   });
+
+  it('passes on the command that fixes the engine, so Settings can show it', async () => {
+    const { api, deps } = backendIn();
+    deps.engines['claude-code'] = { complete: async () => ({ text: '', inputTokens: 0, outputTokens: 0 }), check: async () => ({ ready: false, message: 'Not signed in.', command: 'CLAUDE_CONFIG_DIR="/x" claude auth login' }) };
+    expect(await api.testConnection('ai')).toEqual({ ok: false, message: 'Not signed in.', command: 'CLAUDE_CONFIG_DIR="/x" claude auth login' });
+  });
 });
