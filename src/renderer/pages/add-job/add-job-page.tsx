@@ -51,7 +51,7 @@ export default function AddJobPage() {
       <header className="page-header">
         <div>
           <h1>Add a job</h1>
-          <p>Paste a link or the whole post from anywhere: LinkedIn, a Facebook group, Discord, an email. Applio reads it, scores it and works out how to apply.</p>
+          <p>Paste the whole post from anywhere: LinkedIn, a Facebook group, Discord, an email. Or paste a link to a company's own job page. Applio reads it, scores it and works out how to apply.</p>
         </div>
       </header>
 
@@ -70,7 +70,8 @@ export default function AddJobPage() {
         {mode === 'link' ? (
           <div className="field">
             <label htmlFor="job-link">Job link</label>
-            <input id="job-link" className="input input-lg" type="url" placeholder="https://" value={values.link} onChange={(e) => setValue(e.target.value)} />
+            <input id="job-link" className="input input-lg" type="url" placeholder="https://" aria-describedby="job-link-hint" value={values.link} onChange={(e) => setValue(e.target.value)} />
+            <p id="job-link-hint" className="cell-sub">A company careers page or a Greenhouse, Lever, Ashby or Workable link. Applio doesn't open LinkedIn, Indeed, JobStreet, Upwork or Facebook; paste those posts as text.</p>
           </div>
         ) : (
           <div className="field">

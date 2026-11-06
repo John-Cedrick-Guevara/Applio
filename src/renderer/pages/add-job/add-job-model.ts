@@ -8,5 +8,5 @@ export function inputError(kind: 'text' | 'link', value: string): string | null 
 
 export const EXAMPLES = {
   text: 'Brightline Studio is hiring a Senior TypeScript Engineer. Remote, worldwide, contract. Node.js, PostgreSQL, React. $60–75/hr. Send your CV to hiring@brightline.example\n\n(posted in Remote Devs, a Facebook group)',
-  link: 'https://www.linkedin.com/jobs/view/0000000000',
+  link: 'https://boards.greenhouse.io/brightline/jobs/0000000',
 } as const;

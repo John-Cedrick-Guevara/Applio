@@ -15,7 +15,7 @@ describe('fetchPublicPage', () => {
     'never requests a platform page: %s',
     async (url) => {
       const fetch = vi.fn();
-      await expect(fetchPublicPage(url, fetch)).rejects.toThrow("Applio doesn't open pages on that site. Copy the post's text and paste it instead.");
+      await expect(fetchPublicPage(url, fetch)).rejects.toThrow("Applio doesn't open pages on that site. Switch to Paste text and paste the whole post, link included.");
       expect(fetch).not.toHaveBeenCalled();
     },
   );
@@ -47,7 +47,7 @@ describe('fetchPublicPage', () => {
 
   it('never follows a redirect onto a platform page', async () => {
     const fetch = vi.fn(async () => new Response(null, { status: 302, headers: { location: 'https://www.linkedin.com/jobs/view/1' } }));
-    await expect(fetchPublicPage('https://bit.ly/x', fetch)).rejects.toThrow("Applio doesn't open pages on that site. Copy the post's text and paste it instead.");
+    await expect(fetchPublicPage('https://bit.ly/x', fetch)).rejects.toThrow("Applio doesn't open pages on that site. Switch to Paste text and paste the whole post, link included.");
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
