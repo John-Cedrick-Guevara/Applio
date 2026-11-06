@@ -145,7 +145,8 @@ export async function sendByEmail(jobId: string, sentBy: SentBy, ports: ApplyPor
 
   const { name, email } = ports.owner();
   const message: EmailMessage = {
-    from: name ? `${name} <${email}>` : email,
+    // Quoted, so a comma or other address character in the name can't split it into two addresses.
+    from: name ? `"${name.replace(/["\\]/g, '')}" <${email}>` : email,
     to: job.applyTarget,
     subject: name ? `Application: ${job.title} — ${name}` : `Application: ${job.title}`,
     text: draft.coverLetter,

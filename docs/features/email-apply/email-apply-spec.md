@@ -42,6 +42,7 @@ Send approved email applications from the operator's Gmail and log exactly what 
 - AC-7: Tests for both actions.
 - MNB-1: Test approving a platform job never calls SMTP.
 - MNB-2: Test greps logs and files for the password.
+- MNB-3: `backend.test.ts` › "keeps a sent application exactly as sent: its letter can no longer be edited".
 
 ## Out of scope
 - Reading replies (PR-21); autonomous sends (PR-20).
