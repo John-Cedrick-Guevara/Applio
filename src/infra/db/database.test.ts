@@ -38,6 +38,10 @@ describe('openDatabase', () => {
     db.close();
   });
 
+  it('waits for a lock held by another connection instead of failing at once', () => {
+    expect(openDatabase(':memory:').prepare('PRAGMA busy_timeout').get()).toEqual({ timeout: 5000 });
+  });
+
   it('runs in WAL mode with foreign keys enforced', () => {
     const db = openDatabase(tempPath());
     expect(db.prepare('PRAGMA journal_mode').get()?.journal_mode).toBe('wal');

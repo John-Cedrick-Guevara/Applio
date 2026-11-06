@@ -13,7 +13,8 @@ export function openDatabase(path: string): DatabaseSync {
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
   const db = new DatabaseSync(path);
   try {
-    db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
+    // The MCP server process shares the file with main, so wait for a lock rather than fail.
+    db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
     migrate(db, MIGRATIONS);
   } catch (err) {
     db.close();

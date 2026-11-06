@@ -19,8 +19,8 @@ interface Options {
   /** Somewhere with no project files, so no `CLAUDE.md` or project settings load. */
   cwd: string;
   env: NodeJS.ProcessEnv;
-  /** Applio's MCP config as JSON; nothing else is loaded (`--strict-mcp-config`). */
-  mcpConfig: () => string;
+  /** Applio's MCP config as JSON for these jobs; nothing else is loaded (`--strict-mcp-config`). */
+  mcpConfig: (jobIds: readonly string[]) => string;
 }
 
 /** Runs the binary, feeding `stdin`, and resolves its stdout once it exits 0. */
@@ -64,11 +64,13 @@ const count = (v: unknown) => (typeof v === 'number' ? v : 0);
  */
 export function createClaudeCodeEngine(options: Options): AiEngine {
   return {
-    async complete({ system, prompt }) {
+    async complete({ system, prompt, jobIds }) {
       const args = [
         '-p', '--output-format', 'stream-json', '--verbose', '--strict-mcp-config',
-        '--mcp-config', options.mcpConfig(),
+        '--mcp-config', options.mcpConfig(jobIds),
         '--tools', '',
+        // Print mode denies any tool needing a permission prompt, so pre-allow Applio's server (`applio`) and nothing else.
+        '--allowedTools', 'mcp__applio',
         '--no-session-persistence',
         ...(system ? ['--system-prompt', system] : []),
       ];

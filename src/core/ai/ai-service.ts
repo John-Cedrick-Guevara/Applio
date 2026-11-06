@@ -17,7 +17,8 @@ export interface AiRequest {
   system?: string;
   prompt: string;
   runId?: number;
-  jobId?: string;
+  /** The jobs this call is about: the tools' scope, and the usage row's job when there's one. */
+  jobIds: readonly string[];
   /** Scheduled work stops while automation is paused; what the operator asks for still runs (MNB-1). */
   trigger: 'scheduled' | 'operator';
 }
@@ -73,14 +74,14 @@ export function createAi(ports: AiPorts) {
       const full = before.find((p) => p.used >= p.limit);
       if (full) throw new QuotaExceededError(`${full.over} (${fmt(full.used)} of ${fmt(full.limit)}). AI resumes ${full.resumes}, or raise the budget in Settings.`);
 
-      const reply = await ports.engine().complete({ system: request.system, prompt: request.prompt });
+      const reply = await ports.engine().complete({ system: request.system, prompt: request.prompt, jobIds: request.jobIds });
       ports.record({
         at: ports.now().toISOString(),
         step: request.step,
         inputTokens: reply.inputTokens,
         outputTokens: reply.outputTokens,
         ...(request.runId !== undefined ? { runId: request.runId } : {}),
-        ...(request.jobId !== undefined ? { jobId: request.jobId } : {}),
+        ...(request.jobIds.length === 1 ? { jobId: request.jobIds[0] } : {}),
       });
 
       for (const p of before) {

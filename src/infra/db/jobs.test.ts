@@ -35,6 +35,13 @@ describe('jobs repository', () => {
     expect(jobs.dedupKeys()).toEqual(new Set(['acme|engineer', 'globex|designer']));
   });
 
+  it('saves a match score and its summaries', () => {
+    const jobs = setup();
+    jobs.insert(first, { dedupKey: 'k1', createdAt: NOW.toISOString() });
+    jobs.saveMatch(first.id, { score: 82, roleSummary: 'APIs', descriptionSummary: 'Remote', strengths: ['Node'], gaps: ['Go'] });
+    expect(jobs.get(first.id)).toMatchObject({ score: 82, roleSummary: 'APIs', descriptionSummary: 'Remote', strengths: ['Node'], gaps: ['Go'] });
+  });
+
   it('lists jobs in the given statuses, newest first', () => {
     const jobs = setup();
     jobs.insert({ ...first, status: 'drafted' }, { dedupKey: 'k1', createdAt: '2026-11-01T00:00:00.000Z' });

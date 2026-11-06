@@ -5,10 +5,13 @@ import { createApiEngine } from '../infra/ai/api-engine';
 import { createClaudeCodeEngine } from '../infra/ai/claude-code-engine';
 import { openDatabase } from '../infra/db';
 import { createSecretStore } from '../infra/secrets/secret-store';
+import { createToolPorts } from '../mcp/db-ports';
+import { createTools } from '../mcp/tools';
 import { createAllSources, createPoliteHttp, SOURCE_HOSTS } from '../infra/sources';
 import { STATUS_CHANNEL } from '../shared/ipc';
 import { createBackend } from './backend';
 import { registerApiHandlers } from './ipc';
+import { mcpConfigFor } from './mcp-config';
 import { denyAndOpenExternally, guardNavigation } from './security';
 import { createTray } from './tray';
 
@@ -34,6 +37,7 @@ const enginePath = () =>
 
 /** The one Applio folder: the database plus every generated application (SPEC F8). */
 const dataFolder = () => join(app.getPath('home'), 'Applio');
+const dbPath = () => join(dataFolder(), 'applio.db');
 
 /**
  * Creates the app window with a locked-down renderer: no Node, isolated
@@ -80,7 +84,7 @@ function createWindow(): BrowserWindow {
 
 app.whenReady().then(() => {
   try {
-    db = openDatabase(join(dataFolder(), 'applio.db'));
+    db = openDatabase(dbPath());
   } catch (err) {
     console.error('[db] failed to open', err);
     dialog.showErrorBox("Applio can't open its data", err instanceof Error ? err.message : String(err));
@@ -88,6 +92,7 @@ app.whenReady().then(() => {
     return;
   }
   // Secrets sit in the OS app-data folder, never in the Applio folder the operator browses and shares.
+  const appDb = db;
   const secrets = createSecretStore(safeStorage, join(app.getPath('userData'), 'secrets.json'));
   const http = createPoliteHttp({
     fetch: (url, init) => fetch(url, init),
@@ -117,10 +122,14 @@ app.whenReady().then(() => {
         // App data, not a project folder, so no CLAUDE.md or project settings load.
         cwd: app.getPath('userData'),
         env: { ...process.env, PATH: enginePath() },
-        // ponytail: no MCP servers until PR-15 adds Applio's; --strict-mcp-config keeps the operator's own out.
-        mcpConfig: () => JSON.stringify({ mcpServers: {} }),
+        // Only Applio's server; --strict-mcp-config keeps the operator's own MCP servers out.
+        mcpConfig: (jobIds) => mcpConfigFor({ execPath: process.execPath, script: join(__dirname, 'mcp.cjs'), dbPath: dbPath() }, jobIds),
       }),
-      'api-key': createApiEngine({ apiKey: () => secrets.get('anthropicApiKey') }),
+      'api-key': createApiEngine({
+        apiKey: () => secrets.get('anthropicApiKey'),
+        // The same tools as the MCP server, run in-process (MCP MNB-2).
+        tools: (jobIds) => createTools(createToolPorts(appDb, jobIds, () => new Date())),
+      }),
     },
   });
   registerApiHandlers(backend, DEV_SERVER_URL);
