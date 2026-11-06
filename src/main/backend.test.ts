@@ -20,6 +20,8 @@ import type { JobSource } from '../core/jobs/source';
 import { discovered } from '../core/triage/test-jobs';
 import { createSecretStore, type Encryptor } from '../infra/secrets/secret-store';
 import { seedJobs } from '../shared/mock/fixtures';
+import { createToolPorts } from '../mcp/db-ports';
+import { createTools } from '../mcp/tools';
 import { createBackend, type BackendDeps } from './backend';
 
 const fakeEncryptor: Encryptor = {
@@ -268,13 +270,14 @@ describe('createBackend discovery', () => {
     const { api, deps } = await searchingBackend();
     // Stands in for Claude calling save_match through the tools.
     const complete = vi.fn(async ({ jobIds }: { jobIds: readonly string[] }) => {
-      for (const id of jobIds) createJobsRepo(deps.db).saveMatch(id, { score: 88, roleSummary: 'APIs', descriptionSummary: 'Remote', strengths: [], gaps: [] });
+      for (const id of jobIds) createJobsRepo(deps.db).saveMatch(id, { score: 60, roleSummary: 'APIs', descriptionSummary: 'Remote', strengths: [], gaps: [] });
       return { text: 'done', inputTokens: 900, outputTokens: 100 };
     });
     deps.engines['claude-code'] = { complete, check: async () => ({ ready: true, message: 'ok' }) };
     await api.runDiscovery();
-    const [job] = await api.listJobs({ minScore: 80 });
-    expect(job).toMatchObject({ title: 'Senior Backend Engineer', score: 88 });
+    // Below the draft threshold, so this run scores and drafts nothing.
+    const [job] = await api.listJobs({ minScore: 50 });
+    expect(job).toMatchObject({ title: 'Senior Backend Engineer', score: 60 });
     expect(await api.getJob(job!.id)).toEqual(job);
     expect((await api.getStatus()).tokensToday).toBe(1000);
     await api.runDiscovery();
@@ -283,5 +286,34 @@ describe('createBackend discovery', () => {
 
   it('says plainly when a job does not exist', async () => {
     await expect(backendIn().api.getJob('nope')).rejects.toThrow('Job nope not found');
+  });
+
+  it('drafts strong matches through the tools after scoring them, and sends nothing', async () => {
+    const { api, deps } = await searchingBackend();
+    const fact = await api.saveFact({ group: 'Acme — Engineer', text: 'Cut API latency 40%' });
+    // Plays Claude: scores through save_match, drafts through save_draft, as the prompts ask.
+    const complete = vi.fn(async ({ prompt, jobIds }: { prompt: string; jobIds: readonly string[] }) => {
+      const tools = createTools(createToolPorts(deps.db, jobIds, () => new Date()));
+      const call = (name: string, input: unknown) => tools.find((t) => t.name === name)!.call(input);
+      for (const jobId of jobIds) {
+        if (prompt.startsWith('Score')) call('save_match', { jobId, score: 90, roleSummary: 'APIs', descriptionSummary: 'Remote', strengths: [{ text: 'Fast APIs', factId: fact.id }], gaps: [] });
+        else call('save_draft', { jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ heading: 'Acme', items: [{ text: 'Cut latency 40%', factId: fact.id }] }], coverLetter: 'Dear team', answers: [] });
+      }
+      return { text: 'done', inputTokens: 900, outputTokens: 100 };
+    });
+    deps.engines['claude-code'] = { complete, check: async () => ({ ready: true, message: 'ok' }) };
+    expect(await api.runDiscovery()).toMatchObject({ passedFilters: 1, drafted: 1 });
+    const [job] = await api.listJobs({ statuses: ['drafted'] });
+    expect(job).toMatchObject({ factsUsed: 1, tokensUsed: 1000, strengths: ['Fast APIs'] });
+    expect((await api.getDraft(job!.id))?.coverLetter).toBe('Dear team');
+    expect((await api.getStatus()).lastRun?.drafted).toBe(1);
+    expect(await api.listJobs({ statuses: ['applied'] })).toEqual([]);
+    await api.updateCoverLetter(job!.id, 'Dear Acme team');
+    expect(await api.getDraft(job!.id)).toMatchObject({ coverLetter: 'Dear Acme team', edited: true });
+  });
+
+  it('says plainly when there is no draft to edit', async () => {
+    const { api } = backendIn();
+    await expect(api.updateCoverLetter('nope', 'x')).rejects.toThrow('No draft for job nope');
   });
 });

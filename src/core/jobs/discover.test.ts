@@ -9,7 +9,8 @@ const NOW = new Date('2026-11-05T06:00:00.000Z');
 
 const setup = (polled: RunSourcesResult, existing: string[] = [], targetRoles = ['Backend Engineer']) => {
   const saved: { jobs: { job: Job; dedupKey: string }[]; details: RunDetails }[] = [];
-  const scoring: { runId: number; details: RunDetails }[] = [];
+  const scoring: { runId: number; details: RunDetails; drafted: number }[] = [];
+  const draft = vi.fn(async (ids: readonly string[]) => ({ drafted: ids.length, notDrafted: 0, notifyOnly: 0 }));
   const score = vi.fn(async (ids: readonly string[]) => ({ scored: ids.length, toDraft: [...ids], belowThreshold: 0, notScored: 0 }));
   let n = 0;
   const poll = vi.fn(async () => polled);
@@ -19,11 +20,12 @@ const setup = (polled: RunSourcesResult, existing: string[] = [], targetRoles = 
     filters: () => ({ preferences: { ...DEFAULT_PREFERENCES, targetRoles }, blocklist: ['Evil Corp'] }),
     save: (jobs, details) => (saved.push({ jobs, details }), 42),
     score,
-    saveScoring: (runId, details) => void scoring.push({ runId, details }),
+    draft,
+    finishRun: (runId, details, drafted) => void scoring.push({ runId, details, drafted }),
     now: () => NOW,
     newId: () => `id-${++n}`,
   };
-  return { run: () => discover(ports), saved, poll, score, scoring };
+  return { run: () => discover(ports), saved, poll, score, draft, scoring };
 };
 
 const ok = (sourceId: string, jobs: number) => ({ sourceId, outcome: 'ok' as const, jobs, dropped: 0 });
@@ -39,8 +41,8 @@ describe('discover', () => {
     sources: [ok('remotive', 3), ok('remoteok', 1)],
   };
 
-  it('returns the run summary: found, new after dedup, passed filters, nothing drafted yet', async () => {
-    expect(await setup(polled).run()).toEqual({ at: NOW.toISOString(), found: 4, newAfterDedup: 3, passedFilters: 1, drafted: 0 });
+  it('returns the run summary: found, new after dedup, passed filters, drafted', async () => {
+    expect(await setup(polled).run()).toEqual({ at: NOW.toISOString(), found: 4, newAfterDedup: 3, passedFilters: 1, drafted: 1 });
   });
 
   it('saves the jobs that pass as found, with their channel and board link', async () => {
@@ -82,6 +84,13 @@ describe('discover', () => {
     await run();
     expect(score).toHaveBeenCalledWith(['id-1'], 42);
     expect(scoring[0]).toMatchObject({ runId: 42, details: { scoring: { scored: 1, toDraft: ['id-1'], belowThreshold: 0, notScored: 0 } } });
+  });
+
+  it('drafts the strong matches against the run and stores how many', async () => {
+    const { run, draft, scoring } = setup(polled);
+    await run();
+    expect(draft).toHaveBeenCalledWith(['id-1'], 42);
+    expect(scoring[0]).toMatchObject({ drafted: 1, details: { drafting: { drafted: 1, notDrafted: 0, notifyOnly: 0 } } });
   });
 
   it('keeps the run when scoring fails as a whole, and records why', async () => {

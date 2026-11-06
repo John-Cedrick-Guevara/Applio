@@ -32,9 +32,13 @@ export function createToolPorts(db: DatabaseSync, jobIds: readonly string[], now
         jobs.saveMatch(id, match);
         advance(id, ['found'], 'scored');
       }),
-    saveDraft: (draft) =>
+    saveDraft: (draft, reusedAnswerIds) =>
       transaction(db, () => {
         drafts.save(draft);
+        const cited = new Set(draft.resume.flatMap((s) => s.items.map((i) => i.factId)));
+        for (const fact of store.listFacts()) if (cited.has(fact.id)) store.saveFact({ ...fact, timesUsed: fact.timesUsed + 1 });
+        for (const answer of store.listAnswers()) if (reusedAnswerIds.includes(answer.id)) store.saveAnswer({ ...answer, timesReused: answer.timesReused + 1 });
+        jobs.update(draft.jobId, { factsUsed: cited.size });
         advance(draft.jobId, ['found', 'scored'], 'drafted');
       }),
     logEvent: (id, note) => {
