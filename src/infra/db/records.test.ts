@@ -33,6 +33,13 @@ describe('drafts repository', () => {
     expect(drafts.get(draft.jobId)).toEqual({ ...draft, coverLetter: 'Edited', edited: true });
   });
 
+  it('lists drafts made since a given time', () => {
+    const { drafts, draft } = setup();
+    drafts.save({ ...draft, createdAt: '2026-11-05T10:00:00.000Z' });
+    expect(drafts.createdSince('2026-11-05T00:00:00.000Z').map((d) => d.jobId)).toEqual([draft.jobId]);
+    expect(drafts.createdSince('2026-11-06T00:00:00.000Z')).toEqual([]);
+  });
+
   it('refuses a draft for a job that does not exist', () => {
     const { drafts, draft } = setup();
     expect(() => drafts.save({ ...draft, jobId: 'missing' })).toThrow();
@@ -100,6 +107,17 @@ describe('activity repository', () => {
     activity.updateDetails(id, { ...base, scoring: { scored: 1, toDraft: ['j1'], belowThreshold: 0, notScored: 0 } }, 1);
     expect(activity.latestRunDetails()?.scoring).toEqual({ scored: 1, toDraft: ['j1'], belowThreshold: 0, notScored: 0 });
     expect(activity.latestRun()?.drafted).toBe(1);
+  });
+
+  it('lists usage rows since a given time, oldest first', () => {
+    const activity = createActivityRepo(openDatabase(':memory:'));
+    activity.recordUsage({ at: '2026-11-03T23:00:00.000Z', step: 'score', tokens: 999 });
+    activity.recordUsage({ at: '2026-11-04T09:30:00.000Z', step: 'tailor', tokens: 400 });
+    activity.recordUsage({ at: '2026-11-04T08:00:00.000Z', step: 'score', tokens: 100 });
+    expect(activity.usageSince('2026-11-04T00:00:00.000Z')).toEqual([
+      { at: '2026-11-04T08:00:00.000Z', step: 'score', tokens: 100 },
+      { at: '2026-11-04T09:30:00.000Z', step: 'tailor', tokens: 400 },
+    ]);
   });
 
   it('totals all tokens since a given time', () => {
