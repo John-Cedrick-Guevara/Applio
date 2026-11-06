@@ -75,6 +75,11 @@ describe('settings service', () => {
     expect(JSON.stringify(service.getSettings())).not.toContain('123:token');
   });
 
+  it('starts every source below Autonomous, so nothing is sent on its own until the operator chooses it', () => {
+    const service = createSettingsService(fakes().ports);
+    expect(service.listSources().filter((s) => s.autonomy === 'autonomous')).toEqual([]);
+  });
+
   it('changes a source and keeps platform sources capped below autonomous', () => {
     const service = createSettingsService(fakes().ports);
     expect(service.updateSource('remoteok', { enabled: false }).enabled).toBe(false);
