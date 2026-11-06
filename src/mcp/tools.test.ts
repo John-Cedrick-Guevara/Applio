@@ -140,4 +140,12 @@ describe('MCP tools', () => {
     call('save_draft', { ...draftInput, kind: 'cover-letter' });
     expect((vi.mocked(ports.saveDraft).mock.calls[0]![0] as Draft).kind).toBe('proposal');
   });
+
+  it('sends at most 3,000 characters of each posting, so a batch stays inside the tool output limit', () => {
+    const { call, ports } = setup();
+    ports.job = (id) => (id === inScope.id ? { ...inScope, description: 'x'.repeat(10_000) } : undefined);
+    const [job] = JSON.parse(call('get_jobs')) as { description: string }[];
+    expect(job!.description).toHaveLength(3001);
+    expect(job!.description.endsWith('…')).toBe(true);
+  });
 });

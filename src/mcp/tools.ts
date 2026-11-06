@@ -66,6 +66,14 @@ const numbersIn = (s: string) => s.match(/\d+(?:[.,]\d+)*/g) ?? [];
 const EventInput = z.strictObject({ ...JobRef, message: text(500) });
 const NoInput = z.strictObject({});
 
+/**
+ * Enough of a posting to score and tailor from. Whole postings can run past 10,000
+ * characters: a batch of them overflowed Claude Code's tool-output limit, and they cost
+ * tokens on every turn. Requirements come early in nearly every post.
+ */
+const MAX_DESCRIPTION = 3_000;
+const trimmed = (text: string) => (text.length > MAX_DESCRIPTION ? `${text.slice(0, MAX_DESCRIPTION)}…` : text);
+
 /** Parses Claude's input; a mismatch names each bad field so Claude can retry. */
 const parse = <T>(schema: z.ZodType<T>, input: unknown): T => {
   const result = schema.safeParse(input ?? {});
@@ -110,7 +118,7 @@ export function createTools(ports: ToolPorts): McpTool[] {
       JSON.stringify(
         [...ports.scope].flatMap((id) => {
           const j = ports.job(id);
-          return j ? [{ id: j.id, company: j.company, title: j.title, location: j.location, salary: j.salary, employmentType: j.employmentType, tags: j.tags, description: j.description }] : [];
+          return j ? [{ id: j.id, company: j.company, title: j.title, location: j.location, salary: j.salary, employmentType: j.employmentType, tags: j.tags, description: trimmed(j.description) }] : [];
         }),
       ),
     ),

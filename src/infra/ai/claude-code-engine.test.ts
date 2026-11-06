@@ -98,4 +98,10 @@ describe('Claude Code engine', () => {
     expect(await missing.check()).toEqual({ ready: false, message: notInstalled });
     await expect(missing.complete({ prompt: 'x', jobIds: [] })).rejects.toThrow(notInstalled);
   });
+
+  it("keeps the operator's own Claude Code hooks out of Applio's calls", async () => {
+    await engine().complete({ prompt: 'x', jobIds: [] });
+    const { args } = seen();
+    expect(JSON.parse(args[args.indexOf('--settings') + 1]!)).toEqual({ disableAllHooks: true });
+  });
 });

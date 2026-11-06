@@ -1,5 +1,6 @@
 import { AppError } from '../../shared/errors';
 import type { RunSummary } from '../../shared/types';
+import { NoTargetRolesError } from './discover';
 
 const HOUR = 3_600_000;
 
@@ -56,8 +57,12 @@ export function createScheduler(ports: SchedulerPorts): Scheduler {
     running = ports
       .run()
       .catch((err: unknown) => {
-        lastFailedAt = ports.now().getTime();
-        ports.log('[scheduler] run failed', err);
+        // No target role yet isn't a failure: nothing was polled, so check again next tick (a fresh
+        // install would otherwise wait a whole interval after the operator adds one).
+        if (!(err instanceof NoTargetRolesError)) {
+          lastFailedAt = ports.now().getTime();
+          ports.log('[scheduler] run failed', err);
+        }
         throw err;
       })
       .finally(() => {

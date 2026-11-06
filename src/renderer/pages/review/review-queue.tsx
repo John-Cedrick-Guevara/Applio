@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Job } from '../../../shared/types';
 import { CHANNEL_LABEL } from '../../lib/labels';
 import { queueState, sendsOnApprove } from './review-model';
@@ -5,12 +6,14 @@ import { queueState, sendsOnApprove } from './review-model';
 interface ReviewQueueProps {
   jobs: Job[];
   currentId?: string;
-  belowThreshold: number;
+  /** Jobs scored below the draft threshold, best first: shown on request, never drafted. */
+  below: Job[];
   draftThreshold: number;
 }
 
 /** "Waiting on you": one row per draft, linking to it. Manual-handoff channels get an amber chip. */
-export function ReviewQueue({ jobs, currentId, belowThreshold, draftThreshold }: ReviewQueueProps) {
+export function ReviewQueue({ jobs, currentId, below, draftThreshold }: ReviewQueueProps) {
+  const [showBelow, setShowBelow] = useState(false);
   return (
     <section className="card card-flush review-queue" aria-label="Queue">
       <div className="card-header">
@@ -42,9 +45,25 @@ export function ReviewQueue({ jobs, currentId, belowThreshold, draftThreshold }:
           </li>
         ))}
       </ul>
-      {belowThreshold > 0 ? (
+      {below.length > 0 ? (
         <div className="queue-footer">
-          {belowThreshold} more scored below your draft threshold ({draftThreshold}). <a href="#/applications">See all</a>
+          {below.length} more scored below your draft threshold ({draftThreshold}).{' '}
+          <button type="button" className="link-button" aria-expanded={showBelow} onClick={() => setShowBelow((s) => !s)}>
+            {showBelow ? 'Hide them' : 'Show them'}
+          </button>
+          {showBelow ? (
+            <ul className="list-plain below-list">
+              {below.map((job) => (
+                <li key={job.id}>
+                  {/* The posting opens in the system browser (the window refuses to navigate away). */}
+                  <a href={job.url || undefined} target="_blank" rel="noreferrer" className="below-row">
+                    <span className="queue-score mono">{job.score}</span>
+                    <span>{job.title}<span className="cell-sub"> · {job.company}</span></span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </div>
       ) : null}
     </section>

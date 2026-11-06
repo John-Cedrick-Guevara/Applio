@@ -71,6 +71,9 @@ export function createClaudeCodeEngine(options: Options): AiEngine {
         '--tools', '',
         // Print mode denies any tool needing a permission prompt, so pre-allow Applio's server (`applio`) and nothing else.
         '--allowedTools', 'mcp__applio',
+        // The operator's own hooks (from their Claude Code settings and plugins) must not run inside
+        // Applio's calls: they add tokens, change behavior, and can run commands.
+        '--settings', JSON.stringify({ disableAllHooks: true }),
         '--no-session-persistence',
         ...(system ? ['--system-prompt', system] : []),
       ];

@@ -66,17 +66,24 @@ export async function scoreJobs(jobIds: readonly string[], { runId, draftThresho
     }
   };
 
+  const noted = new Set<string>();
+  const noteOnce = (id: string, text: string) => {
+    if (noted.has(id)) return;
+    noted.add(id);
+    ports.note(id, text);
+  };
+
   for (const batch of chunks(todo, BATCH_SIZE)) {
     if (stopped) break;
     let failure = await attempt(batch);
     const missing = () => batch.filter((id) => ports.score(id) === undefined);
     if (!stopped && missing().length > 0) failure = await attempt(missing());
     if (stopped) break;
-    for (const id of missing()) ports.note(id, `Not scored: ${failure ?? "Claude didn't save a score."}`);
+    for (const id of missing()) noteOnce(id, `Not scored: ${failure ?? "Claude didn't save a score."}`);
   }
 
   // A stop leaves the rest unscored for good (they aren't retried), so they get the reason too.
-  if (stopped) for (const id of todo) if (ports.score(id) === undefined) ports.note(id, `Not scored: ${stopped}`);
+  if (stopped) for (const id of todo) if (ports.score(id) === undefined) noteOnce(id, `Not scored: ${stopped}`);
 
   const scores = todo.flatMap((id) => {
     const s = ports.score(id);

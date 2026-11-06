@@ -40,9 +40,10 @@ export const DEFAULT_SOURCES: readonly Source[] = [
   source('wwr', 'WeWorkRemotely', 'board', 'draft', 'RSS feed'),
   source('jobicy', 'Jobicy', 'board', 'notify', 'Public JSON API'),
   source('arbeitnow', 'Arbeitnow', 'board', 'draft', 'Public JSON API · 4 polls a day'),
-  source('ats', 'ATS watchlist', 'ats-watchlist', 'draft', 'Greenhouse, Lever, Ashby, Workable · 14 companies'),
+  source('ats', 'ATS watchlist', 'ats-watchlist', 'draft', 'Greenhouse, Lever, Ashby, Workable · your company list (empty for now)'),
   source('hn', 'HN Who is hiring', 'api', 'draft', 'Monthly thread via Algolia API'),
-  source('upwork', 'Upwork', 'api', 'draft', 'Official API · proposals cost Connects', { maxAutonomy: 'draft' }),
+  // Off until the Upwork API key is approved (SPEC §6); paste Upwork jobs through Add job meanwhile.
+  source('upwork', 'Upwork', 'api', 'draft', 'Official API · not available yet, paste Upwork jobs instead', { maxAutonomy: 'draft', enabled: false }),
   source('clip', 'Clipped jobs', 'clip', 'draft', 'LinkedIn, Indeed, JobStreet, Facebook, anything you clip', { maxAutonomy: 'draft' }),
   source('jsearch', 'JSearch', 'api', 'notify', 'Optional · free tier 200 calls a month', { enabled: false }),
 ];

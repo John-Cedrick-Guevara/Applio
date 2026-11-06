@@ -103,4 +103,14 @@ describe('ReviewPage', () => {
     expect(await screen.findByText(/Automation is paused/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Run now' })).toBeDisabled();
   });
+
+  it('lists the jobs scored below the draft threshold when asked, each linking to its posting', async () => {
+    open();
+    const queue = await screen.findByRole('region', { name: 'Queue' });
+    expect(within(queue).queryByText('Senior Software Engineer, Platform')).not.toBeInTheDocument();
+    await userEvent.click(within(queue).getByRole('button', { name: 'Show them' }));
+    const link = within(queue).getByRole('link', { name: /Senior Software Engineer, Platform/ });
+    expect(link).toHaveTextContent('67');
+    expect(link).toHaveAttribute('href', 'https://example.com/jobs/j5');
+  });
 });

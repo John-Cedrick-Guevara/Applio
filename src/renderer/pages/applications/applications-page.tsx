@@ -124,7 +124,12 @@ function Applications({ jobs, followUpDays, onJob }: { jobs: Job[]; followUpDays
               </tbody>
             </table>
           </div>
-          {visible.length === 0 ? (
+          {rows.length === 0 ? (
+            <div className="state">
+              <h3>No applications yet</h3>
+              <p className="muted">Applications show up here once you approve a draft or mark one as applied.</p>
+            </div>
+          ) : visible.length === 0 ? (
             <div className="state">
               <h3>No applications match</h3>
               <Button size="sm" onClick={() => { setQuery(''); setFilter('all'); }}>Clear filters</Button>

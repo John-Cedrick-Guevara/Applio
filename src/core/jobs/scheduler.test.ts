@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { RunSummary } from '../../shared/types';
+import { NoTargetRolesError } from './discover';
 import { createScheduler, type SchedulerPorts } from './scheduler';
 
 const HOUR = 3_600_000;
@@ -118,5 +119,15 @@ describe('scheduler', () => {
   it('still rejects Run now with the error, so the page can show it', async () => {
     const { scheduler } = setup({ run: async () => Promise.reject(new Error('database is locked')) });
     await expect(scheduler.runNow()).rejects.toThrow('database is locked');
+  });
+
+  it('retries on the next tick when no target role is set yet, without logging it as a failure', async () => {
+    const run = vi.fn(async () => Promise.reject(new NoTargetRolesError()));
+    const { scheduler, ports, advance } = setup({ run });
+    await scheduler.tick();
+    advance(60_000);
+    await scheduler.tick();
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(ports.log).not.toHaveBeenCalled();
   });
 });
