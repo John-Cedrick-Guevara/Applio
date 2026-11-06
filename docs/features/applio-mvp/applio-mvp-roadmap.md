@@ -230,14 +230,15 @@ Wire real data behind the same `ApplioApi`. Each PR replaces part of the mock st
   - [x] tests with a fake engine
   - _decided:_ `claude-opus-5-5` for every API step; monthly budget added (default 3M tokens); `@anthropic-ai/sdk` is the one new dependency
 
-- [ ] **PR-15 — MCP server**  The six tools Claude may call.
+- [x] **PR-15 — MCP server**  The six tools Claude may call.
   - _branch:_ `feat/mcp-server`
   - _PR title:_ `feat: add local mcp server`
   - _why:_ Claude reads the profile and writes results only through these tools (SPEC §4)
   - _depends on:_ PR-14
-  - [ ] spec: `docs/features/mcp-server/mcp-server-spec.md`
-  - [ ] `get_profile`, `get_jobs`, `save_match`, `save_draft`, `get_answers`, `log_event`, inputs validated
-  - [ ] tests per tool
+  - [x] spec: `docs/features/mcp-server/mcp-server-spec.md`
+  - [x] `get_profile`, `get_jobs`, `save_match`, `save_draft`, `get_answers`, `log_event`, inputs validated
+  - [x] tests per tool
+  - _decided:_ stdio (Claude Code starts it; nothing else can reach it); hand-written JSON-RPC, no MCP SDK; the API-key engine runs the same tools in-process
 
 - [ ] **PR-16 — Scoring**  Batched AI scoring of jobs that pass the prefilter.
   - _branch:_ `feat/ai-scoring`
