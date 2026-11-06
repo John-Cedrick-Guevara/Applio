@@ -471,4 +471,13 @@ describe('createBackend discovery', () => {
     expect(vi.mocked(deps.submitAts).mock.calls[0]![0].input.answers).toContainEqual({ question: 'Phone', answer: '+63 917 555 0100' });
     expect(readFileSync(join(job.folderPath!, 'sent.md'), 'utf8')).toContain('Email: sam@gmail.com');
   });
+
+  it('keeps a sent application exactly as sent: its letter can no longer be edited', async () => {
+    const { api, job } = await emailJob();
+    await api.approveDraft(job.id);
+    const sentMd = readFileSync(join(job.folderPath!, 'sent.md'), 'utf8');
+    await expect(api.updateCoverLetter(job.id, 'A different letter')).rejects.toThrow('This application was already sent, so its letter stays as sent.');
+    expect((await api.getDraft(job.id))?.coverLetter).toBe('Dear team');
+    expect(readFileSync(join(job.folderPath!, 'sent.md'), 'utf8')).toBe(sentMd);
+  });
 });
