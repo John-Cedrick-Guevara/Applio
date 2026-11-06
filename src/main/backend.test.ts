@@ -538,4 +538,13 @@ describe('createBackend discovery', () => {
     await (api as unknown as { tick: () => Promise<void> }).tick();
     expect((await api.getJob('old')).status).toBe('ghosted');
   });
+
+  it('keeps a sent application exactly as sent: its letter can no longer be edited', async () => {
+    const { api, job } = await emailJob();
+    await api.approveDraft(job.id);
+    const sentMd = readFileSync(join(job.folderPath!, 'sent.md'), 'utf8');
+    await expect(api.updateCoverLetter(job.id, 'A different letter')).rejects.toThrow('This application was already sent, so its letter stays as sent.');
+    expect((await api.getDraft(job.id))?.coverLetter).toBe('Dear team');
+    expect(readFileSync(join(job.folderPath!, 'sent.md'), 'utf8')).toBe(sentMd);
+  });
 });
