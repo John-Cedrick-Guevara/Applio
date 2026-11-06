@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { DOC_CSS, letterBody, resumeBody, type DocumentOwner } from '../../../shared/templates/application-documents';
 import type { Draft, Job } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { Button } from '../../components/button';
@@ -10,6 +11,7 @@ export type DocTab = 'letter' | 'resume' | 'post';
 interface DraftDocumentProps {
   job: Job;
   draft: Draft;
+  owner: DocumentOwner;
   tab: DocTab;
   onTab: (tab: DocTab) => void;
   editing: boolean;
@@ -19,10 +21,14 @@ interface DraftDocumentProps {
 
 /**
  * The draft as a page preview: cover letter (editable), tailored resume, or
- * the original post. Every resume line is drawn from the fact bank (SPEC F4).
+ * the original post. Letter and résumé use the same template the PDFs are
+ * printed from (draft-files AC-5). Every resume line is drawn from the fact bank (SPEC F4).
  */
-export function DraftDocument({ job, draft, tab, onTab, editing, onEditDone }: DraftDocumentProps) {
+export function DraftDocument({ job, draft, owner, tab, onTab, editing, onEditDone }: DraftDocumentProps) {
+  const api = useApi();
+  const action = useAction();
   const letterWord = draft.kind === 'proposal' ? 'Proposal' : 'Cover letter';
+  const file = tab === 'resume' ? 'resume' : tab === 'letter' ? 'letter' : null;
   const tabs: { id: DocTab; label: string }[] = [
     { id: 'letter', label: letterWord },
     { id: 'resume', label: 'Resume' },
@@ -43,6 +49,17 @@ export function DraftDocument({ job, draft, tab, onTab, editing, onEditDone }: D
           <Icon name="shield" strokeWidth={1.8} className="trace-icon" />
           Every claim traced to your fact bank · {job.factsUsed} facts used
         </div>
+        {file ? (
+          <Button
+            size="sm"
+            disabled={!job.folderPath}
+            title={job.folderPath ? undefined : 'Applio saves the files right after drafting'}
+            busy={action.pending}
+            onClick={() => action.run('open the file', () => api.openDraftFile(job.id, file))}
+          >
+            {file === 'letter' && draft.kind === 'proposal' ? 'Open proposal' : 'Open PDF'}
+          </Button>
+        ) : null}
       </div>
       <div className="doc-well">
         <div className="doc-paper" role="tabpanel">
@@ -52,10 +69,10 @@ export function DraftDocument({ job, draft, tab, onTab, editing, onEditDone }: D
           {tab === 'letter' && !editing ? (
             <>
               {draft.edited ? <div className="cell-sub doc-edited">Edited by you</div> : null}
-              <p className="pre doc-letter">{draft.coverLetter}</p>
+              <TemplatePreview html={letterBody(draft, job, owner)} />
             </>
           ) : null}
-          {tab === 'resume' ? <ResumePreview draft={draft} /> : null}
+          {tab === 'resume' ? <TemplatePreview html={resumeBody(draft, owner)} /> : null}
           {tab === 'post' ? <p className="pre doc-post">{job.description}</p> : null}
         </div>
       </div>
@@ -86,23 +103,15 @@ function LetterEditor({ draft, label, onDone }: { draft: Draft; label: string; o
   );
 }
 
-/** ATS-safe single-column resume: header, summary, experience bullets. */
-function ResumePreview({ draft }: { draft: Draft }) {
+/**
+ * The exact markup the PDF is printed from, with its stylesheet. Safe to inject:
+ * the template escapes every value, and it has no scripts, links or images.
+ */
+function TemplatePreview({ html }: { html: string }) {
   return (
-    <div className="resume">
-      <div className="resume-name">[Your Name]</div>
-      <div className="cell-sub">{draft.headline} · Remote · [email] · [github]</div>
-      <div className="resume-heading">Summary</div>
-      <p>{draft.summary}</p>
-      <div className="resume-heading">Experience</div>
-      {draft.resume.map((section) => (
-        <div key={section.heading}>
-          <div className="resume-role">{section.heading}</div>
-          <ul>
-            {section.items.map((item) => <li key={item.text}>{item.text}</li>)}
-          </ul>
-        </div>
-      ))}
-    </div>
+    <>
+      <style>{DOC_CSS}</style>
+      <div className="applio-doc" dangerouslySetInnerHTML={{ __html: html }} />
+    </>
   );
 }
