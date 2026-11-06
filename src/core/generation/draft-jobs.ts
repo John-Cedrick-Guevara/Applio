@@ -24,6 +24,8 @@ export interface DraftPorts {
   note: (jobId: string, text: string) => void;
   /** Adds a call's tokens to the job's running total. */
   addTokens: (jobId: string, tokens: number) => void;
+  /** Called once per saved draft, e.g. to write its files. Its own failures are its to handle. */
+  onDrafted: (jobId: string) => Promise<void>;
 }
 
 export interface DraftResult {
@@ -72,7 +74,10 @@ export async function draftJobs(jobIds: readonly string[], { runId }: { runId?: 
       }
     }
 
-    if (ports.hasDraft(id)) result.drafted++;
+    if (ports.hasDraft(id)) {
+      result.drafted++;
+      await ports.onDrafted(id);
+    }
     else {
       result.notDrafted++;
       if (!result.stopped) ports.note(id, `Not drafted: ${failure}`);

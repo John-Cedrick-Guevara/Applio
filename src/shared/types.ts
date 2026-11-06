@@ -248,6 +248,8 @@ export type SecretKey = 'anthropicApiKey' | 'gmailAppPassword' | 'telegramBotTok
 /** Non-secret settings. Secrets are represented only by whether they are set. */
 export interface Settings {
   outputFolder?: string;
+  /** Printed at the top of every résumé and letter; left off when empty, never guessed. */
+  fullName: string;
   aiEngine: AiEngine;
   gmailAddress: string;
   telegramChatId: string;

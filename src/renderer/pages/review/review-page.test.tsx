@@ -1,6 +1,8 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { createMockApi } from '../../../shared/mock/mock-api';
+import { resumeBody } from '../../../shared/templates/application-documents';
 import { renderWithApp } from '../../../test/render';
 import ReviewPage from './review-page';
 
@@ -44,6 +46,32 @@ describe('ReviewPage', () => {
     expect(screen.getByText(/p95 query time dropped/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('tab', { name: 'Original post' }));
     expect(screen.getByText(/Apply: email jobs@northwind-labs.example/)).toBeInTheDocument();
+  });
+
+  it('previews the résumé with exactly the markup the PDF is printed from', async () => {
+    const { api, container } = open('j2');
+    const detail = await screen.findByRole('region', { name: 'Draft detail' });
+    await userEvent.click(await within(detail).findByRole('tab', { name: 'Resume' }));
+    const [draft, settings] = await Promise.all([api.getDraft('j2'), api.getSettings()]);
+    expect(container.querySelector('.applio-doc')!.innerHTML).toBe(resumeBody(draft!, { name: settings.fullName, email: settings.gmailAddress }));
+  });
+
+  it('opens the generated PDF in the system viewer', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const openDraftFile = vi.spyOn(api, 'openDraftFile');
+    renderWithApp(<ReviewPage params={{ id: 'j2' }} />, api);
+    const detail = await screen.findByRole('region', { name: 'Draft detail' });
+    await userEvent.click(await within(detail).findByRole('button', { name: 'Open PDF' }));
+    expect(openDraftFile).toHaveBeenCalledWith('j2', 'letter');
+  });
+
+  it('keeps Open PDF disabled until the files exist', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const job = await api.getJob('j2');
+    vi.spyOn(api, 'getJob').mockResolvedValue({ ...job, folderPath: undefined });
+    renderWithApp(<ReviewPage params={{ id: 'j2' }} />, api);
+    const detail = await screen.findByRole('region', { name: 'Draft detail' });
+    expect(await within(detail).findByRole('button', { name: 'Open PDF' })).toBeDisabled();
   });
 
   it('sends an email application on approval', async () => {

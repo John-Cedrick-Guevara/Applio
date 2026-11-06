@@ -20,6 +20,7 @@ const setup = (jobs: Record<string, Fake>, autonomy: Record<string, Autonomy> = 
     autonomy: (sourceId) => autonomy[sourceId] ?? 'draft',
     note: vi.fn(),
     addTokens: vi.fn(),
+    onDrafted: vi.fn(async () => {}),
   };
   return { ports, requests };
 };
@@ -44,6 +45,13 @@ describe('draftJobs', () => {
     const { ports } = setup({ j1: { employmentType: 'full-time', sourceId: 'remotive' } });
     await draftJobs(['j1'], {}, ports);
     expect(ports.addTokens).toHaveBeenCalledWith('j1', 4000);
+  });
+
+  it('hands each saved draft on, so its files get written', async () => {
+    const { ports } = setup({ j1: { employmentType: 'full-time', sourceId: 'r' }, j2: { employmentType: 'full-time', sourceId: 'r', saves: false } });
+    await draftJobs(['j1', 'j2'], {}, ports);
+    expect(ports.onDrafted).toHaveBeenCalledTimes(1);
+    expect(ports.onDrafted).toHaveBeenCalledWith('j1');
   });
 
   it('never drafts a job from a Notify-only source', async () => {

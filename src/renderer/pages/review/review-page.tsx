@@ -22,6 +22,7 @@ async function loadReview(api: ReturnType<typeof useApi>) {
     queue: [...drafted].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
     belowThreshold: scored.filter((j) => (j.score ?? 0) < settings.draftThreshold).length,
     thresholds: { draft: settings.draftThreshold, auto: settings.autoSendThreshold },
+    owner: { name: settings.fullName, email: settings.gmailAddress },
     autonomyBySource: Object.fromEntries(sources.map((s) => [s.id, s.autonomy])) as Record<string, Autonomy>,
     status,
   };
@@ -81,6 +82,7 @@ function ReviewLayout({ data, selectedId, onJobChange, onStatusChange, onRunComp
             jobId={currentId}
             nextId={nextId}
             thresholds={data.thresholds}
+            owner={data.owner}
             autonomyBySource={data.autonomyBySource}
             onJobChange={onJobChange}
           />

@@ -11,7 +11,7 @@ vi.mock('electron', () => electron);
 const home = vi.hoisted(() => ({ dir: '' }));
 vi.mock('node:os', async (original) => ({ ...(await original<typeof import('node:os')>()), homedir: () => home.dir }));
 
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createJobsRepo, openDatabase } from '../infra/db';
@@ -62,6 +62,8 @@ const backendIn = (folder = (dir = mkdtempSync(join(tmpdir(), 'applio-backend-')
     httpFor: () => ({ getJson: async () => null, getText: async () => '' }),
     onStatus: vi.fn(),
     setLaunchAtLogin: vi.fn(),
+    // Stands in for printToPDF: the "PDF" is the page's HTML, so tests can read what was printed.
+    printPdf: vi.fn(async (html: string) => new TextEncoder().encode(html)),
     engines: {
       'claude-code': fakeEngine(false, "Claude Code isn't signed in. Run `claude auth login` in a terminal, or switch to an Anthropic API key below."),
       'api-key': fakeEngine(true, 'The Anthropic API accepted the key.'),
@@ -315,5 +317,80 @@ describe('createBackend discovery', () => {
   it('says plainly when there is no draft to edit', async () => {
     const { api } = backendIn();
     await expect(api.updateCoverLetter('nope', 'x')).rejects.toThrow('No draft for job nope');
+  });
+
+  /** A backend that has run once and drafted one job, with Claude played through the real tools. */
+  const draftedBackend = async () => {
+    const b = await searchingBackend();
+    await b.api.saveSettings({ fullName: 'Sam Rivera' });
+    const fact = await b.api.saveFact({ group: 'Acme — Engineer', text: 'Cut API latency 40%' });
+    b.deps.engines['claude-code'] = {
+      check: async () => ({ ready: true, message: 'ok' }),
+      complete: async ({ prompt, jobIds }) => {
+        const tools = createTools(createToolPorts(b.deps.db, jobIds, () => new Date()));
+        const call = (name: string, input: unknown) => tools.find((t) => t.name === name)!.call(input);
+        for (const jobId of jobIds) {
+          if (prompt.startsWith('Score')) call('save_match', { jobId, score: 90, roleSummary: 'APIs', descriptionSummary: 'Remote', strengths: [{ text: 'Fast APIs', factId: fact.id }], gaps: [] });
+          else call('save_draft', { jobId, kind: 'cover-letter', headline: 'Backend engineer', summary: 's', resume: [{ heading: 'Acme', items: [{ text: 'Cut latency 40%', factId: fact.id }] }], coverLetter: 'Dear team', answers: [] });
+        }
+        return { text: 'done', inputTokens: 900, outputTokens: 100 };
+      },
+    };
+    await b.api.runDiscovery();
+    const [job] = await b.api.listJobs({ statuses: ['drafted'] });
+    return { ...b, job: job! };
+  };
+
+  it('writes the résumé and letter PDFs and job.md into the month folder, with the name on them', async () => {
+    const { job, deps } = await draftedBackend();
+    expect(job.folderPath).toMatch(/Applio\/\d{4}-\d{2}\/Acme — Senior Backend Engineer \(90%\)$/);
+    expect(readdirSync(job.folderPath!).sort()).toEqual(['cover-letter.pdf', 'job.md', 'resume.pdf']);
+    expect(readFileSync(join(job.folderPath!, 'resume.pdf'), 'utf8')).toContain('<h1>Sam Rivera</h1>');
+    expect(readFileSync(join(job.folderPath!, 'job.md'), 'utf8')).toContain(`applio_job_id: ${job.id}`);
+    expect(deps.printPdf).toHaveBeenCalledTimes(2);
+  });
+
+  it('prints the letter again when the operator edits it', async () => {
+    const { api, job } = await draftedBackend();
+    await api.updateCoverLetter(job.id, 'Dear Acme team');
+    expect(readFileSync(join(job.folderPath!, 'cover-letter.pdf'), 'utf8')).toContain('Dear Acme team');
+  });
+
+  it('re-links a renamed folder by job id, so Open folder still works', async () => {
+    const { api, job } = await draftedBackend();
+    const renamed = join(job.folderPath!, '..', 'Acme (my notes)');
+    renameSync(job.folderPath!, renamed);
+    await api.openJobFolder(job.id);
+    expect(electron.shell.openPath).toHaveBeenLastCalledWith(renamed);
+    expect((await api.getJob(job.id)).folderPath).toBe(renamed);
+  });
+
+  it('opens the résumé or letter PDF in the system viewer', async () => {
+    const { api, job } = await draftedBackend();
+    await api.openDraftFile(job.id, 'resume');
+    expect(electron.shell.openPath).toHaveBeenLastCalledWith(join(job.folderPath!, 'resume.pdf'));
+    await api.openDraftFile(job.id, 'letter');
+    expect(electron.shell.openPath).toHaveBeenLastCalledWith(join(job.folderPath!, 'cover-letter.pdf'));
+  });
+
+  it('keeps the draft and notes why when the files cannot be written', async () => {
+    const b = await searchingBackend();
+    vi.mocked(b.deps.printPdf).mockRejectedValue(new Error('printing failed'));
+    const fact = await b.api.saveFact({ group: 'Acme', text: 'Shipped APIs' });
+    b.deps.engines['claude-code'] = {
+      check: async () => ({ ready: true, message: 'ok' }),
+      complete: async ({ prompt, jobIds }) => {
+        const call = (name: string, input: unknown) => createTools(createToolPorts(b.deps.db, jobIds, () => new Date())).find((t) => t.name === name)!.call(input);
+        for (const jobId of jobIds) {
+          if (prompt.startsWith('Score')) call('save_match', { jobId, score: 90, roleSummary: 'r', descriptionSummary: 'd', strengths: [], gaps: [] });
+          else call('save_draft', { jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ heading: 'A', items: [{ text: 'Shipped APIs', factId: fact.id }] }], coverLetter: 'Hi', answers: [] });
+        }
+        return { text: 'done', inputTokens: 1, outputTokens: 1 };
+      },
+    };
+    expect(await b.api.runDiscovery()).toMatchObject({ drafted: 1 });
+    const [job] = await b.api.listJobs({ statuses: ['drafted'] });
+    expect(job!.history.at(-1)?.note).toBe("Couldn't save the files: printing failed");
+    expect(existsSync(join(home.dir, 'Applio'))).toBe(false);
   });
 });

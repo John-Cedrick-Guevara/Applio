@@ -37,6 +37,13 @@ describe('SettingsPage', () => {
     expect(screen.getByText('Add your Anthropic API key below.')).toBeInTheDocument();
   });
 
+  it('saves the name printed on résumés and letters', async () => {
+    const { api } = renderWithApp(<SettingsPage />);
+    await userEvent.type(await screen.findByLabelText('Name on your documents'), 'Sam Rivera');
+    await userEvent.tab();
+    expect((await api.getSettings()).fullName).toBe('Sam Rivera');
+  });
+
   it('switches platform apply to assisted fill', async () => {
     const { api } = renderWithApp(<SettingsPage />);
     await userEvent.click(await screen.findByRole('switch', { name: 'Assisted fill for Platform apply' }));

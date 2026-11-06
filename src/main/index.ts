@@ -4,6 +4,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { createApiEngine } from '../infra/ai/api-engine';
 import { createClaudeCodeEngine } from '../infra/ai/claude-code-engine';
 import { openDatabase } from '../infra/db';
+import { printPdf } from '../infra/pdf/print-pdf';
 import { createSecretStore } from '../infra/secrets/secret-store';
 import { createToolPorts } from '../mcp/db-ports';
 import { createTools } from '../mcp/tools';
@@ -116,6 +117,7 @@ app.whenReady().then(() => {
       refreshTray();
     },
     setLaunchAtLogin: (openAtLogin) => app.setLoginItemSettings({ openAtLogin }),
+    printPdf,
     engines: {
       'claude-code': createClaudeCodeEngine({
         command: 'claude',

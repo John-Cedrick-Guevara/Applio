@@ -10,6 +10,7 @@ import { useAsync } from '../../hooks/use-async';
 import { formatRelative, formatTokens } from '../../lib/format';
 import { CHANNEL_LABEL } from '../../lib/labels';
 import { navigate } from '../../lib/router';
+import type { DocumentOwner } from '../../../shared/templates/application-documents';
 import { DraftDocument, type DocTab } from './draft-document';
 import { modeLabel, primaryAction, sentLine } from './review-model';
 import { SourceCredit } from '../../components/source-credit';
@@ -18,6 +19,8 @@ interface DraftPanelProps {
   jobId: string;
   nextId?: string;
   thresholds: { draft: number; auto: number };
+  /** Whose name and email go on the documents. */
+  owner: DocumentOwner;
   autonomyBySource: Record<string, Autonomy>;
   onJobChange: (job: Job) => void;
 }
@@ -57,7 +60,7 @@ interface DetailProps extends Omit<DraftPanelProps, 'jobId' | 'onJobChange'> {
   onDraft: (draft: Draft) => void;
 }
 
-function DraftDetail({ job, draft, nextId, thresholds, autonomyBySource, onJob, onDraft }: DetailProps) {
+function DraftDetail({ job, draft, nextId, thresholds, owner, autonomyBySource, onJob, onDraft }: DetailProps) {
   const api = useApi();
   const action = useAction();
   const [tab, setTab] = useState<DocTab>('letter');
@@ -115,6 +118,7 @@ function DraftDetail({ job, draft, nextId, thresholds, autonomyBySource, onJob, 
         <DraftDocument
           job={job}
           draft={draft}
+          owner={owner}
           tab={tab}
           onTab={(t) => {
             setTab(t);
