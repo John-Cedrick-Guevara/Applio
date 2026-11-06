@@ -16,6 +16,10 @@ export interface EmailMessage {
   subject: string;
   text: string;
   attachments: { filename: string; path: string }[];
+  /** Set on every email Applio sends, so replies and follow-ups thread to it. */
+  messageId?: string;
+  inReplyTo?: string;
+  references?: string;
 }
 
 /** What went out, exactly as sent (SPEC F7). */
@@ -25,6 +29,8 @@ export interface SentRecord {
   body: string;
   attachments: string[];
   at: string;
+  /** The email's Message-ID, for threading follow-ups and matching replies. */
+  messageId?: string;
 }
 
 /** How an attempt at an ATS form ended. Only `submitted` was seen to go through. */
@@ -63,6 +69,7 @@ export interface ApplyPorts {
   /** The operator's local midnight (ISO), where daily caps reset. */
   dayStart: () => string;
   now: () => Date;
+  newMessageId: (jobId: string) => string;
   /** Adds answers the operator just approved to the answer bank. */
   saveAiAnswers: (answers: { question: string; answer: string }[]) => void;
   bankAnswers: () => { question: string; answer: string }[];
@@ -150,6 +157,7 @@ export async function sendByEmail(jobId: string, sentBy: SentBy, ports: ApplyPor
     subject: name ? `Application: ${job.title} — ${name}` : `Application: ${job.title}`,
     text: draft.coverLetter,
     attachments: [{ filename: 'resume.pdf', path: resume }],
+    messageId: ports.newMessageId(jobId),
   };
 
   ports.sendLog.claim(jobId, 'email', ports.now().toISOString());
@@ -162,7 +170,7 @@ export async function sendByEmail(jobId: string, sentBy: SentBy, ports: ApplyPor
     throw err;
   }
 
-  const record: SentRecord = { to: message.to, subject: message.subject, body: message.text, attachments: ['resume.pdf'], at: ports.now().toISOString() };
+  const record: SentRecord = { to: message.to, subject: message.subject, body: message.text, attachments: ['resume.pdf'], at: ports.now().toISOString(), messageId: message.messageId };
   return recordSent(jobId, sentBy, folder, record, ports);
 }
 

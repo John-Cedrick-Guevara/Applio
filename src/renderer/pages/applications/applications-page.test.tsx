@@ -60,4 +60,14 @@ describe('ApplicationsPage', () => {
     expect((await screen.findAllByText(/Follow-up sent/)).length).toBeGreaterThan(0);
     expect((await api.getJob('j10')).history.at(-1)?.note).toBe('Follow-up sent');
   });
+
+  it('lets the operator correct a status, offering only the moves the rules allow', async () => {
+    const { api } = renderWithApp(<ApplicationsPage />);
+    await userEvent.click(await screen.findByRole('button', { name: /Quanta Robotics/ }));
+    const detail = screen.getByRole('complementary', { name: 'Application detail' });
+    const menu = within(detail).getByLabelText('Correct status');
+    expect(within(menu).getAllByRole('option').map((o) => o.textContent)).toEqual(['Choose…', 'Replied', 'Interview', 'Rejected', 'No reply']);
+    await userEvent.selectOptions(menu, 'Interview');
+    expect((await api.getJob('j7')).status).toBe('interview');
+  });
 });

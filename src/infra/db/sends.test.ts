@@ -13,7 +13,7 @@ const setup = () => {
   for (const j of jobs) createJobsRepo(db).insert(j, { dedupKey: j.id, createdAt: NOW });
   return { sends: createSendsRepo(db), ids: jobs.map((j) => j.id) };
 };
-const sent = { to: 'jobs@acme.com', subject: 'Application: Engineer', body: 'Dear team', attachments: ['resume.pdf'], at: NOW };
+const sent = { to: 'jobs@acme.com', subject: 'Application: Engineer', body: 'Dear team', attachments: ['resume.pdf'], at: NOW, messageId: '<j1.1@applio.local>' };
 
 describe('sends repository', () => {
   it('claims a job once; a second claim fails', () => {

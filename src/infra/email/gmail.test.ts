@@ -45,6 +45,14 @@ describe('Gmail sender', () => {
     expect(raw[0]).toContain(Buffer.from('%PDF-1.7 fake').toString('base64'));
   });
 
+  it('threads a follow-up under the original email', async () => {
+    const { gmail, raw } = capture();
+    await gmail.send({ from: 'sam@gmail.com', to: 'jobs@acme.com', subject: 'Re: Application', text: 'Hi again', attachments: [], messageId: '<j1.2@applio.local>', inReplyTo: '<j1.1@applio.local>', references: '<j1.1@applio.local>' });
+    expect(raw[0]).toMatch(/^Message-ID: <j1\.2@applio\.local>$/im);
+    expect(raw[0]).toMatch(/^In-Reply-To: <j1\.1@applio\.local>$/m);
+    expect(raw[0]).toMatch(/^References: <j1\.1@applio\.local>$/m);
+  });
+
   it('sends a test email to the operator’s own address', async () => {
     const { gmail, raw } = capture();
     await gmail.sendTest();

@@ -183,4 +183,12 @@ export const MIGRATIONS: readonly Migration[] = [
       ALTER TABLE jobs ADD COLUMN apply_url TEXT;
     `,
   },
+  {
+    version: 7,
+    name: 'message ids',
+    sql: `
+      -- The Message-ID of each email sent, so follow-ups thread to it and replies can be matched (SPEC F7).
+      ALTER TABLE sends ADD COLUMN message_id TEXT;
+    `,
+  },
 ];

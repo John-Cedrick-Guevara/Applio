@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import type { InterviewPrep, Job } from '../../../shared/types';
+import { nextStatuses } from '../../../shared/status';
+import type { InterviewPrep, Job, JobStatus } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { Button } from '../../components/button';
 import { useAction } from '../../hooks/use-action';
@@ -65,7 +66,31 @@ export function ApplicationDetail({ job, status, followUpDays, now, onJob }: Det
         ) : null}
         <Button disabled={!job.folderPath} onClick={() => os.run('open the folder', () => api.openJobFolder(job.id))}>Open folder</Button>
       </div>
+      <StatusCorrection job={job} onJob={onJob} />
     </aside>
+  );
+}
+
+const STATUS_WORD: Partial<Record<JobStatus, string>> = { applied: 'Applied', replied: 'Replied', interview: 'Interview', offer: 'Offer', rejected: 'Rejected', ghosted: 'No reply' };
+
+/** For a reply Applio didn't catch: move the application on yourself, within the status rules (SPEC F7). */
+function StatusCorrection({ job, onJob }: { job: Job; onJob: (job: Job) => void }) {
+  const api = useApi();
+  const action = useAction();
+  const moves = nextStatuses(job.status).filter((s) => STATUS_WORD[s]);
+  if (moves.length === 0) return null;
+  const move = async (status: JobStatus) => {
+    const next = await action.run('change the status', () => api.setStatus(job.id, status, 'Corrected by you'), `Marked ${STATUS_WORD[status]}`);
+    if (next) onJob(next);
+  };
+  return (
+    <div className="field">
+      <label htmlFor={`correct-${job.id}`}>Correct status</label>
+      <select id={`correct-${job.id}`} className="select" value="" disabled={action.pending} onChange={(e) => e.target.value && move(e.target.value as JobStatus)}>
+        <option value="">Choose…</option>
+        {moves.map((s) => <option key={s} value={s}>{STATUS_WORD[s]}</option>)}
+      </select>
+    </div>
   );
 }
 
