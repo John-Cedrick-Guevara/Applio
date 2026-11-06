@@ -238,6 +238,11 @@ button {
 
 .engine-line .mono {
   color: var(--text);
+  white-space: nowrap;
+}
+
+.engine-line > :first-child {
+  white-space: nowrap;
 }
 
 .engine-dot {
@@ -269,6 +274,11 @@ button {
   height: 100%;
   border-radius: inherit;
   background: var(--accent);
+}
+
+/* Same 80% line as the Usage page's warning (SPEC F10). */
+.engine-meter-warn > div {
+  background: var(--warning);
 }
 
 @media (max-width: 760px) {

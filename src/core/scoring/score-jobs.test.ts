@@ -75,4 +75,14 @@ describe('scoreJobs', () => {
     expect(vi.mocked(ports.note).mock.calls).toHaveLength(12);
     expect(ports.note).toHaveBeenCalledWith('j12', 'Not scored: Budget used up.');
   });
+
+  it('notes each unscored job once, even when a retry note came before the stop', async () => {
+    const { ports } = setup({ ...all(10, 80), j1: undefined, j11: 80 });
+    vi.mocked(ports.ai).mockImplementationOnce(async () => ({ text: 'done', inputTokens: 1, outputTokens: 1 }))
+      .mockImplementationOnce(async () => ({ text: 'done', inputTokens: 1, outputTokens: 1 }))
+      .mockRejectedValueOnce(new QuotaExceededError('Budget used up.'));
+    await scoreJobs(ids(11), { runId: 1, draftThreshold: 75 }, ports);
+    const notes = vi.mocked(ports.note).mock.calls.map(([id]) => id);
+    expect(notes.filter((id) => id === 'j1')).toHaveLength(1);
+  });
 });

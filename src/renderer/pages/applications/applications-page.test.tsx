@@ -1,6 +1,7 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { createMockApi } from '../../../shared/mock/mock-api';
 import { renderWithApp } from '../../../test/render';
 import ApplicationsPage from './applications-page';
 
@@ -69,5 +70,13 @@ describe('ApplicationsPage', () => {
     expect(within(menu).getAllByRole('option').map((o) => o.textContent)).toEqual(['Choose…', 'Replied', 'Interview', 'Rejected', 'No reply']);
     await userEvent.selectOptions(menu, 'Interview');
     expect((await api.getJob('j7')).status).toBe('interview');
+  });
+
+  it('says there are no applications yet, rather than that a filter hid them', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    vi.spyOn(api, 'listJobs').mockResolvedValue([]);
+    renderWithApp(<ApplicationsPage />, api);
+    expect(await screen.findByText('No applications yet')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Clear filters' })).not.toBeInTheDocument();
   });
 });

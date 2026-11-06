@@ -86,4 +86,10 @@ describe('settings service', () => {
     expect(() => service.updateSource('upwork', { autonomy: 'autonomous' })).toThrow('Upwork is never autonomous');
     expect(() => service.updateSource('nope', { enabled: true })).toThrow('Source nope not found');
   });
+
+  it('starts sources Applio cannot fetch yet switched off, and claims no watchlist companies', () => {
+    const sources = createSettingsService(fakes().ports).listSources();
+    expect(sources.find((s) => s.id === 'upwork')?.enabled).toBe(false);
+    expect(sources.find((s) => s.id === 'ats')?.via).not.toMatch(/\d+ compan/);
+  });
 });

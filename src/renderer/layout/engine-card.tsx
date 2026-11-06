@@ -36,7 +36,7 @@ export function EngineCard() {
           <span>Tokens today</span>
           <span className="mono">{formatTokens(status.tokensToday)} / {formatTokens(status.dailyTokenBudget)}</span>
         </div>
-        <div className="engine-meter" role="meter" aria-label="Tokens used today" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
+        <div className={pct >= 80 ? 'engine-meter engine-meter-warn' : 'engine-meter'} role="meter" aria-label="Tokens used today" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
           <div style={{ width: `${pct}%` }} />
         </div>
       </div>

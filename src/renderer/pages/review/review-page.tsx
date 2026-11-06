@@ -20,7 +20,7 @@ async function loadReview(api: ReturnType<typeof useApi>) {
   ]);
   return {
     queue: [...drafted].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
-    belowThreshold: scored.filter((j) => (j.score ?? 0) < settings.draftThreshold).length,
+    below: scored.filter((j) => (j.score ?? 0) < settings.draftThreshold).sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
     thresholds: { draft: settings.draftThreshold, auto: settings.autoSendThreshold },
     owner: { name: settings.fullName, email: settings.gmailAddress },
     autonomyBySource: Object.fromEntries(sources.map((s) => [s.id, s.autonomy])) as Record<string, Autonomy>,
@@ -75,7 +75,7 @@ function ReviewLayout({ data, selectedId, onJobChange, onStatusChange, onRunComp
     <>
       <ReviewHeader status={data.status} onStatusChange={onStatusChange} onRunComplete={onRunComplete} />
       <div className="split">
-        <ReviewQueue jobs={data.queue} currentId={currentId} belowThreshold={data.belowThreshold} draftThreshold={data.thresholds.draft} />
+        <ReviewQueue jobs={data.queue} currentId={currentId} below={data.below} draftThreshold={data.thresholds.draft} />
         {currentId ? (
           <DraftPanel
             key={currentId}

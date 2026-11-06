@@ -37,4 +37,13 @@ describe('EngineCard', () => {
     unmount();
     expect(events.listeners.size).toBe(0);
   });
+
+  it('turns the token meter amber from 80% of the daily budget', async () => {
+    const events = fakeEvents();
+    const { api } = renderWithApp(<EngineCard />);
+    await screen.findByText('Ready');
+    const busy = { ...(await api.getStatus()), tokensToday: 126_400, dailyTokenBudget: 150_000 };
+    act(() => events.push(busy));
+    expect(screen.getByRole('meter', { name: 'Tokens used today' })).toHaveClass('engine-meter-warn');
+  });
 });
