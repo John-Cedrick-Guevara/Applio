@@ -9,17 +9,21 @@ const NOW = new Date('2026-11-05T06:00:00.000Z');
 
 const setup = (polled: RunSourcesResult, existing: string[] = [], targetRoles = ['Backend Engineer']) => {
   const saved: { jobs: { job: Job; dedupKey: string }[]; details: RunDetails }[] = [];
+  const scoring: { runId: number; details: RunDetails }[] = [];
+  const score = vi.fn(async (ids: readonly string[]) => ({ scored: ids.length, toDraft: [...ids], belowThreshold: 0, notScored: 0 }));
   let n = 0;
   const poll = vi.fn(async () => polled);
   const ports: DiscoverPorts = {
     poll,
     existingKeys: () => new Set(existing),
     filters: () => ({ preferences: { ...DEFAULT_PREFERENCES, targetRoles }, blocklist: ['Evil Corp'] }),
-    save: (jobs, details) => void saved.push({ jobs, details }),
+    save: (jobs, details) => (saved.push({ jobs, details }), 42),
+    score,
+    saveScoring: (runId, details) => void scoring.push({ runId, details }),
     now: () => NOW,
     newId: () => `id-${++n}`,
   };
-  return { run: () => discover(ports), saved, poll };
+  return { run: () => discover(ports), saved, poll, score, scoring };
 };
 
 const ok = (sourceId: string, jobs: number) => ({ sourceId, outcome: 'ok' as const, jobs, dropped: 0 });
@@ -71,6 +75,20 @@ describe('discover', () => {
     const { run, saved } = setup({ jobs: [], sources: [failed] });
     expect(await run()).toMatchObject({ found: 0, passedFilters: 0 });
     expect(saved[0]!.details.sources).toEqual([failed]);
+  });
+
+  it("scores the run's new jobs against the run, then stores the result with it", async () => {
+    const { run, score, scoring } = setup(polled);
+    await run();
+    expect(score).toHaveBeenCalledWith(['id-1'], 42);
+    expect(scoring[0]).toMatchObject({ runId: 42, details: { scoring: { scored: 1, toDraft: ['id-1'], belowThreshold: 0, notScored: 0 } } });
+  });
+
+  it('keeps the run when scoring fails as a whole, and records why', async () => {
+    const { run, score, scoring } = setup(polled);
+    score.mockRejectedValueOnce(new Error('database is locked'));
+    expect(await run()).toMatchObject({ passedFilters: 1 });
+    expect(scoring[0]!.details.scoringError).toBe('database is locked');
   });
 
   it('polls nothing and saves nothing until a target role is set, so unfiltered jobs never pile up', async () => {

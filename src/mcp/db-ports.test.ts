@@ -21,7 +21,7 @@ const setup = () => {
 describe('tools over the Applio database', () => {
   it('store a match and move a found job to scored', () => {
     const { call, jobs, job } = setup();
-    call('save_match', { jobId: job.id, score: 82, roleSummary: 'APIs', descriptionSummary: 'Remote', strengths: ['Node'], gaps: [] });
+    call('save_match', { jobId: job.id, score: 82, roleSummary: 'APIs', descriptionSummary: 'Remote', strengths: [{ text: 'Fast APIs', factId: 'f1' }], gaps: [] });
     expect(jobs.get(job.id)).toMatchObject({ status: 'scored', score: 82, roleSummary: 'APIs' });
   });
 

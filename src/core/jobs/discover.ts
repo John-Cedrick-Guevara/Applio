@@ -1,6 +1,7 @@
 import { AppError } from '../../shared/errors';
 import type { Job, Preferences, RunSummary } from '../../shared/types';
 import { detectChannel } from '../apply/channel';
+import type { ScoreResult } from '../scoring/score-jobs';
 import { triage, type KeyedJob, type TriageReport } from '../triage';
 import type { RunSourcesResult, SourceResult } from './run-sources';
 
@@ -19,6 +20,10 @@ export interface RunDetails {
   duplicates: number;
   dropped: TriageReport['dropped'];
   sources: SourceResult[];
+  /** How scoring went (SPEC F3.3); absent until scoring finishes. */
+  scoring?: ScoreResult;
+  /** Set when scoring failed as a whole; the run and its jobs are kept. */
+  scoringError?: string;
 }
 
 export interface DiscoverPorts {
@@ -26,8 +31,12 @@ export interface DiscoverPorts {
   /** Dedup keys of every job already stored, sent ones included. */
   existingKeys: () => ReadonlySet<string>;
   filters: () => { preferences: Preferences; blocklist: readonly string[] };
-  /** Stores the new jobs and the run together, so a crash can't leave one without the other. */
-  save: (jobs: { job: Job; dedupKey: string }[], details: RunDetails, summary: RunSummary) => void;
+  /** Stores the new jobs and the run together, so a crash can't leave one without the other. @returns The run's id. */
+  save: (jobs: { job: Job; dedupKey: string }[], details: RunDetails, summary: RunSummary) => number;
+  /** Scores the new jobs, charging their tokens to the run. */
+  score: (jobIds: readonly string[], runId: number) => Promise<ScoreResult>;
+  /** Replaces the run's stored details once scoring is done. */
+  saveScoring: (runId: number, details: RunDetails) => void;
   now: () => Date;
   newId: () => string;
 }
@@ -59,8 +68,8 @@ const toJob = (j: KeyedJob, id: string, at: string): Job => ({
 
 /**
  * One discovery run (SPEC F2–F3): poll every source, drop duplicates and
- * misfits for free, and store what's left as found jobs. Scoring and drafting
- * join in PR-16/17, so `drafted` is 0 for now.
+ * misfits for free, store what's left as found jobs, then score them.
+ * Drafting joins in PR-17, so `drafted` is 0 for now.
  * @throws NoTargetRolesError before polling when no target role is set.
  */
 export async function discover(ports: DiscoverPorts): Promise<RunSummary> {
@@ -70,10 +79,14 @@ export async function discover(ports: DiscoverPorts): Promise<RunSummary> {
   const { passed, report } = triage(polled.jobs, { existingKeys: ports.existingKeys(), ...filters });
   const at = ports.now().toISOString();
   const summary: RunSummary = { at, found: report.found, newAfterDedup: report.found - report.duplicates, passedFilters: report.passed, drafted: 0 };
-  ports.save(
-    passed.map((j) => ({ job: toJob(j, ports.newId(), at), dedupKey: j.dedupKey })),
-    { duplicates: report.duplicates, dropped: report.dropped, sources: polled.sources },
-    summary,
-  );
+  const jobs = passed.map((j) => ({ job: toJob(j, ports.newId(), at), dedupKey: j.dedupKey }));
+  const details: RunDetails = { duplicates: report.duplicates, dropped: report.dropped, sources: polled.sources };
+  const runId = ports.save(jobs, details, summary);
+  try {
+    ports.saveScoring(runId, { ...details, scoring: await ports.score(jobs.map((j) => j.job.id), runId) });
+  } catch (err) {
+    // The jobs are saved already; a later run won't re-find them, so record why they're unscored.
+    ports.saveScoring(runId, { ...details, scoringError: err instanceof Error ? err.message : String(err) });
+  }
   return summary;
 }

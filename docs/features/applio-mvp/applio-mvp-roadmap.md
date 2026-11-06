@@ -240,15 +240,16 @@ Wire real data behind the same `ApplioApi`. Each PR replaces part of the mock st
   - [x] tests per tool
   - _decided:_ stdio (Claude Code starts it; nothing else can reach it); hand-written JSON-RPC, no MCP SDK; the API-key engine runs the same tools in-process
 
-- [ ] **PR-16 — Scoring**  Batched AI scoring of jobs that pass the prefilter.
+- [x] **PR-16 — Scoring**  Batched AI scoring of jobs that pass the prefilter.
   - _branch:_ `feat/ai-scoring`
   - _PR title:_ `feat: score jobs against the fact bank`
   - _why:_ match score, summaries, strengths and gaps drive the queue (SPEC F3.3)
   - _depends on:_ PR-13, PR-15
-  - [ ] spec: `docs/features/ai-scoring/ai-scoring-spec.md`
-  - [ ] batched scoring writes score, role/description summary, strengths, gaps
-  - [ ] jobs at or above the draft threshold move to generation
-  - [ ] tests with a fake engine
+  - [x] spec: `docs/features/ai-scoring/ai-scoring-spec.md`
+  - [x] batched scoring writes score, role/description summary, strengths, gaps
+  - [x] jobs at or above the draft threshold move to generation
+  - [x] tests with a fake engine
+  - _decided:_ batches of 10; only each run's new jobs are scored, with one retry; strengths cite fact IDs; `listJobs` / `getJob` now read SQLite
 
 - [ ] **PR-17 — Draft generation and output folder**  Tailored resume, cover letter or proposal, answers; PDF and folder.
   - _branch:_ `feat/draft-generation`

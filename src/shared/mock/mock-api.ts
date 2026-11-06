@@ -1,4 +1,5 @@
-import type { ApplioApi, JobFilter } from '../api';
+import type { ApplioApi } from '../api';
+import { matchesFilter } from '../job-filter';
 import { capAutonomy } from '../autonomy';
 import { nextStatuses } from '../status';
 import type { AppStatus, Job, JobStatus, SecretKey } from '../types';
@@ -57,16 +58,6 @@ export function createMockApi({ latencyMs = 250, now = () => new Date() }: MockO
     return job;
   };
 
-  const matches = (job: Job, filter: JobFilter): boolean => {
-    if (filter.statuses && !filter.statuses.includes(job.status)) return false;
-    if (filter.minScore !== undefined && (job.score ?? 0) < filter.minScore) return false;
-    if (filter.search) {
-      const q = filter.search.toLowerCase();
-      if (!`${job.company} ${job.title}`.toLowerCase().includes(q)) return false;
-    }
-    return true;
-  };
-
   /** Engine/scheduler snapshot; the next run is the next 6-hour slot (SPEC F2). */
   const status = (): AppStatus => {
     const next = new Date(now());
@@ -95,7 +86,7 @@ export function createMockApi({ latencyMs = 250, now = () => new Date() }: MockO
     listJobs: (filter = {}) =>
       respond(
         jobs
-          .filter((j) => matches(j, filter))
+          .filter((j) => matchesFilter(j, filter))
           .sort((a, b) => b.history.at(-1)!.at.localeCompare(a.history.at(-1)!.at)),
       ),
 

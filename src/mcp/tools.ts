@@ -43,8 +43,8 @@ const MatchInput = z.strictObject({
   score: z.number().int().min(0).max(100),
   roleSummary: text(400),
   descriptionSummary: text(600),
-  strengths: list(8),
-  gaps: list(8),
+  strengths: z.array(z.strictObject({ text: text(300), factId: text(64) })).max(5),
+  gaps: list(5),
 });
 
 const DraftInput = z.strictObject({
@@ -80,6 +80,13 @@ export function createTools(ports: ToolPorts): McpTool[] {
     return job;
   };
 
+  /** Throws, naming them, if any cited fact isn't in the bank, so Claude can fix it. */
+  const requireFacts = (factIds: readonly string[]) => {
+    const known = new Set(ports.profile().facts.map((f) => f.id));
+    const unknown = [...new Set(factIds.filter((id) => !known.has(id)))];
+    if (unknown.length > 0) throw new ToolInputError(`These fact IDs are not in the fact bank: ${unknown.join(', ')}. Use only facts from get_profile.`);
+  };
+
   const tool = <T>(name: string, description: string, schema: z.ZodType<T>, run: (input: T) => string): McpTool => {
     // `$schema` only costs tokens; both MCP and the Messages API read the rest.
     const inputSchema = z.toJSONSchema(schema) as Record<string, unknown>;
@@ -102,17 +109,16 @@ export function createTools(ports: ToolPorts): McpTool[] {
       ),
     ),
 
-    tool('save_match', 'Save the match score (0–100), summaries, strengths and gaps for one job.', MatchInput, ({ jobId, ...match }) => {
+    tool('save_match', 'Save the match score (0–100), summaries, strengths (each citing a fact id) and gaps for one job.', MatchInput, ({ jobId, strengths, ...match }) => {
       scoped(jobId);
-      ports.saveMatch(jobId, match);
+      requireFacts(strengths.map((s) => s.factId));
+      ports.saveMatch(jobId, { ...match, strengths: strengths.map((s) => s.text) });
       return 'Saved.';
     }),
 
     tool('save_draft', 'Save the tailored résumé (every bullet cites a fact id), cover letter or proposal, and form answers for one job.', DraftInput, (d) => {
       scoped(d.jobId);
-      const known = new Set(ports.profile().facts.map((f) => f.id));
-      const unknown = [...new Set(d.resume.flatMap((s) => s.items.map((i) => i.factId)).filter((id) => !known.has(id)))];
-      if (unknown.length > 0) throw new ToolInputError(`These fact IDs are not in the fact bank: ${unknown.join(', ')}. Use only facts from get_profile.`);
+      requireFacts(d.resume.flatMap((s) => s.items.map((i) => i.factId)));
       ports.saveDraft({
         ...d,
         edited: false,
