@@ -37,6 +37,18 @@ describe('suggestFacts', () => {
     expect(suggestFacts(text, ['owned on-call.'])).toEqual([{ group: 'Imported', text: 'Shipped the billing portal.' }]);
   });
 
+  it('joins a bullet wrapped across lines by the PDF back into one fact', () => {
+    const text = `EXPERIENCE
+• Cut reported production bugs from 30+/day to 5–10/day by rebuilding the orchestrator logic, and
+rewriting prompts to be tenant-agnostic.
+• Reduced reply latency from 20s to 6s by parallelizing reads, deferring work, and
+now only review runs and confirm findings.`;
+    expect(suggestFacts(text, [])).toEqual([
+      { group: 'EXPERIENCE', text: 'Cut reported production bugs from 30+/day to 5–10/day by rebuilding the orchestrator logic, and rewriting prompts to be tenant-agnostic.' },
+      { group: 'EXPERIENCE', text: 'Reduced reply latency from 20s to 6s by parallelizing reads, deferring work, and now only review runs and confirm findings.' },
+    ]);
+  });
+
   it('suggests nothing for text with no bullets or sentences', () => {
     expect(suggestFacts('Jane Doe\nEXPERIENCE\n', [])).toEqual([]);
   });

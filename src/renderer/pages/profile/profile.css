@@ -198,6 +198,17 @@
 }
 
 .resume-suggestions .fact-row {
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: space-between;
+}
+
+/* The text takes the room and wraps; the button keeps its place on the right whatever the length. */
+.resume-suggestions .fact-row > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.resume-suggestions .fact-row > button {
+  flex-shrink: 0;
 }
