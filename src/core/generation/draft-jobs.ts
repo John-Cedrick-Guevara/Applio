@@ -45,7 +45,11 @@ const kindOf = (job: Pick<Job, 'employmentType' | 'platform'>) => (job.employmen
  * draft after the call gets one more try, then a note. A budget stop or pause
  * ends drafting for this run.
  */
-export async function draftJobs(jobIds: readonly string[], { runId }: { runId?: number }, ports: DraftPorts): Promise<DraftResult> {
+export async function draftJobs(
+  jobIds: readonly string[],
+  { runId, trigger = 'scheduled' }: { runId?: number; trigger?: AiRequest['trigger'] },
+  ports: DraftPorts,
+): Promise<DraftResult> {
   const result: DraftResult = { drafted: 0, notDrafted: 0, notifyOnly: 0 };
 
   for (const id of jobIds) {
@@ -65,7 +69,7 @@ export async function draftJobs(jobIds: readonly string[], { runId }: { runId?: 
       try {
         const reply = await ports.ai({
           step: 'tailor', system: DRAFT_SYSTEM, prompt: `Draft a ${kindOf(job)} application for job ${id}.`, jobIds: [id],
-          ...(runId !== undefined ? { runId } : {}), trigger: 'scheduled',
+          ...(runId !== undefined ? { runId } : {}), trigger,
         });
         ports.addTokens(id, reply.inputTokens + reply.outputTokens);
       } catch (err) {

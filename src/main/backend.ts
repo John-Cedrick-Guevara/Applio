@@ -15,7 +15,9 @@ import { gmailImap, readInbox, type InboxClient } from '../infra/email/inbox';
 import { approveDraft, sendByAts, sendByEmail, type ApplyPorts, type AtsOutcome } from '../core/apply/send-application';
 import type { FillInput } from '../core/apply/ats-plan';
 import { folderFor, jobMarkdown } from '../core/generation/application-folder';
-import { draftJobs } from '../core/generation/draft-jobs';
+import { analyzePost, type AnalyzedJob } from '../core/generation/analyze-job';
+import { draftJobs, type DraftPorts } from '../core/generation/draft-jobs';
+import { dedupKey } from '../core/triage';
 import { discover } from '../core/jobs/discover';
 import { localDay, runSources } from '../core/jobs/run-sources';
 import { createScheduler } from '../core/jobs/scheduler';
@@ -25,6 +27,7 @@ import { draftReady, followUpDue, newMatch, quotaWarning, replyArrived, sentOnIt
 import { createTelegramBot } from '../core/notify/telegram-bot';
 import { scoreJobs } from '../core/scoring/score-jobs';
 import { createBotApi } from '../infra/telegram/bot-api';
+import { fetchPublicPage, isPlatformUrl } from '../infra/web/fetch-page';
 import { createSettingsService } from '../core/settings/settings-service';
 import {
   createActivityRepo, createDraftsRepo, createJobsRepo, createSendsRepo, createPollsRepo, createProfileRepo, createSettingsRepo, createSourcesRepo, transaction,
@@ -61,6 +64,8 @@ export interface BackendDeps {
   mailTransport?: (auth: { user: string; pass: string }) => MailTransport;
   /** HTTPS for the Telegram Bot API; global fetch in the app. */
   telegramFetch?: (url: string, init: RequestInit) => Promise<Response>;
+  /** HTTPS for reading a job page the operator pasted a link to; global fetch in the app. */
+  pageFetch?: (url: string, init: RequestInit) => Promise<Response>;
   /** Brings the app window up on a route, e.g. from a Telegram button. */
   showRoute?: (route: string) => void;
   /** IMAP for reply tracking; the real Gmail one in the app, a fake in tests. */
@@ -92,7 +97,7 @@ const MANUAL_APPLY_FROM = new Set(['scored', 'drafted', 'approved']);
  * in-memory store until their PRs land. OS integration is real.
  * ponytail: remaining in-memory data resets on restart — replace with SQLite-backed services per feature.
  */
-export function createBackend(getWindow: () => BrowserWindow | null, { db, secrets, sources, httpFor, onStatus, setLaunchAtLogin, printPdf, mailTransport, submitAts, inbox = gmailImap, telegramFetch = (url, init) => fetch(url, init), showRoute = () => {}, engines }: BackendDeps): Backend {
+export function createBackend(getWindow: () => BrowserWindow | null, { db, secrets, sources, httpFor, onStatus, setLaunchAtLogin, printPdf, mailTransport, submitAts, inbox = gmailImap, telegramFetch = (url, init) => fetch(url, init), showRoute = () => {}, pageFetch = (url, init) => fetch(url, init), engines }: BackendDeps): Backend {
   const store = createMockApi({ latencyMs: 0 });
   const kv = createSettingsRepo(db);
   const jobs = createJobsRepo(db);
@@ -199,6 +204,34 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     return found;
   };
 
+  // Drafting, from a run or from Add job: the same calls, files and autonomy gate either way.
+  const draftPorts: DraftPorts = {
+    ai: (request) => ai.run(request),
+    hasDraft: (id) => drafts.get(id) !== undefined,
+    job: (id) => jobs.get(id),
+    autonomy: (sourceId) => sourcesRepo.get(sourceId)?.autonomy ?? 'draft',
+    note: (id, text) => note(id, text),
+    addTokens: (id, tokens) => jobs.update(id, { tokensUsed: (jobs.get(id)?.tokensUsed ?? 0) + tokens }),
+    // The draft stands even if its files fail; the note says why, and Review can retry later.
+    onDrafted: async (id) => {
+      try {
+        await saveFiles(id);
+      } catch (err) {
+        note(id, `Couldn't save the files: ${err instanceof Error ? err.message : String(err)}`);
+        return;
+      }
+      await sendOnItsOwn(id);
+    },
+  };
+
+  // Add job (SPEC F2 Clip): analyses wait here, by preview id, until the operator adds one.
+  const analyses = new Map<string, AnalyzedJob>();
+  const PLATFORM_NAMES: [RegExp, string][] = [[/linkedin\./, 'LinkedIn'], [/indeed\./, 'Indeed'], [/jobstreet\./, 'JobStreet'], [/upwork\./, 'Upwork'], [/facebook\./, 'Facebook']];
+  const platformIn = (text: string) => {
+    const url = text.match(/https:\/\/[^\s<>"]+/g)?.find(isPlatformUrl);
+    return url ? PLATFORM_NAMES.find(([re]) => re.test(url))?.[1] : undefined;
+  };
+
   const runDiscovery = () =>
     discover({
       poll: () => runSources({ sources, isEnabled: (id) => sourcesRepo.get(id)?.enabled ?? false, polls, httpFor, today: () => localDay(new Date()) }),
@@ -218,25 +251,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
         }
         return result;
       },
-      draft: (jobIds, runId) =>
-        draftJobs(jobIds, { runId }, {
-          ai: ai.run,
-          hasDraft: (id) => drafts.get(id) !== undefined,
-          job: (id) => jobs.get(id),
-          autonomy: (sourceId) => sourcesRepo.get(sourceId)?.autonomy ?? 'draft',
-          note,
-          addTokens: (id, tokens) => jobs.update(id, { tokensUsed: (jobs.get(id)?.tokensUsed ?? 0) + tokens }),
-          // The draft stands even if its files fail; the note says why, and Review can retry later.
-          onDrafted: async (id) => {
-            try {
-              await saveFiles(id);
-            } catch (err) {
-              note(id, `Couldn't save the files: ${err instanceof Error ? err.message : String(err)}`);
-              return;
-            }
-            await sendOnItsOwn(id);
-          },
-        }),
+      draft: (jobIds, runId) => draftJobs(jobIds, { runId }, draftPorts),
       finishRun: (runId, details, drafted) => activity.updateDetails(runId, details, drafted),
       now: () => new Date(),
       newId: randomUUID,
@@ -447,6 +462,40 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     }),
 
     approveDraft: (jobId) => approveDraft(jobId, applyPorts),
+
+    analyzeJob: async (input) => {
+      // A platform link is never opened (MNB-1); its page is refused before any request.
+      const text = input.kind === 'link' ? await fetchPublicPage(input.value, pageFetch) : input.value;
+      const platform = input.kind === 'text' ? platformIn(text) : undefined;
+      const sourceName = input.kind === 'link' ? `from ${new URL(input.value).hostname}` : platform ? `clipped from ${platform}` : 'pasted by you';
+      const { preview, job } = await analyzePost({ text, sourceName, ...(platform ? { platform } : {}) }, {
+        ai: (request) => ai.run(request),
+        factIds: () => new Set(profile.getProfile().facts.map((f) => f.id)),
+        existing: (company, title) => {
+          const found = jobs.findByDedupKey(dedupKey({ company, title }));
+          return found ? { title: found.title, status: found.status } : undefined;
+        },
+      });
+      const previewId = randomUUID();
+      // ponytail: kept in memory and capped; an analysis lost to a restart just needs Analyze again.
+      if (analyses.size >= 20) analyses.delete(analyses.keys().next().value!);
+      analyses.set(previewId, job);
+      return { ...preview, previewId };
+    },
+
+    addJob: async ({ previewId }) => {
+      const analyzed = analyses.get(previewId);
+      if (!analyzed) throw new Error('Analyze the post again, then add it.');
+      const key = dedupKey(analyzed);
+      const existing = jobs.findByDedupKey(key);
+      if (existing) throw new Error(`${existing.title} at ${existing.company} is already in Applio (${existing.status}).`);
+      const id = randomUUID();
+      const at = new Date().toISOString();
+      jobs.insert({ ...analyzed, id, sourceId: 'clip', status: 'scored', factsUsed: 0, history: [{ status: 'found', at }, { status: 'scored', at }] }, { dedupKey: key, createdAt: at });
+      analyses.delete(previewId);
+      await draftJobs([id], { trigger: 'operator' }, draftPorts);
+      return getJob(id);
+    },
 
     markApplied: later((jobId) => {
       const job = getJob(jobId);
