@@ -458,4 +458,13 @@ describe('createBackend discovery', () => {
     expect(await api.testConnection('gmail')).toEqual({ ok: true, message: 'Test email sent to sam@gmail.com' });
     expect(outbox[0]).toMatchObject({ to: 'sam@gmail.com', subject: 'Applio test email' });
   });
+
+  it('keeps a sent application exactly as sent: its letter can no longer be edited', async () => {
+    const { api, job } = await emailJob();
+    await api.approveDraft(job.id);
+    const sentMd = readFileSync(join(job.folderPath!, 'sent.md'), 'utf8');
+    await expect(api.updateCoverLetter(job.id, 'A different letter')).rejects.toThrow('This application was already sent, so its letter stays as sent.');
+    expect((await api.getDraft(job.id))?.coverLetter).toBe('Dear team');
+    expect(readFileSync(join(job.folderPath!, 'sent.md'), 'utf8')).toBe(sentMd);
+  });
 });
