@@ -20,7 +20,13 @@ process.stdin.on('end', () => {
   const line = (o) => process.stdout.write(JSON.stringify(o) + '\\n');
   if (process.argv[2] === 'auth') {
     line({ loggedIn: mode !== 'logged-out', authMethod: 'claude.ai', email: 'someone@example.com' });
+    // The real binary exits 1 when logged out, with the status still on stdout.
+    if (mode === 'logged-out') process.exit(1);
     return;
+  }
+  if (mode === 'logged-out') {
+    line({ type: 'result', subtype: 'success', is_error: true, result: 'Not logged in · Please run /login' });
+    process.exit(1);
   }
   if (mode === 'crash') { process.stderr.write('boom: something broke\\n'); process.exit(3); }
   line({ type: 'system', subtype: 'init', tools: [] });
@@ -91,6 +97,10 @@ describe('Claude Code engine', () => {
       message: "Claude Code isn't signed in for Applio yet. Run this once in a terminal, then click Test: it opens your browser to sign in with the same account. Or switch to an Anthropic API key below.",
       command: 'CLAUDE_CONFIG_DIR="/apps/applio/claude" claude auth login',
     });
+  });
+
+  it("says how to sign in when a call fails because Applio's profile is logged out", async () => {
+    await expect(engine('logged-out').complete({ prompt: 'x', jobIds: [] })).rejects.toThrow("Claude Code isn't signed in for Applio yet.");
   });
 
   it("runs every call and check under Applio's own profile, never the operator's", async () => {

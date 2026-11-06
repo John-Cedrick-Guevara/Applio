@@ -66,6 +66,12 @@ describe('settings service', () => {
     expect(service.getSettings().autoSendThreshold).toBe(85);
   });
 
+  it('drops spaces and line breaks pasted around a secret', () => {
+    const { ports, secrets } = fakes();
+    createSettingsService(ports).setSecret('telegramBotToken', '  123:token\n');
+    expect(secrets.get('telegramBotToken')).toBe('123:token');
+  });
+
   it('stores a secret in the secret store and only reports that it is set', () => {
     const { ports, secrets } = fakes();
     const service = createSettingsService(ports);

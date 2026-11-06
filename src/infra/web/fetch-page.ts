@@ -33,7 +33,7 @@ export async function fetchPublicPage(url: string, fetch: Fetch): Promise<string
   // Redirects are followed by hand, so every hop is checked: a short link must not lead onto a platform page.
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     if (!current.startsWith('https://') || !hostOf(current)) throw new Error('Paste an https link, or the post itself.');
-    if (isPlatformUrl(current)) throw new Error("Applio doesn't open pages on that site. Copy the post's text and paste it instead.");
+    if (isPlatformUrl(current)) throw new Error("Applio doesn't open pages on that site. Switch to Paste text and paste the whole post, link included.");
     try {
       res = await fetch(current, { redirect: 'manual', headers: { 'user-agent': 'Applio/0.1 (+https://github.com/John-Cedrick-Guevara/Applio)' }, signal: AbortSignal.timeout(TIMEOUT_MS) });
     } catch {

@@ -28,19 +28,20 @@ interface Options {
   mcpConfig: (jobIds: readonly string[]) => string;
 }
 
-/** Runs the binary, feeding `stdin`, and resolves its stdout once it exits 0. */
+/**
+ * Runs the binary, feeding `stdin`, and resolves its output once it exits. A
+ * non-zero exit still resolves: Claude Code puts the reason (logged out, API
+ * error) in its stdout, so callers read that before giving up.
+ */
 const run = ({ command, cwd, env, configDir }: Options, args: string[], stdin: string) =>
-  new Promise<string>((resolve, reject) => {
+  new Promise<{ code: number | null; out: string; err: string }>((resolve, reject) => {
     const child = spawn(command, args, { cwd, env: { ...env, CLAUDE_CONFIG_DIR: configDir }, stdio: ['pipe', 'pipe', 'pipe'], timeout: TIMEOUT_MS });
     let out = '';
     let err = '';
     child.stdout.on('data', (c: Buffer) => (out += c.toString()));
     child.stderr.on('data', (c: Buffer) => (err += c.toString()));
     child.on('error', (e: NodeJS.ErrnoException) => reject(new EngineError(e.code === 'ENOENT' ? NOT_INSTALLED : `Claude Code couldn't start: ${e.message}`, { cause: e })));
-    child.on('close', (code) => {
-      if (code === 0) resolve(out);
-      else reject(new EngineError(`Claude Code exited with code ${code}: ${err.trim().split('\n').at(-1) ?? ''}`.trim()));
-    });
+    child.on('close', (code) => resolve({ code, out, err }));
     child.stdin.on('error', () => {}); // a binary that exits early closes stdin; 'close' reports why
     child.stdin.end(stdin);
   });
@@ -58,6 +59,8 @@ const lastResult = (out: string): Record<string, unknown> | undefined =>
       }
     })
     .at(-1);
+
+const exited = (code: number | null, err: string) => `Claude Code exited with code ${code}: ${err.trim().split('\n').at(-1) ?? ''}`.trim();
 
 const count = (v: unknown) => (typeof v === 'number' ? v : 0);
 
@@ -83,9 +86,13 @@ export function createClaudeCodeEngine(options: Options): AiEngine {
         '--no-session-persistence',
         ...(system ? ['--system-prompt', system] : []),
       ];
-      const result = lastResult(await run(options, args, prompt));
-      if (!result) throw new EngineError('Claude Code returned no result.');
-      if (result.is_error === true || result.subtype !== 'success') throw new EngineError(`Claude Code couldn't finish (${String(result.subtype)}).`);
+      const { code, out, err } = await run(options, args, prompt);
+      const result = lastResult(out);
+      if (!result) throw new EngineError(code === 0 ? 'Claude Code returned no result.' : exited(code, err));
+      if (result.is_error === true || result.subtype !== 'success') {
+        if (/not logged in/i.test(String(result.result))) throw new EngineError(NOT_SIGNED_IN);
+        throw new EngineError(`Claude Code couldn't finish (${String(result.subtype)}).`);
+      }
       const usage = (result.usage ?? {}) as Record<string, unknown>;
       return {
         text: String(result.result ?? ''),
@@ -98,7 +105,10 @@ export function createClaudeCodeEngine(options: Options): AiEngine {
     async check(): Promise<{ ready: boolean; message: string; command?: string }> {
       const signIn = `CLAUDE_CONFIG_DIR="${options.configDir}" claude auth login`;
       try {
-        const status: unknown = JSON.parse(await run(options, ['auth', 'status', '--json'], ''));
+        const { code, out, err } = await run(options, ['auth', 'status', '--json'], '');
+        // Logged out exits 1 with the status still on stdout.
+        if (!out.trim()) throw new EngineError(exited(code, err));
+        const status: unknown = JSON.parse(out);
         const loggedIn = !!status && typeof status === 'object' && (status as { loggedIn?: unknown }).loggedIn === true;
         return loggedIn ? { ready: true, message: 'Claude Code is signed in.' } : { ready: false, message: NOT_SIGNED_IN, command: signIn };
       } catch (err) {

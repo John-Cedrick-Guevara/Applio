@@ -23,7 +23,7 @@ describe('Telegram Bot API client', () => {
   it("explains Telegram's refusal without the token", async () => {
     const fetch = vi.fn(async () => new Response(JSON.stringify({ ok: false, description: 'Bad Request: chat not found' }), { status: 400 }));
     const err = await createBotApi(TOKEN, fetch).sendMessage('42', 'Hi').catch((e: Error) => e);
-    expect((err as Error).message).toBe('Telegram refused: Bad Request: chat not found');
+    expect((err as Error).message).toBe("Telegram can't find that chat. Open your bot in Telegram, press Start, then check the chat ID and test again.");
     expect(String((err as Error).stack) + String((err as Error).cause)).not.toContain(TOKEN);
   });
 
@@ -34,6 +34,11 @@ describe('Telegram Bot API client', () => {
     const err = await createBotApi(TOKEN, down).getUpdates().catch((e: Error) => e);
     expect((err as Error).message).toBe("Couldn't reach Telegram.");
     expect(JSON.stringify(err) + (err as Error).message + String((err as Error).cause)).not.toContain(TOKEN);
+  });
+
+  it('says the token is wrong when Telegram answers 404, as it does for a malformed token', async () => {
+    const notFound = vi.fn(async () => new Response(JSON.stringify({ ok: false, description: 'Not Found' }), { status: 404 }));
+    await expect(createBotApi(TOKEN, notFound).sendMessage('42', 'x')).rejects.toThrow('Telegram rejected the bot token. Copy it from @BotFather and save it again.');
   });
 
   it('gives up on a request that hangs, so long polling can recover after a stalled connection', async () => {
