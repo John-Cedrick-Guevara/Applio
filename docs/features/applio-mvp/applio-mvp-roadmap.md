@@ -251,22 +251,31 @@ Wire real data behind the same `ApplioApi`. Each PR replaces part of the mock st
   - [x] tests with a fake engine
   - _decided:_ batches of 10; only each run's new jobs are scored, with one retry; strengths cite fact IDs; `listJobs` / `getJob` now read SQLite
 
-- [ ] **PR-17 — Draft generation and output folder**  Tailored resume, cover letter or proposal, answers; PDF and folder.
+- [x] **PR-17a — Draft generation**  Tailored resume, cover letter or proposal, answers, every line citing a fact.
   - _branch:_ `feat/draft-generation`
-  - _PR title:_ `feat: generate drafts and write application folders`
-  - _why:_ every draft cites only fact-bank entries and lands in the operator's folder (SPEC F4, F8)
+  - _PR title:_ `feat: generate drafts from the fact bank`
+  - _why:_ every draft cites only fact-bank entries (SPEC F4, principle 2)
   - _depends on:_ PR-16
-  - [ ] spec: `docs/features/draft-generation/draft-generation-spec.md`
-  - [ ] drafts with fact citations; answers from the bank first, AI only for new ones
+  - [x] spec: `docs/features/draft-generation/draft-generation-spec.md`
+  - [x] drafts with fact citations; numbers must match the cited fact; answers from the bank first, AI only for new ones
+  - [x] real `getDraft`, `updateCoverLetter`
+  - [x] tests: citation check rejects unknown fact IDs
+  - _decided:_ split from PR-17 (size); one AI call per job right after scoring; Notify-only sources are never drafted
+
+- [ ] **PR-17b — Draft files**  One ATS template, PDFs, the output folder, previews from the template.
+  - _branch:_ `feat/draft-files`
+  - _PR title:_ `feat: write application folders and pdfs`
+  - _why:_ every draft lands in the operator's folder as the files that get sent (SPEC F4, F8)
+  - _depends on:_ PR-17a
+  - [ ] spec: `docs/features/draft-files/draft-files-spec.md`
   - [ ] PDF via `printToPDF` from the one ATS template; folder layout and re-link by job ID
-  - [ ] real `getDraft`, `updateCoverLetter`, `openJobFolder`
-  - [ ] tests: citation check rejects unknown fact IDs
+  - [ ] real `openJobFolder`; Review previews from the same template; Open PDF
 
 - [ ] **PR-18 — Email apply**  Send approved email applications through Gmail.
   - _branch:_ `feat/email-apply`
   - _PR title:_ `feat: send email applications via gmail`
   - _why:_ first real send channel (SPEC F5 channel 1)
-  - _depends on:_ PR-17
+  - _depends on:_ PR-17b
   - [ ] spec: `docs/features/email-apply/email-apply-spec.md`
   - [ ] SMTP send with app password; `sent.md` written; double-send guard
   - [ ] real `approveDraft` for email, `markApplied`, `skipJob`, `testConnection('gmail')`
