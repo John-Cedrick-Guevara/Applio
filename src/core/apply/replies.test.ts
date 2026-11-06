@@ -23,6 +23,12 @@ describe('matchReply', () => {
     expect(matchReply(mail({ from: 'no-reply@hire.lever.co', fromName: 'Globex Recruiting' }), apps)).toBe('j2');
   });
 
+  it("matches the company's name only as whole words, so Metabase isn't Meta", () => {
+    const meta: Application[] = [{ id: 'm1', company: 'Meta', applyTarget: 'jobs.lever.co', messageIds: [], status: 'applied' }];
+    expect(matchReply(mail({ from: 'team@metabase.com', fromName: 'Metabase Team' }), meta)).toBeUndefined();
+    expect(matchReply(mail({ from: 'no-reply@hire.lever.co', fromName: 'Meta Recruiting' }), meta)).toBe('m1');
+  });
+
   it("never matches by a webmail domain like gmail.com", () => {
     expect(matchReply(mail({ from: 'friend@gmail.com' }), apps)).toBeUndefined();
   });
@@ -42,6 +48,8 @@ describe('classifyReply', () => {
     ["We regret to inform you the position has been filled.", 'rejected'],
     ["We'd love to schedule an interview. What's your availability next week?", 'interview'],
     ['Thanks for applying! We received your application.', 'replied'],
+    ["Unfortunately that time doesn't suit us, can we reschedule the interview?", 'interview'],
+    ['Unfortunately, we will not be moving forward with your application.', 'rejected'],
   ] as const)('reads %j as %s', (text, status) => {
     expect(classifyReply(mail({ text }))).toBe(status);
   });

@@ -1,4 +1,4 @@
-import type { Autonomy, Job } from '../../shared/types';
+import type { Autonomy, Draft, Job } from '../../shared/types';
 import { QuotaExceededError, type AiRequest } from '../ai/ai-service';
 import type { AiReply } from '../ai/engine';
 import { AutomationPausedError } from '../jobs/scheduler';
@@ -37,7 +37,8 @@ export interface DraftResult {
 }
 
 /** Freelance work and Upwork get a proposal; everything else a cover letter (SPEC F4). */
-const kindOf = (job: Pick<Job, 'employmentType' | 'platform'>) => (job.employmentType === 'freelance' || job.platform === 'Upwork' ? 'proposal' : 'cover letter');
+export const draftKind = (job: Pick<Job, 'employmentType' | 'platform'>): Draft['kind'] => (job.employmentType === 'freelance' || job.platform === 'Upwork' ? 'proposal' : 'cover-letter');
+const kindOf = (job: Pick<Job, 'employmentType' | 'platform'>) => (draftKind(job) === 'proposal' ? 'proposal' : 'cover letter');
 
 /**
  * Drafts each strong match in its own AI call (SPEC F4). Claude saves the draft

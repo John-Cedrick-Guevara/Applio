@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { AppError } from '../shared/errors';
+import { draftKind } from '../core/generation/draft-jobs';
 import type { Answer, Draft, Job, Profile } from '../shared/types';
 
 /** What Claude sent doesn't fit the tool, or targets something it may not touch. The message is for Claude. */
@@ -122,7 +123,7 @@ export function createTools(ports: ToolPorts): McpTool[] {
     }),
 
     tool('save_draft', 'Save the tailored résumé (every line cites a fact id and keeps its numbers exactly), cover letter or proposal, and form answers (answerId for a bank answer) for one job.', DraftInput, (d) => {
-      scoped(d.jobId);
+      const job = scoped(d.jobId);
       const items = d.resume.flatMap((s) => s.items);
       requireFacts(items.map((i) => i.factId));
       // Never invent: a line's numbers must all appear in the fact it cites (draft-generation MNB-1).
@@ -141,7 +142,8 @@ export function createTools(ports: ToolPorts): McpTool[] {
         reused.push(a.answerId);
         return { question: a.question, answer, origin: 'bank' as const, tokens: 0 };
       });
-      ports.saveDraft({ ...d, edited: false, answers, createdAt: ports.now().toISOString() }, reused);
+      // The kind is Applio's rule (SPEC F4), whatever Claude sent.
+      ports.saveDraft({ ...d, kind: draftKind(job), edited: false, answers, createdAt: ports.now().toISOString() }, reused);
       return 'Saved.';
     }),
 

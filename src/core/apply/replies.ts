@@ -33,6 +33,8 @@ const WEBMAIL = new Set(['gmail.com', 'googlemail.com', 'outlook.com', 'hotmail.
 const domainOf = (address: string) => address.split('@')[1]?.toLowerCase() ?? '';
 /** "Acme, Inc." → "acme": the company as one lowercase word, to look for in a domain. */
 const compact = (company: string) => companyKey(company).replace(/[^a-z0-9]/g, '');
+/** Lowercase words separated by single spaces, for whole-word matching. */
+const words = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
 /**
  * Which application an email answers (SPEC F7): the thread first (In-Reply-To or
@@ -51,14 +53,16 @@ export function matchReply(mail: IncomingMail, applications: readonly Applicatio
   const byDomain = open.find((a) => a.applyTarget.includes('@') && domainOf(a.applyTarget) === domain);
   if (byDomain) return byDomain.id;
 
-  const name = mail.fromName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  // Whole words only: "Metabase Team" must not match Meta.
+  const nameWords = ` ${words(mail.fromName)} `;
   return open.find((a) => {
     const key = compact(a.company);
-    return key.length >= 3 && (domain.split('.').some((part) => part === key) || name.includes(key));
+    return key.length >= 3 && (domain.split('.').some((part) => part === key) || nameWords.includes(` ${words(companyKey(a.company))} `));
   })?.id;
 }
 
-const REJECTED = /unfortunately|not (be )?moving forward|move forward with other|decided to (pursue|proceed with) other|regret to inform|position has been filled|no longer (being )?considered|will not be progressing/i;
+// "Unfortunately" alone isn't a rejection ("unfortunately that time doesn't work"); it needs a refusal right after.
+const REJECTED = /unfortunately\b[^.!?]{0,80}\b(not|other candidates|decided|unable|won't)\b|not (be )?moving forward|move forward with other|decided to (pursue|proceed with) other|regret to inform|position has been filled|no longer (being )?considered|will not be progressing/i;
 const INTERVIEW = /\binterview\b|schedule (a |an )?(call|chat|time)|your availability|calendly\.com|book a (time|slot)|next steps? (is|would be) a (call|chat)/i;
 
 /**

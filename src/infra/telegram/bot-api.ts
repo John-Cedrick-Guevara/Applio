@@ -12,6 +12,7 @@ export class TelegramError extends AppError {
 
 /** Long-poll length; Telegram holds the request open until a press arrives or this runs out. */
 const POLL_SECONDS = 30;
+const REQUEST_TIMEOUT_MS = 45_000;
 
 /**
  * The Bot API over HTTPS JSON (SPEC F9), with no library. Errors are rebuilt
@@ -22,7 +23,13 @@ export function createBotApi(token: string, fetch: Fetch): BotApi {
   const call = async <T>(method: string, body: object): Promise<T> => {
     let res: Response;
     try {
-      res = await fetch(`https://api.telegram.org/bot${token}/${method}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+      res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+        // Longer than the 30 s long poll; a stalled connection then fails, and the poll loop backs off and retries.
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
     } catch {
       throw new TelegramError("Couldn't reach Telegram.");
     }

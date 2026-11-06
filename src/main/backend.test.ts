@@ -729,4 +729,13 @@ describe('createBackend discovery', () => {
     await api.saveSettings({ assistedFill: { platform: true, custom: true } });
     await expect(api.assistFill(job.id)).rejects.toThrow('Assisted fill is only for platform and career-site jobs.');
   });
+
+  it('keeps a sent application exactly as sent: its letter can no longer be edited', async () => {
+    const { api, job } = await emailJob();
+    await api.approveDraft(job.id);
+    const sentMd = readFileSync(join(job.folderPath!, 'sent.md'), 'utf8');
+    await expect(api.updateCoverLetter(job.id, 'A different letter')).rejects.toThrow('This application was already sent, so its letter stays as sent.');
+    expect((await api.getDraft(job.id))?.coverLetter).toBe('Dear team');
+    expect(readFileSync(join(job.folderPath!, 'sent.md'), 'utf8')).toBe(sentMd);
+  });
 });

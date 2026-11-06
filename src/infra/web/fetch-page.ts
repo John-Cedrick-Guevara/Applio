@@ -6,6 +6,7 @@ type Fetch = (url: string, init: RequestInit) => Promise<Response>;
 const PLATFORMS = ['linkedin.com', 'indeed.com', 'jobstreet.com', 'jobstreet.com.ph', 'upwork.com', 'facebook.com'];
 const MAX_BYTES = 2_000_000;
 const TIMEOUT_MS = 15_000;
+const MAX_REDIRECTS = 5;
 
 const hostOf = (url: string) => {
   try {
@@ -27,14 +28,23 @@ export function isPlatformUrl(url: string): boolean {
  * @throws with a next step when the link can't be used.
  */
 export async function fetchPublicPage(url: string, fetch: Fetch): Promise<string> {
-  if (!url.startsWith('https://') || !hostOf(url)) throw new Error('Paste an https link, or the post itself.');
-  if (isPlatformUrl(url)) throw new Error("Applio doesn't open pages on that site. Copy the post's text and paste it instead.");
-  let res: Response;
-  try {
-    res = await fetch(url, { redirect: 'follow', headers: { 'user-agent': 'Applio/0.1 (+https://github.com/John-Cedrick-Guevara/Applio)' }, signal: AbortSignal.timeout(TIMEOUT_MS) });
-  } catch {
-    throw new Error("Couldn't load that page. Paste the post's text instead.");
+  let res: Response | undefined;
+  let current = url;
+  // Redirects are followed by hand, so every hop is checked: a short link must not lead onto a platform page.
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    if (!current.startsWith('https://') || !hostOf(current)) throw new Error('Paste an https link, or the post itself.');
+    if (isPlatformUrl(current)) throw new Error("Applio doesn't open pages on that site. Copy the post's text and paste it instead.");
+    try {
+      res = await fetch(current, { redirect: 'manual', headers: { 'user-agent': 'Applio/0.1 (+https://github.com/John-Cedrick-Guevara/Applio)' }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+    } catch {
+      throw new Error("Couldn't load that page. Paste the post's text instead.");
+    }
+    const location = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
+    if (!location) break;
+    current = new URL(location, current).toString();
+    res = undefined;
   }
+  if (!res) throw new Error("That link redirects too many times. Paste the post's text instead.");
   if (!res.ok) throw new Error(`That page answered ${res.status}. Paste the post's text instead.`);
   if (!/text\/html|text\/plain/.test(res.headers.get('content-type') ?? '')) throw new Error("That link isn't a web page. Paste the post's text instead.");
   // A whole page, unlike a board's description: drop what never shows before reading the text.

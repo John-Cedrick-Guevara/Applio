@@ -89,6 +89,8 @@ export function createApiEngine({ apiKey, client = (key) => new Anthropic({ apiK
         inputTokens += u.input_tokens + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0);
         outputTokens += u.output_tokens;
         if (reply.stop_reason === 'refusal') throw new EngineError('Claude declined this request.');
+        // A cut-off answer is incomplete JSON or a half-saved batch; better reported than used.
+        if (reply.stop_reason === 'max_tokens') throw new EngineError("Claude's answer was cut off before it finished. Try again.");
         if (reply.stop_reason !== 'tool_use') {
           return { text: reply.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join(''), inputTokens, outputTokens };
         }
