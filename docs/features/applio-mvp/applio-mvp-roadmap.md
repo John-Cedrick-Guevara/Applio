@@ -262,14 +262,15 @@ Wire real data behind the same `ApplioApi`. Each PR replaces part of the mock st
   - [x] tests: citation check rejects unknown fact IDs
   - _decided:_ split from PR-17 (size); one AI call per job right after scoring; Notify-only sources are never drafted
 
-- [ ] **PR-17b — Draft files**  One ATS template, PDFs, the output folder, previews from the template.
+- [x] **PR-17b — Draft files**  One ATS template, PDFs, the output folder, previews from the template.
   - _branch:_ `feat/draft-files`
   - _PR title:_ `feat: write application folders and pdfs`
   - _why:_ every draft lands in the operator's folder as the files that get sent (SPEC F4, F8)
   - _depends on:_ PR-17a
-  - [ ] spec: `docs/features/draft-files/draft-files-spec.md`
-  - [ ] PDF via `printToPDF` from the one ATS template; folder layout and re-link by job ID
-  - [ ] real `openJobFolder`; Review previews from the same template; Open PDF
+  - [x] spec: `docs/features/draft-files/draft-files-spec.md`
+  - [x] PDF via `printToPDF` from the one ATS template; folder layout and re-link by job ID
+  - [x] real `openJobFolder`; Review previews from the same template; Open PDF
+  - _decided:_ `job.md` front matter holds the job id; a "Name on your documents" setting; `openDraftFile` API method
 
 - [ ] **PR-18 — Email apply**  Send approved email applications through Gmail.
   - _branch:_ `feat/email-apply`
