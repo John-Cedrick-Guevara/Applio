@@ -95,4 +95,9 @@ describe('AI service', () => {
     await expect(ai.run(request)).rejects.toThrow('Claude Code exited with code 1');
     expect(recorded).toEqual([]);
   });
+
+  it('reports a reached hard stop without making a call, so other work can wait on it', () => {
+    expect(setup({ today: 9_000, month: 9_000 }).ai.budgetStop()).toBeUndefined();
+    expect(setup({ today: 10_000, month: 10_000 }).ai.budgetStop()).toBe("Today's Claude token budget is used up (10,000 of 10,000). AI resumes tomorrow, or raise the budget in Settings.");
+  });
 });

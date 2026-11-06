@@ -119,8 +119,8 @@ app.whenReady().then(() => {
     },
     setLaunchAtLogin: (openAtLogin) => app.setLoginItemSettings({ openAtLogin }),
     printPdf,
-    // The operator approved this send, so they watch it fill; autonomous sends (PR-20) run hidden.
-    submitAts: (request) => submitAtsForm({ ...request, visible: true }),
+    // Approved sends fill in view; autonomous ones run hidden (the core decides which).
+    submitAts: submitAtsForm,
     engines: {
       'claude-code': createClaudeCodeEngine({
         command: 'claude',

@@ -472,6 +472,37 @@ describe('createBackend discovery', () => {
     expect(readFileSync(join(job.folderPath!, 'sent.md'), 'utf8')).toContain('Email: sam@gmail.com');
   });
 
+  it('sends a strong match from an Autonomous source on its own, as Autonomous, and lists it with the applications', async () => {
+    const b = await searchingBackend();
+    await b.api.updateSource('remotive', { autonomy: 'autonomous' });
+    await b.api.saveSettings({ fullName: 'Sam Rivera', gmailAddress: 'sam@gmail.com' });
+    await b.api.setSecret('gmailAppPassword', PASSWORD);
+    const fact = await b.api.saveFact({ group: 'Acme', text: 'Shipped APIs' });
+    b.deps.engines['claude-code'] = {
+      check: async () => ({ ready: true, message: 'ok' }),
+      complete: async ({ prompt, jobIds }) => {
+        // The board's job applies by email, so the channel allows sending on its own.
+        for (const id of jobIds) b.deps.db.prepare("UPDATE jobs SET channel = 'email', apply_target = 'jobs@acme.com' WHERE id = ?").run(id);
+        const call = (name: string, input: unknown) => createTools(createToolPorts(b.deps.db, jobIds, () => new Date())).find((t) => t.name === name)!.call(input);
+        for (const jobId of jobIds) {
+          if (prompt.startsWith('Score')) call('save_match', { jobId, score: 92, roleSummary: 'r', descriptionSummary: 'd', strengths: [], gaps: [] });
+          else call('save_draft', { jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ heading: 'A', items: [{ text: 'Shipped APIs', factId: fact.id }] }], coverLetter: 'Dear team', answers: [] });
+        }
+        return { text: 'done', inputTokens: 1, outputTokens: 1 };
+      },
+    };
+    await b.api.runDiscovery();
+    const [sent] = await b.api.listJobs({ statuses: ['applied'] });
+    expect(sent).toMatchObject({ sentBy: 'autonomous' });
+    expect(outbox).toHaveLength(1);
+  });
+
+  it('keeps a strong match from a Draft → Approve source waiting in Review', async () => {
+    const { api } = await draftedBackend();
+    expect(await api.listJobs({ statuses: ['applied'] })).toEqual([]);
+    expect(await api.listJobs({ statuses: ['drafted'] })).toHaveLength(1);
+  });
+
   it('keeps a sent application exactly as sent: its letter can no longer be edited', async () => {
     const { api, job } = await emailJob();
     await api.approveDraft(job.id);

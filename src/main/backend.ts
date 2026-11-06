@@ -6,7 +6,8 @@ import { basename, join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { createAi } from '../core/ai/ai-service';
 import type { AiEngine } from '../core/ai/engine';
-import { approveDraft, type ApplyPorts, type AtsOutcome } from '../core/apply/send-application';
+import { autoSend } from '../core/apply/auto-send';
+import { approveDraft, sendByAts, sendByEmail, type ApplyPorts, type AtsOutcome } from '../core/apply/send-application';
 import type { FillInput } from '../core/apply/ats-plan';
 import { folderFor, jobMarkdown } from '../core/generation/application-folder';
 import { draftJobs } from '../core/generation/draft-jobs';
@@ -26,6 +27,7 @@ import { readResumeText } from '../infra/resume/read-resume';
 import type { SecretStore } from '../infra/secrets/secret-store';
 import type { ApplioApi } from '../shared/api';
 import type { Draft, AiEngine as EngineKind, AppStatus, Job } from '../shared/types';
+import { AUTONOMY_LEVELS } from '../shared/autonomy';
 import { matchesFilter } from '../shared/job-filter';
 import { letterBody, pageHtml, resumeBody } from '../shared/templates/application-documents';
 import { createMockApi } from '../shared/mock/mock-api';
@@ -49,7 +51,7 @@ export interface BackendDeps {
   /** SMTP for Gmail; the real one in the app, a recorder in tests. */
   mailTransport?: (auth: { user: string; pass: string }) => MailTransport;
   /** Fills and submits an ATS form in Applio's own window (SPEC F5 channel 2). */
-  submitAts: (request: { url: string; input: FillInput }) => Promise<AtsOutcome>;
+  submitAts: (request: { url: string; input: FillInput; visible: boolean }) => Promise<AtsOutcome>;
   /** One engine per Settings choice (SPEC §2). */
   engines: Record<EngineKind, AiEngine>;
 }
@@ -167,7 +169,15 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
           note,
           addTokens: (id, tokens) => jobs.update(id, { tokensUsed: (jobs.get(id)?.tokensUsed ?? 0) + tokens }),
           // The draft stands even if its files fail; the note says why, and Review can retry later.
-          onDrafted: (id) => saveFiles(id).catch((err: unknown) => note(id, `Couldn't save the files: ${err instanceof Error ? err.message : String(err)}`)),
+          onDrafted: async (id) => {
+            try {
+              await saveFiles(id);
+            } catch (err) {
+              note(id, `Couldn't save the files: ${err instanceof Error ? err.message : String(err)}`);
+              return;
+            }
+            await sendOnItsOwn(id);
+          },
         }),
       finishRun: (runId, details, drafted) => activity.updateDetails(runId, details, drafted),
       now: () => new Date(),
@@ -232,6 +242,23 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     },
     bankAnswers: () => profile.getProfile().answers.map(({ question, answer }) => ({ question, answer })),
     submitAts,
+  };
+
+  /**
+   * The Autonomous level (SPEC F6): a freshly drafted job goes out without the
+   * operator only when its source, channel, score and guardrails all allow.
+   */
+  const sendOnItsOwn = async (jobId: string) => {
+    const job = getJob(jobId);
+    const source = sourcesRepo.get(job.sourceId);
+    const { autoSendThreshold, blocklist } = settings.getSettings();
+    // A source's own ceiling (clipped jobs, Upwork) caps what it asks for.
+    const asked = source?.autonomy ?? 'draft';
+    const sourceAutonomy = source?.maxAutonomy && AUTONOMY_LEVELS.indexOf(source.maxAutonomy) < AUTONOMY_LEVELS.indexOf(asked) ? source.maxAutonomy : asked;
+    await autoSend(job, { sourceAutonomy, autoSendThreshold, blocklist, paused: isPaused(), budgetStop: ai.budgetStop() }, {
+      send: (id) => (job.channel === 'email' ? sendByEmail(id, 'autonomous', applyPorts) : sendByAts(id, 'autonomous', applyPorts)),
+      note,
+    });
   };
 
   const getStatus = (): AppStatus => {

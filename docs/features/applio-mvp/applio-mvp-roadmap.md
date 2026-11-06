@@ -294,14 +294,15 @@ Wire real data behind the same `ApplioApi`. Each PR replaces part of the mock st
   - [x] tests against saved form fixtures
   - _decided:_ one generic reader and planner for all four; only identity, files, letter and matching saved answers are filled; demographics and checkboxes never; unconfirmed submits are never retried
 
-- [ ] **PR-20 — Autonomous sending**  Send without approval where source, channel and guardrails allow.
+- [x] **PR-20 — Autonomous sending**  Send without approval where source, channel and guardrails allow.
   - _branch:_ `feat/autonomous-send`
   - _PR title:_ `feat: send autonomously within guardrails`
   - _why:_ the Autonomous level (SPEC F6), only on email and ATS, above the auto-send score, under daily caps
   - _depends on:_ PR-19
-  - [ ] spec: `docs/features/autonomous-send/autonomous-send-spec.md`
-  - [ ] gate: source autonomy, channel ceiling, score, per-channel cap, blocklist, cross-source dedup
-  - [ ] tests for every gate
+  - [x] spec: `docs/features/autonomous-send/autonomous-send-spec.md`
+  - [x] gate: source autonomy, channel ceiling, score, per-channel cap, blocklist, cross-source dedup
+  - [x] tests for every gate
+  - _decided:_ held jobs stay drafted in Review with the reason; no extra first-run cap (the per-channel cap bounds it); hidden ATS window for autonomous runs
 
 - [ ] **PR-21 — Reply tracking and follow-ups**  IMAP watcher, status updates, follow-ups, interview prep.
   - _branch:_ `feat/reply-tracking`
