@@ -55,8 +55,8 @@ function UsageBody({ usage }: { usage: Usage }) {
         <Tile label="Avg tokens per application" value={formatTokens(summary.avgTokensPerApplication)} note={summary.avgNote} />
         <Tile
           label="Saved by answer bank"
-          value={formatTokens(summary.savedByAnswerBank.tokens)}
-          of="tokens"
+          value={`~${formatTokens(summary.savedByAnswerBank.tokens)}`}
+          of="tokens, estimated"
           note={`${summary.savedByAnswerBank.answersReused} answers reused`}
         />
       </div>

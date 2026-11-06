@@ -7,7 +7,7 @@ Small PRs, in order. Each phase is one reviewable PR. PRs 1, 3, 4, 6 and 7 are s
 (`feat/review-queue` → `docs/features/review-queue/review-queue-spec.md`). The spec ships in the
 same PR and is what the review checks against. See CLAUDE.md §6.
 
-**Where we are:** Stage 1 is on `main` (#15), and CI runs on every PR (#16). Stage 2: PR-8 to PR-12 are merged (#17–#19, #23–#25); fixes from the first manual run are in #20–#22. PR-13 (scheduler), PR-14 (AI engine) and PR-15 (MCP server) are in review as a stack. Next is PR-16 (scoring).
+**Where we are:** Stage 1 is on `main` (#15), and CI runs on every PR (#16). Stage 2: PR-8 to PR-12 are merged (#17–#19, #23–#25). PR-13 to PR-24 are in review as one stack, merged in order: #26 (13), #27 (14), #28 (15), #29 (16), #30 (17a), #31 (17b), #32 (18), #33 (19), #34 (20), #35 (21a), #36 (21b), #37 (22), #38 (23a), #39 (23b) and #40 (24). Every MVP PR is written; what's left is review, your manual checks, and merging.
 
 ## Stage 1 — Frontend (mock data)
 
@@ -355,12 +355,12 @@ Wire real data behind the same `ApplioApi`. Each PR replaces part of the mock st
   - [x] tests
   - _decided:_ `persist:platform` session the operator signs in to once; no submit step exists in the fill path; Connects read from the pasted post
 
-- [ ] **PR-24 — Real usage and mock removal**  Usage dashboard from recorded data; mock store out of main.
+- [x] **PR-24 — Real usage and mock removal**  Usage dashboard from recorded data; mock store out of main.
   - _branch:_ `feat/usage-live`
   - _PR title:_ `feat: report real usage and remove the mock backend`
   - _why:_ the free-limit guard must show real numbers (SPEC F10); nothing in the app should run on fake data
   - _depends on:_ PR-14, PR-22, PR-23b
-  - [ ] spec: `docs/features/usage-live/usage-live-spec.md`
-  - [ ] real `getUsage` (tiles, guard table, steps, 7-day chart)
-  - [ ] delete the mock spread from `src/main/backend.ts`; keep `src/shared/mock/` for browser dev and tests only
+  - [x] spec: `docs/features/usage-live/usage-live-spec.md`
+  - [x] real `getUsage` (tiles, guard table, steps, 7-day chart)
+  - [x] delete the mock spread from `src/main/backend.ts`; keep `src/shared/mock/` for browser dev and tests only
   - [ ] tests
