@@ -10,7 +10,7 @@ await server.listen();
 const url = server.resolvedUrls?.local[0];
 if (!url) throw new Error('Vite dev server did not report a URL');
 
-for (const mode of ['main', 'preload']) {
+for (const mode of ['main', 'preload', 'mcp']) {
   await build({ configFile: 'vite.electron.config.ts', mode, logLevel: 'warn' });
 }
 
