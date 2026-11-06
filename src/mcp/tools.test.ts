@@ -132,4 +132,12 @@ describe('MCP tools', () => {
     call('log_event', { jobId: inScope.id, message: 'Posting asks for a portfolio link' });
     expect(ports.logEvent).toHaveBeenCalledWith(inScope.id, 'Posting asks for a portfolio link');
   });
+
+  it("sets the draft's kind by Applio's rule, not by what Claude sent", () => {
+    const { call, ports } = setup();
+    const freelance = { ...inScope, employmentType: 'freelance' as const };
+    ports.job = (id) => (id === inScope.id ? freelance : undefined);
+    call('save_draft', { ...draftInput, kind: 'cover-letter' });
+    expect((vi.mocked(ports.saveDraft).mock.calls[0]![0] as Draft).kind).toBe('proposal');
+  });
 });

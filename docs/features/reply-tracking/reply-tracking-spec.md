@@ -15,6 +15,10 @@ Keep the application log current without manual work: detect replies and what th
 - Gmail IMAP, read-only, every 15 minutes on the scheduler tick, from the last UID read (30 days back the first time). New dependency: `imapflow`.
 - Only "Reply from <sender>: <first 200 characters>" is kept, on the timeline; unmatched mail is dropped (MNB-1, AC-3).
 
+## Found in review
+- A company name was matched inside longer words ("Metabase Team" read as Meta); names now match as whole words.
+- "Unfortunately" alone counted as a rejection, so "unfortunately that time doesn't work, can we reschedule?" would have closed the application. It now needs a refusal right after it.
+
 ## Known risks
 - Open question: AI classification of replies (costs tokens) vs keyword rules. Recommended: rules first, AI only when unsure.
 

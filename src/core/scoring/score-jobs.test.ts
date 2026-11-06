@@ -67,4 +67,12 @@ describe('scoreJobs', () => {
     expect(ports.ai).toHaveBeenCalledTimes(1);
     expect(result).toEqual({ scored: 0, toDraft: [], belowThreshold: 0, notScored: 20, stopped: "Today's Claude token budget is used up (150,000 of 150,000)." });
   });
+
+  it('notes the jobs a budget stop left unscored, with the reason', async () => {
+    const { ports } = setup(all(12, 80));
+    vi.mocked(ports.ai).mockRejectedValueOnce(new QuotaExceededError('Budget used up.'));
+    await scoreJobs(ids(12), { runId: 1, draftThreshold: 75 }, ports);
+    expect(vi.mocked(ports.note).mock.calls).toHaveLength(12);
+    expect(ports.note).toHaveBeenCalledWith('j12', 'Not scored: Budget used up.');
+  });
 });

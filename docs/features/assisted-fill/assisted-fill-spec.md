@@ -18,6 +18,14 @@ Optionally pre-fill platform and career-site forms in an Applio window with the 
 - Connects: read from the pasted Upwork post ("16 Connects"). If the post doesn't say, the handoff tells you to check the cost first. Upwork's API, which would know, isn't available to a personal tool yet (SPEC §6).
 - Settings now warns that platforms may restrict accounts that use automation.
 
+## Known risks
+- Platforms may restrict accounts that use automation; Settings warns about it, and filling is always started by you.
+- Platform forms that need clicks to reveal (LinkedIn Easy Apply's steps) may show no form; the fill then says to open the application step and try again.
+
+## Found in review
+- A job pasted from LinkedIn was stored without its link, so assisted fill had nothing to open and the handoff's Open button opened an empty link. The platform link from the pasted text is now kept as the job's link.
+- The Connects fallback matched any number near "Connect"; it now needs "Connects" and at most 3 digits.
+
 ## Test plan
 - AC-1: `backend.test.ts` › fills only when on, the job stays drafted, the note is logged; `handoff-page.test.tsx` › "fills the form in Applio when assisted fill is on…"; the form reading and planning are PR-19's fixture tests. The live window is a manual check.
 - AC-2: `handoff-page.test.tsx` › "stays a manual handoff when assisted fill is off"; `backend.test.ts` refuses when off.

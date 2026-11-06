@@ -695,6 +695,8 @@ describe('createBackend discovery', () => {
     const preview = await api.analyzeJob({ kind: 'text', value: 'Senior TypeScript Engineer at Brightline. https://www.linkedin.com/jobs/view/123' });
     expect(preview).toMatchObject({ channel: 'platform', sourceName: 'clipped from LinkedIn', maxAutonomy: 'draft' });
     expect(pages).toEqual([]);
+    // The link stays with the job, so the handoff can open it and assisted fill can fill it.
+    expect(await api.addJob(preview)).toMatchObject({ url: 'https://www.linkedin.com/jobs/view/123', applyUrl: 'https://www.linkedin.com/jobs/view/123', platform: 'LinkedIn' });
   });
 
   it('refuses to add a job Applio already has, naming it', async () => {
@@ -766,5 +768,14 @@ describe('createBackend discovery', () => {
     for (const file of readdirSync(__dirname).filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))) {
       expect(readFileSync(join(__dirname, file), 'utf8'), file).not.toMatch(/shared\/mock/);
     }
+  });
+
+  it('keeps a sent application exactly as sent: its letter can no longer be edited', async () => {
+    const { api, job } = await emailJob();
+    await api.approveDraft(job.id);
+    const sentMd = readFileSync(join(job.folderPath!, 'sent.md'), 'utf8');
+    await expect(api.updateCoverLetter(job.id, 'A different letter')).rejects.toThrow('This application was already sent, so its letter stays as sent.');
+    expect((await api.getDraft(job.id))?.coverLetter).toBe('Dear team');
+    expect(readFileSync(join(job.folderPath!, 'sent.md'), 'utf8')).toBe(sentMd);
   });
 });

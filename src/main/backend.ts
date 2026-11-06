@@ -195,7 +195,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       [letterName(draft)]: await letterFile(job, draft),
       'job.md': jobMarkdown(job),
     };
-    jobs.update(jobId, { folderPath: writeApplication(outputRoot(), folderFor(job, new Date()), files) });
+    jobs.update(jobId, { folderPath: writeApplication(outputRoot(), folderFor(job, new Date()), files, jobId) });
   };
 
   /** The job's folder on disk, re-linked by job id if it was renamed or moved under the output folder. */
@@ -229,9 +229,11 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
   // Add job (SPEC F2 Clip): analyses wait here, by preview id, until the operator adds one.
   const analyses = new Map<string, AnalyzedJob>();
   const PLATFORM_NAMES: [RegExp, string][] = [[/linkedin\./, 'LinkedIn'], [/indeed\./, 'Indeed'], [/jobstreet\./, 'JobStreet'], [/upwork\./, 'Upwork'], [/facebook\./, 'Facebook']];
+  /** The first platform link in a pasted post, kept so the handoff can open it and assisted fill can fill it. */
   const platformIn = (text: string) => {
     const url = text.match(/https:\/\/[^\s<>"]+/g)?.find(isPlatformUrl);
-    return url ? PLATFORM_NAMES.find(([re]) => re.test(url))?.[1] : undefined;
+    const name = url ? PLATFORM_NAMES.find(([re]) => re.test(url))?.[1] : undefined;
+    return url && name ? { name, url } : undefined;
   };
 
   const runDiscovery = () =>
@@ -458,6 +460,8 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     updateCoverLetter: async (jobId, coverLetter) => {
       const draft = drafts.get(jobId);
       if (!draft) throw new Error(`No draft for job ${jobId}`);
+      // What went out stays as it went out (email-apply MNB-3): the folder must keep matching sent.md.
+      if (!['found', 'scored', 'drafted', 'approved'].includes(getJob(jobId).status)) throw new Error('This application was already sent, so its letter stays as sent.');
       const next = { ...draft, coverLetter, edited: true };
       drafts.save(next);
       // What's on disk must match what gets sent, so the letter file follows the edit.
@@ -500,7 +504,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       // A platform link is never opened (MNB-1); its page is refused before any request.
       const text = input.kind === 'link' ? await fetchPublicPage(input.value, pageFetch) : input.value;
       const platform = input.kind === 'text' ? platformIn(text) : undefined;
-      const sourceName = input.kind === 'link' ? `from ${new URL(input.value).hostname}` : platform ? `clipped from ${platform}` : 'pasted by you';
+      const sourceName = input.kind === 'link' ? `from ${new URL(input.value).hostname}` : platform ? `clipped from ${platform.name}` : 'pasted by you';
       const { preview, job } = await analyzePost({ text, sourceName, ...(platform ? { platform } : {}) }, {
         ai: (request) => ai.run(request),
         factIds: () => new Set(profile.getProfile().facts.map((f) => f.id)),

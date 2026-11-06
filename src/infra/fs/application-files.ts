@@ -3,12 +3,16 @@ import { join, relative, resolve, sep } from 'node:path';
 import { jobIdIn } from '../../core/generation/application-folder';
 
 /**
- * Writes an application's files into `<root>/<folder>` (SPEC F8), creating it.
+ * Writes an application's files into `<root>/<folder>` (SPEC F8), creating it. If that
+ * folder already belongs to another job, the short job id is added to the name.
  * @returns The folder's absolute path.
  * @throws when `folder` would land outside `root`; names are sanitized upstream, this is the backstop.
  */
-export function writeApplication(root: string, folder: string, files: Record<string, string | Uint8Array>): string {
-  const dir = resolve(root, folder);
+export function writeApplication(root: string, folder: string, files: Record<string, string | Uint8Array>, jobId: string): string {
+  // A folder of the same name that belongs to another job is never written into: this job gets its own.
+  const taken = (d: string) => existsSync(join(d, 'job.md')) && jobIdIn(readFileSync(join(d, 'job.md'), 'utf8')) !== jobId;
+  const named = resolve(root, folder);
+  const dir = taken(named) ? `${named} · ${jobId.slice(0, 8)}` : named;
   const rel = relative(resolve(root), dir);
   if (rel.startsWith('..') || rel.startsWith(sep) || rel === '') throw new Error(`${folder} is outside the output folder`);
   mkdirSync(dir, { recursive: true });
