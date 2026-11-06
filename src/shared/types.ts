@@ -300,6 +300,8 @@ export interface AppStatus {
 
 /** What "Add job" learned from a pasted post or link, before it joins the queue. */
 export interface JobPreview {
+  /** Names the analysis held in main; Add saves exactly that, not what the page sends back. */
+  previewId: string;
   company: string;
   title: string;
   sourceName: string;

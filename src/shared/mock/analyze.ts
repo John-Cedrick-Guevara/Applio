@@ -1,3 +1,4 @@
+import { describeRoute } from '../apply-route';
 import type { JobPreview } from '../types';
 
 /**
@@ -9,6 +10,7 @@ export function analyze(input: string): JobPreview {
   const email = input.match(/[\w.+-]+@[\w-]+\.[\w.]+/)?.[0];
   const sourceName = s.includes('linkedin') ? 'clipped from LinkedIn' : s.includes('facebook') ? 'pasted from Facebook' : s.includes('upwork') ? 'pasted from Upwork' : 'pasted by you';
   const base = {
+    previewId: `preview-${s.length}`,
     company: 'Brightline Studio',
     title: 'Senior TypeScript Engineer',
     sourceName,
@@ -19,13 +21,13 @@ export function analyze(input: string): JobPreview {
   };
 
   if (/linkedin|indeed|jobstreet|upwork/.test(s)) {
-    return { ...base, channel: 'platform', channelLabel: 'Platform apply', route: 'Manual handoff (assisted fill is off)', applyTarget: 'Platform apply', maxAutonomy: 'draft' };
+    return { ...base, channel: 'platform', ...describeRoute('platform', 'Platform apply'), applyTarget: 'Platform apply' };
   }
   if (/greenhouse|lever\.co|ashbyhq|workable/.test(s)) {
-    return { ...base, channel: 'ats', channelLabel: 'Standard ATS form', route: 'Fills and submits in Applio’s own window', applyTarget: 'ATS form', maxAutonomy: 'autonomous' };
+    return { ...base, channel: 'ats', ...describeRoute('ats', 'ATS form'), applyTarget: 'ATS form' };
   }
   if (email) {
-    return { ...base, channel: 'email', channelLabel: 'Email', route: `Sends from your Gmail to ${email}`, applyTarget: email, maxAutonomy: 'autonomous' };
+    return { ...base, channel: 'email', ...describeRoute('email', email), applyTarget: email };
   }
-  return { ...base, channel: null, channelLabel: 'Not found in the post', route: 'Manual: reply to the post or message the poster yourself', applyTarget: 'Manual', maxAutonomy: 'draft' };
+  return { ...base, channel: null, ...describeRoute(null, 'Manual'), applyTarget: 'Manual' };
 }
