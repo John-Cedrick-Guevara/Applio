@@ -10,6 +10,7 @@ export interface SettingsRepo {
   get(key: string): unknown;
   set(key: string, value: unknown): void;
   all(): Record<string, unknown>;
+  delete(key: string): void;
 }
 
 /** SQLite-backed settings, one JSON value per key. */
@@ -23,6 +24,7 @@ export function createSettingsRepo(db: DatabaseSync): SettingsRepo {
       return row ? json<unknown>(row.value) : undefined;
     },
     set: (key, value) => void upsert.run(key, JSON.stringify(value)),
+    delete: (key) => void db.prepare('DELETE FROM settings WHERE key = ?').run(key),
     all: () => Object.fromEntries(db.prepare('SELECT key, value FROM settings').all().map((r) => [String(r.key), json<unknown>(r.value)])),
   };
 }

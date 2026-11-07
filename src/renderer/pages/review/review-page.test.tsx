@@ -145,4 +145,32 @@ describe('ReviewPage', () => {
     expect(screen.getByRole('list', { name: 'Keywords you can claim' })).toHaveTextContent('PostgreSQL');
     expect(screen.getByRole('list', { name: 'Keyword gaps' })).toHaveTextContent('Kafka');
   });
+
+  it('lists the jobs waiting on answers in the queue', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    vi.spyOn(api, 'listQuestions').mockResolvedValue([{ jobId: 'j5', questions: ['Have you worked with healthcare or HIPAA-regulated data?', 'Can you start within two weeks?'], askedAt: '2026-11-07T08:00:00.000Z' }]);
+    renderWithApp(<ReviewPage params={{}} />, api);
+    const queue = await screen.findByRole('region', { name: 'Queue' });
+    const asking = within(queue).getByRole('list', { name: 'Needs your answers' });
+    expect(asking).toHaveTextContent('Senior Software Engineer, Platform');
+  });
+
+  it('asks the operator each question and drafts with the answers', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    vi.spyOn(api, 'listQuestions').mockResolvedValue([{ jobId: 'j5', questions: ['Have you worked with healthcare or HIPAA-regulated data?', 'Can you start within two weeks?'], askedAt: '2026-11-07T08:00:00.000Z' }]);
+    const answer = vi.spyOn(api, 'answerQuestions').mockResolvedValue({ ...(await api.getJob('j5')), status: 'drafted' });
+    renderWithApp(<ReviewPage params={{ id: 'j5' }} />, api);
+    const panel = await screen.findByRole('region', { name: 'Questions from Claude' });
+    const submit = within(panel).getByRole('button', { name: 'Answer and draft' });
+    expect(submit).toBeDisabled();
+    await userEvent.type(within(panel).getByLabelText('Have you worked with healthcare or HIPAA-regulated data?'), 'Yes, patient intake forms at Acme.');
+    await userEvent.click(within(panel).getAllByRole('checkbox', { name: 'Save to fact bank' })[0]!);
+    await userEvent.selectOptions(within(panel).getAllByLabelText('Section')[0]!, 'Projects');
+    await userEvent.type(within(panel).getByLabelText('Can you start within two weeks?'), 'Yes.');
+    await userEvent.click(submit);
+    expect(answer).toHaveBeenCalledWith('j5', [
+      { question: 'Have you worked with healthcare or HIPAA-regulated data?', answer: 'Yes, patient intake forms at Acme.', saveTo: 'Projects' },
+      { question: 'Can you start within two weeks?', answer: 'Yes.' },
+    ]);
+  });
 });

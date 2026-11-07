@@ -1,4 +1,4 @@
-import type { Autonomy, Draft, Job } from '../../shared/types';
+import type { Autonomy, Draft, Job, QuestionAnswer } from '../../shared/types';
 import { QuotaExceededError, type AiRequest } from '../ai/ai-service';
 import { budgetTokens, type AiReply } from '../ai/engine';
 import { AutomationPausedError } from '../jobs/scheduler';
@@ -23,7 +23,8 @@ I apply broadly because applications are free. Never tell me to skip a job.
 # Process
 1. Job analysis: find the post's top keywords and skills (hard skills, tools, domain terms). Mark which I can honestly claim, each with the fact that proves it, and which are gaps.
 2. Pick the best 2–3 experiences/projects to feature, and order bullets by relevance to this post.
-3. Call save_draft once for the job.
+3. Questions: only if something you need is missing, unclear, or conflicts with my facts (project names, stacks, dates, scope), ask me before writing: call save_draft with "questions" instead of a draft. Max 5 questions, grouped in one call. Never ask for passwords, keys, or other secrets. If my answers are in the prompt, treat them as the new truth and draft.
+4. Otherwise call save_draft once for the job.
 
 # Resume (locked format; Applio lays it out, you choose the content)
 - headline: a short title line matching the target role (e.g. "Full-Stack Developer", "AI Engineer"). No tech stack list.
@@ -54,6 +55,10 @@ export interface DraftPorts {
   /** The guarded AI call (budget, pause, usage). */
   ai: (request: AiRequest) => Promise<AiReply>;
   hasDraft: (jobId: string) => boolean;
+  /** True while Claude's questions for the job wait on the operator. */
+  hasQuestions: (jobId: string) => boolean;
+  /** The operator's answers to Claude's questions, for drafting again; empty when there are none. */
+  answers: (jobId: string) => readonly Pick<QuestionAnswer, 'question' | 'answer'>[];
   job: (jobId: string) => Pick<Job, 'employmentType' | 'platform' | 'sourceId'> | undefined;
   autonomy: (sourceId: string) => Autonomy;
   note: (jobId: string, text: string) => void;
@@ -68,6 +73,8 @@ export interface DraftResult {
   notDrafted: number;
   /** Strong matches from Notify-only sources: surfaced, never drafted (SPEC F6). */
   notifyOnly: number;
+  /** Jobs waiting on the operator's answers to Claude's questions. */
+  asked: number;
   stopped?: string;
 }
 
@@ -86,11 +93,16 @@ export async function draftJobs(
   { runId, trigger = 'scheduled' }: { runId?: number; trigger?: AiRequest['trigger'] },
   ports: DraftPorts,
 ): Promise<DraftResult> {
-  const result: DraftResult = { drafted: 0, notDrafted: 0, notifyOnly: 0 };
+  const result: DraftResult = { drafted: 0, notDrafted: 0, notifyOnly: 0, asked: 0 };
 
   for (const id of jobIds) {
     const job = ports.job(id);
     if (!job || ports.hasDraft(id)) continue;
+    // A job waiting on answers is never drafted, so nothing can be sent before the operator replies.
+    if (ports.hasQuestions(id)) {
+      result.asked++;
+      continue;
+    }
     if (ports.autonomy(job.sourceId) === 'notify') {
       result.notifyOnly++;
       continue;
@@ -101,10 +113,13 @@ export async function draftJobs(
     }
 
     let failure = "Claude didn't save a draft that passed the fact checks.";
-    for (let attempt = 0; attempt < 2 && !ports.hasDraft(id) && !result.stopped; attempt++) {
+    // The operator's own answers, so they're trusted, unlike the posting.
+    const answered = ports.answers(id).map((a) => `\nQ: ${a.question}\nA: ${a.answer}`).join('');
+    const prompt = `Draft a ${kindOf(job)} application for job ${id}.${answered ? `\nThe operator answered your questions; use these as facts for this job:${answered}` : ''}`;
+    for (let attempt = 0; attempt < 2 && !ports.hasDraft(id) && !ports.hasQuestions(id) && !result.stopped; attempt++) {
       try {
         const reply = await ports.ai({
-          step: 'tailor', system: DRAFT_SYSTEM, prompt: `Draft a ${kindOf(job)} application for job ${id}.`, jobIds: [id],
+          step: 'tailor', system: DRAFT_SYSTEM, prompt, jobIds: [id],
           ...(runId !== undefined ? { runId } : {}), trigger,
         });
         ports.addTokens(id, budgetTokens(reply));
@@ -118,6 +133,7 @@ export async function draftJobs(
       result.drafted++;
       await ports.onDrafted(id);
     }
+    else if (ports.hasQuestions(id)) result.asked++;
     else {
       result.notDrafted++;
       if (!result.stopped) ports.note(id, `Not drafted: ${failure}`);

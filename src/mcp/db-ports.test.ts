@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { createJobsRepo, createProfileRepo, openDatabase } from '../infra/db';
+import { createJobsRepo, createProfileRepo, createQuestionsRepo, createSettingsRepo, openDatabase } from '../infra/db';
 import { seedJobs } from '../shared/mock/fixtures';
 import type { Job } from '../shared/types';
 import { createToolPorts } from './db-ports';
@@ -49,5 +49,12 @@ describe('tools over the Applio database', () => {
 
   it('read the fact bank from the database', () => {
     expect(JSON.parse(setup().call('get_profile')).facts).toEqual([{ id: 'f1', group: 'Acme', text: 'Cut API latency 40%' }]);
+  });
+
+  it('store questions for the job and note them on its timeline', () => {
+    const { call, db, jobs, job } = setup();
+    call('save_draft', { jobId: job.id, questions: ['Can you start in December?'] });
+    expect(createQuestionsRepo(createSettingsRepo(db)).get(job.id)).toMatchObject({ questions: ['Can you start in December?'] });
+    expect(jobs.get(job.id)?.history.at(-1)?.note).toBe('Claude asked 1 question before drafting');
   });
 });

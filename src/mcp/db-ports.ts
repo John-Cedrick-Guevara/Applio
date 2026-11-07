@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import { createProfileService } from '../core/profile/profile-service';
-import { createDraftsRepo, createJobsRepo, createProfileRepo, createSettingsRepo, transaction } from '../infra/db';
+import { createDraftsRepo, createJobsRepo, createProfileRepo, createQuestionsRepo, createSettingsRepo, transaction } from '../infra/db';
 import type { JobStatus } from '../shared/types';
 import type { ToolPorts } from './tools';
 
@@ -41,6 +41,15 @@ export function createToolPorts(db: DatabaseSync, jobIds: readonly string[], now
         jobs.update(draft.jobId, { factsUsed: cited.size });
         advance(draft.jobId, ['found', 'scored'], 'drafted');
       }),
+    saveQuestions: (id, list) => {
+      const at = now().toISOString();
+      transaction(db, () => {
+        createQuestionsRepo(createSettingsRepo(db)).save(id, list, at);
+        const job = jobs.get(id);
+        // A timeline note, which also tells open pages the job changed.
+        if (job) jobs.transition(id, { status: job.status, at, note: `Claude asked ${list.length} question${list.length === 1 ? '' : 's'} before drafting` });
+      });
+    },
     logEvent: (id, note) => {
       const job = jobs.get(id);
       if (job) jobs.transition(id, { status: job.status, at: now().toISOString(), note });

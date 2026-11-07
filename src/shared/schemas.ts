@@ -128,6 +128,11 @@ export const API_ARGS = {
   saveAnswer: z.tuple([z.strictObject({ id: id.optional(), question: z.string().min(1, "can't be empty").max(1000, 'is too long'), answer: z.string().min(1, "can't be empty").max(10_000, 'is too long') })]),
   deleteAnswer: z.tuple([id]),
   savePreferences: z.tuple([PreferencesSchema]),
+  listQuestions: none,
+  answerQuestions: z.tuple([id, z.array(z.strictObject({
+    question: z.string().min(1).max(300, 'is too long'), answer: z.string().trim().min(1, "can't be empty").max(2000, 'is too long'),
+    saveTo: short.min(1).optional(),
+  })).min(1).max(5)]),
   saveContact: z.tuple([z.strictObject({
     phone: z.string().max(60, 'is too long'), location: short, education: short, notes: z.string().max(4000, 'is too long'),
     links: z.array(z.strictObject({ label: z.string().max(60, 'is too long'), url: webUrl })).max(10, 'has too many links (10 max)'),

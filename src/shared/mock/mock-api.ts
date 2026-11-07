@@ -2,7 +2,7 @@ import type { ApplioApi } from '../api';
 import { matchesFilter } from '../job-filter';
 import { capAutonomy } from '../autonomy';
 import { nextStatuses } from '../status';
-import type { AppStatus, Job, JobStatus, SecretKey } from '../types';
+import type { AppStatus, Job, JobStatus, OpenQuestions, SecretKey } from '../types';
 import {
   seedLastRun,
   seedDrafts,
@@ -34,6 +34,7 @@ export function createMockApi({ latencyMs = 250, now = () => new Date() }: MockO
   const sources = seedSources(start);
   let settings = seedSettings();
   let paused = false;
+  let openQuestions: OpenQuestions[] = [];
   let lastRun = seedLastRun(start);
   const secrets = new Map<SecretKey, string>();
   let nextId = 1000;
@@ -238,6 +239,18 @@ export function createMockApi({ latencyMs = 250, now = () => new Date() }: MockO
       }),
 
     savePreferences: (preferences) => run(() => (profile.preferences = preferences)),
+
+    listQuestions: () => respond(openQuestions),
+
+    answerQuestions: (jobId, answers) =>
+      run(() => {
+        if (!openQuestions.some((q) => q.jobId === jobId)) throw new Error('There are no open questions for this job.');
+        for (const a of answers) {
+          if (a.saveTo) profile.facts.push({ id: `f${profile.facts.length + 100}`, group: a.saveTo, text: a.answer, tags: [], timesUsed: 0 });
+        }
+        openQuestions = openQuestions.filter((q) => q.jobId !== jobId);
+        return transition(findJob(jobId), 'drafted', `You answered ${answers.length} questions`);
+      }),
 
     saveContact: (contact) => run(() => (profile.contact = contact)),
 
