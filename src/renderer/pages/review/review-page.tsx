@@ -7,13 +7,14 @@ import { useAsync } from '../../hooks/use-async';
 import { useJobsVersion } from '../../hooks/use-jobs-version';
 import type { RouteParams } from '../../lib/router';
 import { DraftPanel } from './draft-panel';
+import { QuestionsPanel } from './questions-panel';
 import { ReviewHeader } from './review-header';
 import { ReviewQueue } from './review-queue';
 import './review.css';
 
 /** Everything Review needs, loaded together so the split view renders in one pass. */
 async function loadReview(api: ReturnType<typeof useApi>) {
-  const [drafted, scored, found, settings, profile, sources, status] = await Promise.all([
+  const [drafted, scored, found, settings, profile, sources, status, openQuestions] = await Promise.all([
     api.listJobs({ statuses: ['drafted'] }),
     api.listJobs({ statuses: ['scored'] }),
     api.listJobs({ statuses: ['found'] }),
@@ -21,12 +22,18 @@ async function loadReview(api: ReturnType<typeof useApi>) {
     api.getProfile(),
     api.listSources(),
     api.getStatus(),
+    api.listQuestions(),
   ]);
+  const questions = new Map(openQuestions.map((q) => [q.jobId, q.questions]));
   return {
     queue: [...drafted].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
     // Unscored jobs and strong matches whose draft failed: the next run retries both.
-    waiting: [...scored.filter((j) => (j.score ?? 0) >= settings.draftThreshold), ...found],
-    below: scored.filter((j) => (j.score ?? 0) < settings.draftThreshold).sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
+    waiting: [...scored.filter((j) => (j.score ?? 0) >= settings.draftThreshold && !questions.has(j.id)), ...found],
+    // Claude asked before drafting these; they wait for the operator (SPEC F4).
+    asking: scored.filter((j) => questions.has(j.id)),
+    questions,
+    sections: profile.factGroups.map((g) => g.name),
+    below: scored.filter((j) => (j.score ?? 0) < settings.draftThreshold && !questions.has(j.id)).sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
     thresholds: { draft: settings.draftThreshold, auto: settings.autoSendThreshold },
     owner: { name: settings.fullName, email: settings.gmailAddress, contact: profile.contact, groups: profile.factGroups },
     autonomyBySource: Object.fromEntries(sources.map((s) => [s.id, s.autonomy])) as Record<string, Autonomy>,
@@ -82,8 +89,16 @@ function ReviewLayout({ data, selectedId, onJobChange, onStatusChange, onRunComp
     <>
       <ReviewHeader status={data.status} onStatusChange={onStatusChange} onRunComplete={onRunComplete} />
       <div className="split">
-        <ReviewQueue jobs={data.queue} currentId={currentId} below={data.below} waiting={data.waiting} draftThreshold={data.thresholds.draft} />
-        {currentId ? (
+        <ReviewQueue jobs={data.queue} currentId={currentId} below={data.below} waiting={data.waiting} asking={data.asking} draftThreshold={data.thresholds.draft} />
+        {currentId && data.questions.has(currentId) ? (
+          <QuestionsPanel
+            key={currentId}
+            job={data.asking.find((j) => j.id === currentId)!}
+            questions={data.questions.get(currentId)!}
+            sections={data.sections}
+            onAnswered={onRunComplete}
+          />
+        ) : currentId ? (
           <DraftPanel
             key={currentId}
             jobId={currentId}

@@ -44,7 +44,8 @@ export function pendingReason(job: Pick<Job, 'status' | 'history'>): string {
 export function runResult(run: RunSummary): string {
   if (run.found === 0 && run.atLimit) return "Nothing was fetched: every source has used today's polls. They poll again tomorrow.";
   if (run.passedFilters === 0) return 'Run finished: nothing new passed your filters.';
-  return `Run finished: ${run.passedFilters} job${run.passedFilters === 1 ? '' : 's'} passed your filters, ${run.drafted} drafted.`;
+  const asked = run.asked ? ` ${run.asked} need${run.asked === 1 ? 's' : ''} your answers in Review.` : '';
+  return `Run finished: ${run.passedFilters} job${run.passedFilters === 1 ? '' : 's'} passed your filters, ${run.drafted} drafted.${asked}`;
 }
 
 /** One-line summary of the last discovery run for the Review header. */

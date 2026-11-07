@@ -11,11 +11,13 @@ interface ReviewQueueProps {
   below: Job[];
   /** Jobs not scored yet, or strong matches whose draft failed; the next run retries them. */
   waiting: Job[];
+  /** Jobs where Claude asked questions before drafting. */
+  asking: Job[];
   draftThreshold: number;
 }
 
 /** "Waiting on you": one row per draft, linking to it. Manual-handoff channels get an amber chip. */
-export function ReviewQueue({ jobs, currentId, below, waiting, draftThreshold }: ReviewQueueProps) {
+export function ReviewQueue({ jobs, currentId, below, waiting, asking, draftThreshold }: ReviewQueueProps) {
   const [showBelow, setShowBelow] = useState(false);
   const [showWaiting, setShowWaiting] = useState(false);
   return (
@@ -24,6 +26,27 @@ export function ReviewQueue({ jobs, currentId, below, waiting, draftThreshold }:
         <h2 className="queue-title">Waiting on you</h2>
         <span className="cell-sub">Sorted by match</span>
       </div>
+      {asking.length > 0 ? (
+        <>
+          <div className="queue-group-label">Needs your answers</div>
+          <ul className="list-plain" aria-label="Needs your answers">
+            {asking.map((job) => (
+              <li key={job.id}>
+                <a href={`#/review/${job.id}`} className="queue-row" aria-current={job.id === currentId ? 'true' : undefined}>
+                  <div className="queue-row-top">
+                    <div className="queue-row-text">
+                      <div className="queue-role">{job.title}</div>
+                      <div className="cell-sub">{job.company} · {job.sourceName}</div>
+                    </div>
+                    <span className="queue-score mono">{job.score}</span>
+                  </div>
+                  <div className="queue-row-meta"><span className="badge badge-warning">Claude has questions</span></div>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
       <ul className="list-plain">
         {jobs.map((job) => (
           <li key={job.id}>

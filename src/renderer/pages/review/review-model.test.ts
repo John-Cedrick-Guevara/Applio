@@ -82,6 +82,10 @@ describe('runResult', () => {
   it('says what a run produced', () => {
     expect(runResult({ at, found: 62, newAfterDedup: 47, passedFilters: 9, drafted: 4 })).toBe('Run finished: 9 jobs passed your filters, 4 drafted.');
   });
+  it('counts the jobs waiting on the operator\'s answers', () => {
+    expect(runResult({ at, found: 62, newAfterDedup: 47, passedFilters: 9, drafted: 3, asked: 1 })).toBe('Run finished: 9 jobs passed your filters, 3 drafted. 1 needs your answers in Review.');
+  });
+
   it('says plainly when nothing passed', () => {
     expect(runResult({ at, found: 62, newAfterDedup: 47, passedFilters: 0, drafted: 0 })).toBe('Run finished: nothing new passed your filters.');
   });
