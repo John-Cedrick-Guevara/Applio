@@ -60,7 +60,7 @@ function ProfileBody({ profile, onChange }: { profile: Profile; onChange: (patch
 
       <ContactCard contact={profile.contact} onSaved={(contact) => onChange({ contact })} />
 
-      {templateOpen ? <TemplatePreview /> : null}
+      {templateOpen ? <TemplatePreview profile={profile} /> : null}
 
       {imported ? (
         <ResumeSuggestions

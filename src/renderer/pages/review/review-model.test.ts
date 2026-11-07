@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Job } from '../../../shared/types';
-import { modeLabel, pendingReason, primaryAction, queueState, runLine, runResult } from './review-model';
+import { effortLevel, modeLabel, pendingReason, primaryAction, queueState, runLine, runResult } from './review-model';
 
 const job = (over: Partial<Job>): Job => ({
   id: 'x', sourceId: 's', sourceName: 'S', company: 'C', title: 'T', url: '', location: '', employmentType: 'full-time',
@@ -87,5 +87,14 @@ describe('runResult', () => {
   });
   it('says when the sources had no polls left', () => {
     expect(runResult({ at, found: 0, newAfterDedup: 0, passedFilters: 0, drafted: 0, atLimit: 8 })).toBe("Nothing was fetched: every source has used today's polls. They poll again tomorrow.");
+  });
+});
+
+describe('effortLevel', () => {
+  it('maps the match score to how much effort the application deserves', () => {
+    expect(effortLevel(49)).toBe('Quick');
+    expect(effortLevel(50)).toBe('Medium');
+    expect(effortLevel(74)).toBe('Medium');
+    expect(effortLevel(75)).toBe('High');
   });
 });

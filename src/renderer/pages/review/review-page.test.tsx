@@ -134,4 +134,15 @@ describe('ReviewPage', () => {
     const link = within(queue).getByRole('link', { name: /Frontend Developer/ });
     expect(link).toHaveTextContent('Not scored yet');
   });
+
+  it('shows the effort level and the keywords the operator can claim, with gaps', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const [first] = await api.listJobs({ statuses: ['drafted'] });
+    const draft = (await api.getDraft(first!.id))!;
+    vi.spyOn(api, 'getDraft').mockResolvedValue({ ...draft, keywords: { claimed: [{ keyword: 'PostgreSQL', factId: 'f1' }], gaps: ['Kafka'] } });
+    renderWithApp(<ReviewPage params={{ id: first!.id }} />, api);
+    expect(await screen.findByText(/Effort: (High|Medium|Quick)/)).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Keywords you can claim' })).toHaveTextContent('PostgreSQL');
+    expect(screen.getByRole('list', { name: 'Keyword gaps' })).toHaveTextContent('Kafka');
+  });
 });

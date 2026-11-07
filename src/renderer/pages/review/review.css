@@ -272,3 +272,14 @@
 .draft-panel {
   overflow: clip;
 }
+
+.draft-keywords {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0 var(--space-6) var(--space-4);
+}
+
+.tag-warning {
+  background: var(--warning-soft);
+  color: var(--warning-text);
+}
