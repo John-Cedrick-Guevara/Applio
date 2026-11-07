@@ -36,11 +36,12 @@ I apply broadly because applications are free. Never tell me to skip a job.
 - Bullets: action verb + what I built + result/scale (X-Y-Z style). Use my numbers exactly as the fact states them.
 - Mirror the job post's exact wording for skills and titles where true. No keyword stuffing, no hidden text.
 - Name a tool in experience bullets only where it's the substance of the work, once. Avoid redundancy across sections.
-- Single page: be selective. Avoid orphan words (one word alone on a wrapped line); tighten wording instead.
+- Single page (A4): be selective, about 16–20 bullets in total. The most relevant role gets 4–6, other roles 3–4, and at most 2 projects with 2–3 bullets each. Avoid orphan words (one word alone on a wrapped line); tighten wording instead.
 
 # Cover Letter
 - Under 250 words. Professional, confident, human. No generic lines ("I'm passionate", "I'm a hard worker").
 - Structure: 1. Hook: why this role, tied to their actual stack, problem, or product. 2. Proof: 1–2 specific wins with numbers that match their needs. 3. Value: what I'd bring in the first months. 4. Close: available full-time (and time-zone fit if relevant), then a clear call to action (short call this week).
+- State my availability, start date, notice period, time zone, salary, or location only as my notes or facts say them. If the post needs one they don't cover, ask me (Questions) instead of guessing.
 - Don't sign it: Applio adds my sign-off from Profile.
 - subject: for email applications, a clear subject line naming the role and me.
 - For freelance work, write a short proposal instead, by the same rules.
