@@ -182,7 +182,16 @@ export function seedProfile(now: Date): Profile {
   const earlier = '[Earlier Company] — Software Engineer';
   return {
     referenceResume: { fileName: 'reference-resume.pdf', uploadedAt: hoursAgo(now, 24 * 8), factsFound: 38 },
-    factGroups: [{ name: prev, dates: '2022 – now' }, { name: earlier, dates: '2020 – 2022' }, { name: 'Projects' }],
+    factGroups: [
+      { name: prev, kind: 'experience', dates: '2022 – now', context: 'B2B billing platform; payments for 400+ businesses.' },
+      { name: earlier, kind: 'experience', dates: '2020 – 2022' },
+      { name: 'Projects', kind: 'project' },
+    ],
+    contact: {
+      phone: '+1 555 0100', location: 'Remote · UTC−5 to UTC+2',
+      links: [{ label: 'Portfolio', url: 'https://example.com' }, { label: 'GitHub', url: 'https://github.com/example' }],
+      education: 'BS Computer Science', notes: '',
+    },
     facts: [
       { id: 'f1', group: prev, text: 'Redesigned the invoicing schema in PostgreSQL; p95 query time dropped from 900 ms to 120 ms.', tags: ['PostgreSQL', 'metric'], timesUsed: 14 },
       { id: 'f2', group: prev, text: 'Built the usage-metering pipeline on SQS and ECS with idempotent consumers.', tags: ['AWS', 'Node.js'], timesUsed: 11 },

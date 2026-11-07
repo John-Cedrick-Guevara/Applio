@@ -199,4 +199,14 @@ export const MIGRATIONS: readonly Migration[] = [
       ALTER TABLE usage_records ADD COLUMN cache_read_tokens INTEGER NOT NULL DEFAULT 0;
     `,
   },
+  {
+    version: 9,
+    name: 'fact group details',
+    sql: `
+      -- What each section is, its context line and link, so the résumé can lay it out.
+      ALTER TABLE fact_groups ADD COLUMN kind TEXT;
+      ALTER TABLE fact_groups ADD COLUMN context TEXT;
+      ALTER TABLE fact_groups ADD COLUMN link TEXT;
+    `,
+  },
 ];

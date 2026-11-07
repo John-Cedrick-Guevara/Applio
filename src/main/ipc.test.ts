@@ -38,6 +38,13 @@ describe('IPC handlers', () => {
     expect(log).toHaveBeenCalledWith('[ipc] rejected saveFact: invalid arguments', [{ path: 'text', message: "can't be empty" }]);
   });
 
+  it('accepts only web links in contact details', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const contact = { phone: '', location: '', education: '', notes: '' };
+    await expect(call('saveContact', { ...contact, links: [{ label: 'Site', url: 'javascript:alert(1)' }] })).rejects.toThrow();
+    await expect(call('saveFactGroup', { name: 'X', link: 'file:///etc/passwd' })).rejects.toThrow();
+  });
+
   it('never logs a secret, even when its call is rejected', async () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     const secret = 'sk-ant-do-not-log-me';

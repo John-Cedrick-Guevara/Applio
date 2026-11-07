@@ -1,7 +1,7 @@
 import type { ApplioApi } from '../../shared/api';
-import { DEFAULT_PREFERENCES } from '../../shared/defaults';
+import { DEFAULT_PREFERENCES, EMPTY_CONTACT } from '../../shared/defaults';
 import { AppError } from '../../shared/errors';
-import type { Answer, Fact, FactGroup, Preferences, ReferenceResume, ResumeImport } from '../../shared/types';
+import type { Answer, Contact, Fact, FactGroup, Preferences, ReferenceResume, ResumeImport } from '../../shared/types';
 import { suggestFacts } from './suggest-facts';
 
 /** Ports this service needs; `src/infra/db` implements them. */
@@ -21,7 +21,7 @@ export interface ProfilePorts {
   now: () => Date;
 }
 
-type ProfileMethods = 'getProfile' | 'saveFact' | 'deleteFact' | 'saveAnswer' | 'deleteAnswer' | 'savePreferences';
+type ProfileMethods = 'getProfile' | 'saveFact' | 'deleteFact' | 'saveAnswer' | 'deleteAnswer' | 'savePreferences' | 'saveContact' | 'saveFactGroup';
 /** The profile API methods, synchronously, plus recording a résumé the backend has already read. */
 export type ProfileService = { [M in ProfileMethods]: (...args: Parameters<ApplioApi[M]>) => Awaited<ReturnType<ApplioApi[M]>> } & {
   /** Records the reference résumé and returns fact suggestions; adds nothing to the bank. */
@@ -46,7 +46,30 @@ export function createProfileService({ store, kv, newId, now }: ProfilePorts): P
       answers: store.listAnswers(),
       preferences: (kv.get('preferences') as Preferences | undefined) ?? DEFAULT_PREFERENCES,
       referenceResume: kv.get('referenceResume') as ReferenceResume | undefined,
+      contact: (kv.get('contact') as Contact | undefined) ?? EMPTY_CONTACT,
     }),
+
+    saveContact: (input) => {
+      const links = input.links.map((l) => ({ label: l.label.trim(), url: l.url.trim() }));
+      if (links.some((l) => !l.label)) throw invalid('Give each link a label, e.g. Portfolio or GitHub');
+      const contact: Contact = { phone: input.phone.trim(), location: input.location.trim(), links, education: input.education.trim(), notes: input.notes.trim() };
+      kv.set('contact', contact);
+      return contact;
+    },
+
+    saveFactGroup: (input) => {
+      const groups = store.listFactGroups();
+      if (!groups.some((g) => g.name === input.name)) throw invalid('That section no longer exists. Reload Profile and try again.');
+      // Empty fields are dropped, so clearing one removes it.
+      const next: FactGroup = { name: input.name };
+      if (input.kind) next.kind = input.kind;
+      for (const key of ['dates', 'context', 'link'] as const) {
+        const v = input[key]?.trim();
+        if (v) next[key] = v;
+      }
+      store.replaceFactGroups(groups.map((g) => (g.name === input.name ? next : g)));
+      return store.listFactGroups();
+    },
 
     saveFact: (input) => {
       const text = input.text.trim();

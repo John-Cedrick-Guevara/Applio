@@ -239,6 +239,15 @@ export function createMockApi({ latencyMs = 250, now = () => new Date() }: MockO
 
     savePreferences: (preferences) => run(() => (profile.preferences = preferences)),
 
+    saveContact: (contact) => run(() => (profile.contact = contact)),
+
+    saveFactGroup: (group) =>
+      run(() => {
+        if (!profile.factGroups.some((g) => g.name === group.name)) throw new Error('That section no longer exists. Reload Profile and try again.');
+        profile.factGroups = profile.factGroups.map((g) => (g.name === group.name ? group : g));
+        return profile.factGroups;
+      }),
+
     importResume: () =>
       run(() => {
         const suggestions = [
