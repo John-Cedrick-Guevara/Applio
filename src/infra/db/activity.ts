@@ -51,9 +51,10 @@ export function createActivityRepo(db: DatabaseSync): ActivityRepo {
       Number(insertRun.run(r.at, r.found, r.newAfterDedup, r.passedFilters, r.drafted, details ? JSON.stringify(details) : null).lastInsertRowid),
     latestRun: () => {
       const r = selectLatest.get();
-      return r
-        ? { at: String(r.at), found: Number(r.found), newAfterDedup: Number(r.new_after_dedup), passedFilters: Number(r.passed_filters), drafted: Number(r.drafted) }
-        : undefined;
+      if (!r) return undefined;
+      const summary: RunSummary = { at: String(r.at), found: Number(r.found), newAfterDedup: Number(r.new_after_dedup), passedFilters: Number(r.passed_filters), drafted: Number(r.drafted) };
+      const atLimit = r.details == null ? 0 : json<RunDetails>(r.details).sources.filter((s) => s.outcome === 'limit').length;
+      return atLimit ? { ...summary, atLimit } : summary;
     },
     updateDetails: (id, details, drafted) => void setDetails.run(JSON.stringify(details), drafted, id),
     latestRunDetails: () => {

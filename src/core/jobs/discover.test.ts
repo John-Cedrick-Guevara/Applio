@@ -7,7 +7,7 @@ import type { RunSourcesResult } from './run-sources';
 
 const NOW = new Date('2026-11-05T06:00:00.000Z');
 
-const setup = (polled: RunSourcesResult, existing: string[] = [], targetRoles = ['Backend Engineer']) => {
+const setup = (polled: RunSourcesResult, existing: string[] = [], targetRoles = ['Backend Engineer'], leftover = { unscored: [] as string[], undrafted: [] as string[] }) => {
   const saved: { jobs: { job: Job; dedupKey: string }[]; details: RunDetails }[] = [];
   const scoring: { runId: number; details: RunDetails; drafted: number }[] = [];
   const draft = vi.fn(async (ids: readonly string[]) => ({ drafted: ids.length, notDrafted: 0, notifyOnly: 0 }));
@@ -22,6 +22,7 @@ const setup = (polled: RunSourcesResult, existing: string[] = [], targetRoles = 
     score,
     draft,
     finishRun: (runId, details, drafted) => void scoring.push({ runId, details, drafted }),
+    leftover: () => leftover,
     now: () => NOW,
     newId: () => `id-${++n}`,
   };
@@ -64,6 +65,13 @@ describe('discover', () => {
       dropped: { blocklist: 1, type: 0, remote: 0, role: 1, pay: 0, hours: 0 },
       sources: polled.sources,
     });
+  });
+
+  it('also retries jobs an earlier run left unscored or undrafted', async () => {
+    const { run, score, draft } = setup(polled, [], ['Backend Engineer'], { unscored: ['old-1'], undrafted: ['old-2'] });
+    await run();
+    expect(score).toHaveBeenCalledWith(['id-1', 'old-1'], 42);
+    expect(draft).toHaveBeenCalledWith(['id-1', 'old-1', 'old-2'], 42);
   });
 
   it('never saves a job Applio already has', async () => {

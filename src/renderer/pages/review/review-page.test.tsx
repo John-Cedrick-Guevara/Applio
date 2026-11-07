@@ -113,4 +113,13 @@ describe('ReviewPage', () => {
     expect(link).toHaveTextContent('67');
     expect(link).toHaveAttribute('href', 'https://example.com/jobs/j5');
   });
+
+  it('lists jobs still waiting to be scored or drafted, with the reason, so none go missing', async () => {
+    open();
+    const queue = await screen.findByRole('region', { name: 'Queue' });
+    expect(within(queue).getByText(/1 not scored or drafted yet; the next run retries them\./)).toBeInTheDocument();
+    await userEvent.click(within(queue).getByRole('button', { name: 'Show waiting jobs' }));
+    const link = within(queue).getByRole('link', { name: /Frontend Developer/ });
+    expect(link).toHaveTextContent('Not scored yet');
+  });
 });

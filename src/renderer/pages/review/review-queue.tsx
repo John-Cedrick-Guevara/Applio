@@ -1,19 +1,22 @@
 import { useState } from 'react';
 import type { Job } from '../../../shared/types';
 import { CHANNEL_LABEL } from '../../lib/labels';
-import { queueState, sendsOnApprove } from './review-model';
+import { pendingReason, queueState, sendsOnApprove } from './review-model';
 
 interface ReviewQueueProps {
   jobs: Job[];
   currentId?: string;
   /** Jobs scored below the draft threshold, best first: shown on request, never drafted. */
   below: Job[];
+  /** Jobs not scored yet, or strong matches whose draft failed; the next run retries them. */
+  waiting: Job[];
   draftThreshold: number;
 }
 
 /** "Waiting on you": one row per draft, linking to it. Manual-handoff channels get an amber chip. */
-export function ReviewQueue({ jobs, currentId, below, draftThreshold }: ReviewQueueProps) {
+export function ReviewQueue({ jobs, currentId, below, waiting, draftThreshold }: ReviewQueueProps) {
   const [showBelow, setShowBelow] = useState(false);
+  const [showWaiting, setShowWaiting] = useState(false);
   return (
     <section className="card card-flush review-queue" aria-label="Queue">
       <div className="card-header">
@@ -45,6 +48,25 @@ export function ReviewQueue({ jobs, currentId, below, draftThreshold }: ReviewQu
           </li>
         ))}
       </ul>
+      {waiting.length > 0 ? (
+        <div className="queue-footer">
+          {waiting.length} not scored or drafted yet; the next run retries them.{' '}
+          <button type="button" className="link-button" aria-expanded={showWaiting} aria-label={showWaiting ? 'Hide waiting jobs' : 'Show waiting jobs'} onClick={() => setShowWaiting((s) => !s)}>
+            {showWaiting ? 'Hide them' : 'Show them'}
+          </button>
+          {showWaiting ? (
+            <ul className="list-plain below-list">
+              {waiting.map((job) => (
+                <li key={job.id}>
+                  <a href={job.url || undefined} target="_blank" rel="noreferrer" className="below-row">
+                    <span>{job.title}<span className="cell-sub"> · {job.company}</span><span className="cell-sub waiting-reason">{pendingReason(job)}</span></span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
       {below.length > 0 ? (
         <div className="queue-footer">
           {below.length} more scored below your draft threshold ({draftThreshold}).{' '}

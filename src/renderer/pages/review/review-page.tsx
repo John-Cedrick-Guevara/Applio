@@ -11,15 +11,18 @@ import './review.css';
 
 /** Everything Review needs, loaded together so the split view renders in one pass. */
 async function loadReview(api: ReturnType<typeof useApi>) {
-  const [drafted, scored, settings, sources, status] = await Promise.all([
+  const [drafted, scored, found, settings, sources, status] = await Promise.all([
     api.listJobs({ statuses: ['drafted'] }),
     api.listJobs({ statuses: ['scored'] }),
+    api.listJobs({ statuses: ['found'] }),
     api.getSettings(),
     api.listSources(),
     api.getStatus(),
   ]);
   return {
     queue: [...drafted].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
+    // Unscored jobs and strong matches whose draft failed: the next run retries both.
+    waiting: [...scored.filter((j) => (j.score ?? 0) >= settings.draftThreshold), ...found],
     below: scored.filter((j) => (j.score ?? 0) < settings.draftThreshold).sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
     thresholds: { draft: settings.draftThreshold, auto: settings.autoSendThreshold },
     owner: { name: settings.fullName, email: settings.gmailAddress },
@@ -75,7 +78,7 @@ function ReviewLayout({ data, selectedId, onJobChange, onStatusChange, onRunComp
     <>
       <ReviewHeader status={data.status} onStatusChange={onStatusChange} onRunComplete={onRunComplete} />
       <div className="split">
-        <ReviewQueue jobs={data.queue} currentId={currentId} below={data.below} draftThreshold={data.thresholds.draft} />
+        <ReviewQueue jobs={data.queue} currentId={currentId} below={data.below} waiting={data.waiting} draftThreshold={data.thresholds.draft} />
         {currentId ? (
           <DraftPanel
             key={currentId}

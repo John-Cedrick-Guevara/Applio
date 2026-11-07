@@ -284,6 +284,8 @@ export interface RunSummary {
   newAfterDedup: number;
   passedFilters: number;
   drafted: number;
+  /** Sources skipped because they'd used their polls for the day; set when the run's details are stored. */
+  atLimit?: number;
 }
 
 /** Engine and scheduler state for the sidebar card and Review header. */

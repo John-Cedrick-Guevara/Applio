@@ -273,6 +273,13 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       },
       draft: (jobIds, runId) => draftJobs(jobIds, { runId }, draftPorts),
       finishRun: (runId, details, drafted) => activity.updateDetails(runId, details, drafted),
+      leftover: () => {
+        const threshold = settings.getSettings().draftThreshold;
+        return {
+          unscored: jobs.list({ statuses: ['found'] }).map((j) => j.id),
+          undrafted: jobs.list({ statuses: ['scored'] }).filter((j) => (j.score ?? 0) >= threshold).map((j) => j.id),
+        };
+      },
       now: () => new Date(),
       newId: randomUUID,
     });
