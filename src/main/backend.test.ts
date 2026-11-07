@@ -301,6 +301,21 @@ describe('createBackend discovery', () => {
     expect(deps.onStatus).toHaveBeenLastCalledWith(expect.objectContaining({ paused: true }));
   });
 
+  it('pushes status on a tick only when a job changed since the last push, so open pages refresh', async () => {
+    const { api, deps } = await searchingBackend();
+    await api.runDiscovery();
+    const [job] = await api.listJobs({ statuses: ['found'] });
+    // Written straight to the database, as Claude's MCP process or a reply check would.
+    deps.db.prepare("INSERT INTO status_events (job_id, status, at, note) VALUES (?, 'found', ?, 'x')").run(job!.id, new Date().toISOString());
+    deps.onStatus.mockClear();
+    await api.tick();
+    expect(deps.onStatus).toHaveBeenCalledTimes(1);
+    expect(deps.onStatus.mock.calls[0]![0].jobsVersion).toBeGreaterThan(0);
+    deps.onStatus.mockClear();
+    await api.tick();
+    expect(deps.onStatus).not.toHaveBeenCalled();
+  });
+
   it('turns launch at login on and off with the setting', async () => {
     const { api, deps } = backendIn();
     await api.saveSettings({ launchAtLogin: true });

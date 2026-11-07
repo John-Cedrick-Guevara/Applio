@@ -3,6 +3,7 @@ import type { AppStatus, Autonomy, Job } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { AsyncView } from '../../components/async-view';
 import { useAsync } from '../../hooks/use-async';
+import { useJobsVersion } from '../../hooks/use-jobs-version';
 import type { RouteParams } from '../../lib/router';
 import { DraftPanel } from './draft-panel';
 import { ReviewHeader } from './review-header';
@@ -38,7 +39,8 @@ async function loadReview(api: ReturnType<typeof useApi>) {
  */
 export default function ReviewPage({ params }: { params: RouteParams }) {
   const api = useApi();
-  const state = useAsync(() => loadReview(api), [api]);
+  const jobsChanges = useJobsVersion();
+  const state = useAsync(() => loadReview(api), [api, jobsChanges]);
 
   /** Swaps an updated job into the queue (approved, skipped, edited). */
   const updateJob = (job: Job) => state.setData((d) => ({ ...d, queue: d.queue.map((j) => (j.id === job.id ? job : j)) }));

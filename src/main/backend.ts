@@ -455,9 +455,15 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       tokensToday: activity.tokensSince(midnight),
       dailyTokenBudget,
       lastRun: activity.latestRun(),
+      jobsVersion: jobs.version(),
     };
   };
-  const pushStatus = () => onStatus(getStatus());
+  let pushedJobsVersion: number | undefined;
+  const pushStatus = () => {
+    const status = getStatus();
+    pushedJobsVersion = status.jobsVersion;
+    onStatus(status);
+  };
   void checkEngine().catch((err: unknown) => console.error('[engine] check failed', err));
 
   /** Runs a synchronous service call as the async API method; a throw becomes a rejection. */
@@ -584,6 +590,8 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       markNoReply();
       warnLimits();
       await checkReplies().catch((err: unknown) => console.error('[replies] inbox check failed', err));
+      // Replies, sends and drafts change jobs outside any page's request; tell open pages.
+      if (jobs.version() !== pushedJobsVersion) pushStatus();
     },
 
     sendFollowUp: (jobId, text) =>

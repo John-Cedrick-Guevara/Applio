@@ -298,6 +298,8 @@ export interface AppStatus {
   tokensToday: number;
   dailyTokenBudget: number;
   lastRun?: RunSummary;
+  /** Moves whenever any job changes; pages showing jobs reload when it does. */
+  jobsVersion?: number;
 }
 
 /** What "Add job" learned from a pasted post or link, before it joins the queue. */

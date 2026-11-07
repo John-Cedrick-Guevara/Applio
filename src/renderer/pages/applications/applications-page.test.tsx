@@ -1,6 +1,8 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { act } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { AppStatus } from '../../../shared/types';
 import { createMockApi } from '../../../shared/mock/mock-api';
 import { renderWithApp } from '../../../test/render';
 import ApplicationsPage from './applications-page';
@@ -8,6 +10,26 @@ import ApplicationsPage from './applications-page';
 const table = () => screen.findByRole('table');
 
 describe('ApplicationsPage', () => {
+  afterEach(() => {
+    delete window.applioEvents;
+  });
+
+  it('reloads when main reports a job changed in the background, like a reply moving it to Interview', async () => {
+    let push: (s: AppStatus) => void = () => {};
+    window.applioEvents = { onStatus: (l) => ((push = l), () => {}) };
+    const api = createMockApi({ latencyMs: 0 });
+    renderWithApp(<ApplicationsPage />, api);
+    const t = await table();
+    const quanta = (await api.listJobs()).find((j) => j.company === 'Quanta Robotics')!;
+    expect(within(t).getByText('Quanta Robotics').closest('tr')).not.toHaveTextContent('Interview');
+    await api.setStatus(quanta.id, 'interview');
+    const status = await api.getStatus();
+    act(() => push({ ...status, jobsVersion: 1 }));
+    act(() => push({ ...status, jobsVersion: 2 }));
+    const row = () => within(t).getByText('Quanta Robotics').closest('tr')!;
+    await vi.waitFor(() => expect(row()).toHaveTextContent('Interview'));
+  });
+
   it('lists only applications that were sent', async () => {
     renderWithApp(<ApplicationsPage />);
     const t = await table();
