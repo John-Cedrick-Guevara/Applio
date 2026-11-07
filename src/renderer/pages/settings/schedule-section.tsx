@@ -11,7 +11,7 @@ export function ScheduleSection({ settings, onChange }: { settings: Settings; on
   const api = useApi();
   const action = useAction();
   const save = async (what: string, patch: Partial<Settings>) => {
-    const next = await action.run(what, () => api.saveSettings(patch));
+    const next = await action.run(what, () => api.saveSettings(patch), 'Saved');
     if (next) onChange(next);
   };
 

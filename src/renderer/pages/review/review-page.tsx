@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type { AppStatus, Autonomy, Job } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { AsyncView } from '../../components/async-view';
+import { buttonClass } from '../../components/button';
 import { useAsync } from '../../hooks/use-async';
 import { useJobsVersion } from '../../hooks/use-jobs-version';
 import type { RouteParams } from '../../lib/router';
@@ -95,7 +96,7 @@ function ReviewLayout({ data, selectedId, onJobChange, onStatusChange, onRunComp
           <section className="card review-empty" aria-label="Draft detail">
             <h2>Nothing waiting on you</h2>
             <p className="muted">New drafts land here after each run. Add a job yourself any time.</p>
-            <a href="#/add-job">Add a job</a>
+            <a className={buttonClass('strong')} href="#/add-job">Add a job</a>
           </section>
         )}
       </div>

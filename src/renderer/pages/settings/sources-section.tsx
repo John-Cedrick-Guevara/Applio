@@ -12,7 +12,10 @@ export function SourcesSection({ sources, onChange }: { sources: Source[]; onCha
   const action = useAction();
 
   const update = async (source: Source, patch: Partial<Pick<Source, 'enabled' | 'autonomy'>>) => {
-    const next = await action.run(`update ${source.name}`, () => api.updateSource(source.id, patch));
+    const saved = patch.enabled !== undefined
+      ? `${source.name} turned ${patch.enabled ? 'on' : 'off'}`
+      : `${source.name} set to ${AUTONOMY_LABEL[patch.autonomy ?? source.autonomy]}`;
+    const next = await action.run(`update ${source.name}`, () => api.updateSource(source.id, patch), saved);
     if (next) onChange(next);
   };
 

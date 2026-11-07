@@ -64,7 +64,7 @@ export default function AddJobPage() {
               </button>
             ))}
           </div>
-          <Button variant="ghost" className="link-accent" onClick={() => setValue(EXAMPLES[mode])}>Use an example</Button>
+          <Button size="sm" onClick={() => setValue(EXAMPLES[mode])}>Use an example</Button>
         </div>
 
         {mode === 'link' ? (
@@ -81,7 +81,7 @@ export default function AddJobPage() {
         )}
 
         <div className="spread">
-          {error ? <span className="field-error" role="alert">{error}</span> : <span className="cell-sub">Reading and scoring uses about 1k tokens.</span>}
+          {error ? <span className="field-error" role="alert">{error}</span> : <span className="cell-sub">Reading and scoring uses about 8k tokens.</span>}
           <Button variant="strong" busy={analyze.pending} onClick={run}>{analyze.pending ? 'Analyzing…' : 'Analyze job'}</Button>
         </div>
       </section>
@@ -143,13 +143,13 @@ function PreviewCard({ preview, draftThreshold, added, onAdded, onDiscard }: Pre
         <div className="banner banner-success preview-done" role="status">
           <span>Added. Drafting the resume and cover letter now; it will be in Review in about a minute.</span>
           <span className="row">
-            <Button variant="link" className="success-link" onClick={onDiscard}>Add another</Button>
+            <Button size="sm" onClick={onDiscard}>Add another</Button>
             <a href={`#/review/${added.id}`}>Go to Review</a>
           </span>
         </div>
       ) : (
         <div className="preview-actions">
-          <Button variant="ghost" onClick={onDiscard}>Discard</Button>
+          <Button onClick={onDiscard}>Discard</Button>
           <Button variant="primary" busy={action.pending} onClick={add}>Add to review queue</Button>
         </div>
       )}

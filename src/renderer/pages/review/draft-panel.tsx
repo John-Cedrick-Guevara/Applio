@@ -75,7 +75,7 @@ function DraftDetail({ job, draft, nextId, thresholds, owner, autonomyBySource, 
   };
 
   const skip = async () => {
-    const next = await action.run('skip the job', () => api.skipJob(job.id));
+    const next = await action.run('skip the job', () => api.skipJob(job.id), `Skipped ${job.title} at ${job.company}`);
     if (!next) return;
     onJob(next);
     if (nextId) navigate(`/review/${nextId}`);
@@ -147,7 +147,7 @@ function DraftDetail({ job, draft, nextId, thresholds, owner, autonomyBySource, 
         </div>
         {waiting ? (
           <div className="row">
-            <Button variant="ghost" busy={action.pending} onClick={skip}>Skip</Button>
+            <Button busy={action.pending} onClick={skip}>Skip</Button>
             <Button disabled={!draft} onClick={() => { setTab('letter'); setEditing(true); }}>Edit</Button>
             {primary.handoff ? (
               <a className={buttonClass('primary')} href={`#/handoff/${job.id}`}>{primary.label}</a>

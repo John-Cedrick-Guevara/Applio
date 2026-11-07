@@ -56,7 +56,7 @@ function EngineRow({ settings, onChange }: Props) {
   const ready = check.data?.ok ?? (!isApi || settings.secretsSet.anthropicApiKey);
 
   const pick = async (engine: Settings['aiEngine']) => {
-    const next = await action.run('switch the AI engine', () => api.saveSettings({ aiEngine: engine }));
+    const next = await action.run('switch the AI engine', () => api.saveSettings({ aiEngine: engine }), engine === 'claude-code' ? 'Using Claude Code' : 'Using your Anthropic API key');
     if (next) onChange(next);
   };
 
@@ -193,7 +193,7 @@ function ConnectionRow({ title, ready, readyText, setupText, field, secret, test
         )}
       </div>
       <div className="row">
-        {ready && !editing ? <Button variant="ghost" aria-label={`Change ${title}`} onClick={() => setEditing(true)}>Change</Button> : null}
+        {ready && !editing ? <Button aria-label={`Change ${title}`} onClick={() => setEditing(true)}>Change</Button> : null}
         <Button busy={action.pending} onClick={runTest}>{action.pending ? 'Sending…' : test.label}</Button>
       </div>
     </div>

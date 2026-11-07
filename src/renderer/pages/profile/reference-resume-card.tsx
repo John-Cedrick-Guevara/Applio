@@ -2,6 +2,7 @@ import type { ReferenceResume, ResumeImport } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { Button } from '../../components/button';
 import { FileIcon } from '../../components/icons';
+import { useToast } from '../../components/toast';
 import { useAction } from '../../hooks/use-action';
 import { formatShortDate } from '../../lib/format';
 
@@ -16,10 +17,14 @@ interface Props {
 export function ReferenceResumeCard({ resume, templateOpen, onToggleTemplate, onImported }: Props) {
   const api = useApi();
   const action = useAction();
+  const toast = useToast();
 
   const replace = async () => {
     const next = await action.run('import the resume', () => api.importResume());
-    if (next) onImported(next); // null = picker cancelled
+    if (!next) return; // null = picker cancelled
+    const n = next.suggestions.length;
+    toast.show(n ? `Found ${n} new fact${n === 1 ? '' : 's'} in ${next.resume.fileName}. Add the ones that are right.` : `Nothing new in ${next.resume.fileName}: every fact is already in your bank.`, 'success');
+    onImported(next);
   };
 
   return (

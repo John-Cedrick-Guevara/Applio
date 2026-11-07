@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Job } from '../../../shared/types';
+import { buttonClass } from '../../components/button';
 import { CHANNEL_LABEL } from '../../lib/labels';
 import { pendingReason, queueState, sendsOnApprove } from './review-model';
 
@@ -51,7 +52,7 @@ export function ReviewQueue({ jobs, currentId, below, waiting, draftThreshold }:
       {waiting.length > 0 ? (
         <div className="queue-footer">
           {waiting.length} not scored or drafted yet; the next run retries them.{' '}
-          <button type="button" className="link-button" aria-expanded={showWaiting} aria-label={showWaiting ? 'Hide waiting jobs' : 'Show waiting jobs'} onClick={() => setShowWaiting((s) => !s)}>
+          <button type="button" className={buttonClass('secondary', 'sm', 'queue-footer-action')} aria-expanded={showWaiting} aria-label={showWaiting ? 'Hide waiting jobs' : 'Show waiting jobs'} onClick={() => setShowWaiting((s) => !s)}>
             {showWaiting ? 'Hide them' : 'Show them'}
           </button>
           {showWaiting ? (
@@ -70,7 +71,7 @@ export function ReviewQueue({ jobs, currentId, below, waiting, draftThreshold }:
       {below.length > 0 ? (
         <div className="queue-footer">
           {below.length} more scored below your draft threshold ({draftThreshold}).{' '}
-          <button type="button" className="link-button" aria-expanded={showBelow} onClick={() => setShowBelow((s) => !s)}>
+          <button type="button" className={buttonClass('secondary', 'sm', 'queue-footer-action')} aria-expanded={showBelow} onClick={() => setShowBelow((s) => !s)}>
             {showBelow ? 'Hide them' : 'Show them'}
           </button>
           {showBelow ? (

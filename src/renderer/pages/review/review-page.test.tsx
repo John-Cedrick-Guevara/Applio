@@ -97,6 +97,18 @@ describe('ReviewPage', () => {
     expect((await api.getDraft('j1'))?.coverLetter).toBe('Short and sweet');
   });
 
+  it('tells the operator what Run now did', async () => {
+    open();
+    await userEvent.click(await screen.findByRole('button', { name: 'Run now' }));
+    expect(await screen.findByText('Run finished: 2 jobs passed your filters, 0 drafted.')).toBeInTheDocument();
+  });
+
+  it('confirms a skip', async () => {
+    open();
+    await userEvent.click(await screen.findByRole('button', { name: 'Skip' }));
+    expect(await screen.findByText(/^Skipped /)).toBeInTheDocument();
+  });
+
   it('pauses automation and blocks manual runs', async () => {
     open();
     await userEvent.click(await screen.findByRole('button', { name: 'Pause automation' }));

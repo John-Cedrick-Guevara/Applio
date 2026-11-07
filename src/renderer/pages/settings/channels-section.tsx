@@ -17,7 +17,7 @@ export function ChannelsSection({ settings, onChange }: { settings: Settings; on
   const action = useAction();
 
   const setAssist = async (id: 'platform' | 'custom', on: boolean) => {
-    const next = await action.run('update assisted fill', () => api.saveSettings({ assistedFill: { ...settings.assistedFill, [id]: on } }));
+    const next = await action.run('update assisted fill', () => api.saveSettings({ assistedFill: { ...settings.assistedFill, [id]: on } }), `Assisted fill turned ${on ? 'on' : 'off'}`);
     if (next) onChange(next);
   };
 
