@@ -6,9 +6,6 @@
   max-width: 820px;
 }
 
-.link-accent {
-  color: var(--accent);
-}
 
 .input-lg {
   height: 44px;
@@ -93,8 +90,3 @@
   padding: 14px var(--space-6);
 }
 
-.success-link {
-  color: var(--success-text);
-  font-weight: 500;
-  text-decoration: underline;
-}

@@ -34,7 +34,7 @@ export function ResumeSuggestions({ fileName, suggestions, onAdded, onDone }: Pr
     <section className="card" aria-label={`Facts found in ${fileName}`}>
       <div className="card-header">
         <h2 className="card-title">Facts found in {fileName}</h2>
-        <Button variant="ghost" onClick={onDone}>Dismiss the rest</Button>
+        <Button size="sm" onClick={onDone}>Dismiss the rest</Button>
       </div>
       {left.length === 0 ? (
         <p className="cell-sub">No new facts found. Everything in it is already in your fact bank.</p>

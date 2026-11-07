@@ -220,7 +220,7 @@ function DoneStep({ job, platform, onJob }: { job: Job; platform: string; onJob:
         <div className="step-title">Done on {platform}?</div>
         <div className="cell-sub">Logs what you sent to Applications and starts reply tracking.</div>
       </div>
-      <Button variant="ghost" busy={action.pending} onClick={() => finish('skipped')}>I didn't apply</Button>
+      <Button busy={action.pending} onClick={() => finish('skipped')}>I didn't apply</Button>
       <Button variant="primary" busy={action.pending} onClick={() => finish('applied')}>Mark as applied</Button>
     </div>
   );
