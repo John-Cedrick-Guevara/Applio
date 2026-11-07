@@ -31,7 +31,8 @@ process.stdin.on('end', () => {
   if (mode === 'crash') { process.stderr.write('boom: something broke\\n'); process.exit(3); }
   line({ type: 'system', subtype: 'init', tools: [] });
   line({ type: 'assistant', message: { content: [{ type: 'text', text: 'partial' }] } });
-  if (mode === 'error') line({ type: 'result', subtype: 'error_max_turns', is_error: true, result: '' });
+  if (mode === 'api-error') line({ type: 'result', subtype: 'success', is_error: true, result: 'API Error: 429 rate limited' });
+  else if (mode === 'error') line({ type: 'result', subtype: 'error_max_turns', is_error: true, result: '' });
   else line({ type: 'result', subtype: 'success', is_error: false, result: '{"score":82}',
     usage: { input_tokens: 120, cache_creation_input_tokens: 30, cache_read_input_tokens: 50, output_tokens: 40 } });
 });
@@ -81,6 +82,10 @@ describe('Claude Code engine', () => {
 
   it('reports an error result readably', async () => {
     await expect(engine('error').complete({ prompt: 'x', jobIds: [] })).rejects.toThrow("Claude Code couldn't finish (error_max_turns).");
+  });
+
+  it("keeps Claude Code's own error text when it flags a result as an error", async () => {
+    await expect(engine('api-error').complete({ prompt: 'x', jobIds: [] })).rejects.toThrow("Claude Code couldn't finish: API Error: 429 rate limited");
   });
 
   it('reports a crash with the end of its error output', async () => {
