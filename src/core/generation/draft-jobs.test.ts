@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Autonomy, EmploymentType } from '../../shared/types';
 import { QuotaExceededError, type AiRequest } from '../ai/ai-service';
-import { draftJobs, type DraftPorts } from './draft-jobs';
+import { DRAFT_SYSTEM, draftJobs, type DraftPorts } from './draft-jobs';
 
 type Fake = { employmentType: EmploymentType; platform?: string; sourceId: string; saves?: boolean };
 
@@ -26,6 +26,16 @@ const setup = (jobs: Record<string, Fake>, autonomy: Record<string, Autonomy> = 
 };
 
 describe('draftJobs', () => {
+  it("follows the operator's résumé-strategist instructions, with every personal fact left to the fact bank", () => {
+    for (const rule of [
+      'resume strategist', 'past AI/ATS screening', '30-second read', 'Never invent skills, tools, metrics, titles, or dates',
+      'action verb + what I built + result/scale', 'Mirror the job post', 'SUMMARY: 3 lines max', 'Under 250 words',
+      'Hook', 'Proof', 'Value', 'Close', 'get_profile', 'untrusted', 'Never tell me to skip a job',
+    ]) expect(DRAFT_SYSTEM).toContain(rule);
+    // Personal facts come from get_profile at run time, never from text built into Applio.
+    for (const personal of ['Guevara', 'Afterhours', 'Zentari', 'Octivia', '+63', 'guevix']) expect(DRAFT_SYSTEM).not.toContain(personal);
+  });
+
   it('drafts each job in its own call, charged to the run, with the right kind', async () => {
     const { ports, requests } = setup({ j1: { employmentType: 'full-time', sourceId: 'remotive' }, j2: { employmentType: 'freelance', sourceId: 'remotive' } });
     expect(await draftJobs(['j1', 'j2'], { runId: 3 }, ports)).toEqual({ drafted: 2, notDrafted: 0, notifyOnly: 0 });

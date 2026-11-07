@@ -122,6 +122,9 @@ describe('ProfilePage', () => {
   it('toggles the ATS template preview', async () => {
     renderWithApp(<ProfilePage />);
     await userEvent.click(await screen.findByRole('button', { name: 'Preview template' }));
-    expect(screen.getByRole('region', { name: 'Resume template preview' })).toBeInTheDocument();
+    const preview = screen.getByRole('region', { name: 'Resume template preview' });
+    // The locked layout with the operator's own sections and dates.
+    expect(within(preview).getByText('EXPERIENCE')).toBeInTheDocument();
+    expect(within(preview).getByText('2022 – now')).toBeInTheDocument();
   });
 });

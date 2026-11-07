@@ -1,6 +1,6 @@
 import { dialog, shell, type BrowserWindow } from 'electron';
 import { randomUUID } from 'node:crypto';
-import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
+import { appendFileSync, copyFileSync, existsSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
@@ -46,7 +46,7 @@ import type { Draft, AiEngine as EngineKind, AppStatus, InterviewPrep, Job } fro
 import { AUTONOMY_LEVELS } from '../shared/autonomy';
 import { nextStatuses } from '../shared/status';
 import { matchesFilter } from '../shared/job-filter';
-import { letterBody, pageHtml, resumeBody } from '../shared/templates/application-documents';
+import { documentNames, letterBody, pageHtml, resumeBody } from '../shared/templates/application-documents';
 import { isSafeExternalUrl } from './security';
 
 /** Expands a leading `~` so stored folder paths work with the OS shell. */
@@ -180,9 +180,11 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
 
   // Application files (SPEC F8): the same template the Review preview shows, printed to PDF.
   const outputRoot = () => expandHome(settings.getSettings().outputFolder ?? '~/Applio');
+  /** Whose documents these are: name and email from Settings, header details and sections from Profile. */
   const owner = () => {
     const { fullName, gmailAddress } = settings.getSettings();
-    return { name: fullName, email: gmailAddress };
+    const { contact, factGroups } = profile.getProfile();
+    return { name: fullName, email: gmailAddress, contact, groups: factGroups };
   };
   /** A proposal stays editable Markdown (SPEC F8); a cover letter is a PDF. */
   const letterName = (draft: Draft) => (draft.kind === 'proposal' ? 'proposal.md' : 'cover-letter.pdf');
@@ -332,6 +334,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     folder: (job) => jobFolder(job),
     fileExists: existsSync,
     writeFile: (path, text) => writeFileSync(path, text),
+    copyFile: (from, to) => copyFileSync(from, to),
     owner,
     // ponytail: Gmail's cap is SPEC F10's default; the editable quota table comes with PR-24.
     caps: () => ({ gmailDaily: GMAIL_DAILY_CAP, perChannel: settings.getSettings().maxPerChannelPerDay }),
@@ -677,11 +680,14 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       const folder = jobFolder(job);
       if (!draft || !folder) throw new Error("This job's files aren't saved yet.");
       const coverLetter = join(folder, 'cover-letter.pdf');
+      // Uploaded under the operator's file names, as ATS sends are.
+      const names = documentNames(owner().name, draft.headline);
+      const asNamed = (from: string, name: string) => (copyFileSync(from, join(folder, name)), join(folder, name));
       const result = await fillPlatformForm({
         url,
         input: {
           applicant: { fullName: owner().name, email: owner().email },
-          files: { resume: join(folder, 'resume.pdf'), ...(existsSync(coverLetter) ? { coverLetter } : {}) },
+          files: { resume: asNamed(join(folder, 'resume.pdf'), names.resume), ...(existsSync(coverLetter) ? { coverLetter: asNamed(coverLetter, names.letter) } : {}) },
           letter: draft.coverLetter,
           answers: [...draft.answers.map(({ question, answer }) => ({ question, answer })), ...applyPorts.bankAnswers()],
         },

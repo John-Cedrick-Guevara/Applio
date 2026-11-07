@@ -1,4 +1,5 @@
 import { AppError } from '../../shared/errors';
+import { documentNames, isLockedLayout, signOff, type DocumentOwner } from '../../shared/templates/application-documents';
 import type { ApplyChannel, Draft, Job, JobStatus, SentBy } from '../../shared/types';
 import type { FillInput, FillStep } from './ats-plan';
 import { atsFormUrl } from './channel';
@@ -64,7 +65,9 @@ export interface ApplyPorts {
   folder: (job: Job) => string | undefined;
   fileExists: (path: string) => boolean;
   writeFile: (path: string, content: string | Uint8Array) => void;
-  owner: () => { name: string; email: string };
+  /** Copies a file, replacing the target; used to upload documents under the operator's file names. */
+  copyFile: (from: string, to: string) => void;
+  owner: () => DocumentOwner;
   caps: () => { gmailDaily: number; perChannel: number };
   /** The operator's local midnight (ISO), where daily caps reset. */
   dayStart: () => string;
@@ -153,13 +156,16 @@ const recordSent = (jobId: string, sentBy: SentBy, folder: string, record: SentR
 export async function sendByEmail(jobId: string, sentBy: SentBy, ports: ApplyPorts): Promise<Job> {
   const { job, draft, folder, resume } = readyToSend(jobId, 'email', ports);
 
-  const { name, email } = ports.owner();
+  const owner = ports.owner();
+  const { name, email } = owner;
+  const names = documentNames(name, draft.headline);
   const message: EmailMessage = {
     from: fromHeader(name, email),
     to: job.applyTarget,
-    subject: name ? `Application: ${job.title} — ${name}` : `Application: ${job.title}`,
-    text: draft.coverLetter,
-    attachments: [{ filename: 'resume.pdf', path: resume }],
+    subject: draft.subject ?? (name ? `Application: ${job.title} — ${name}` : `Application: ${job.title}`),
+    // The sign-off comes from Profile, so the phone and link are always right. Older drafts signed their own.
+    text: isLockedLayout(draft) ? `${draft.coverLetter}\n\n${signOff(owner)}` : draft.coverLetter,
+    attachments: [{ filename: names.resume, path: resume }],
     messageId: ports.newMessageId(jobId),
   };
 
@@ -173,7 +179,7 @@ export async function sendByEmail(jobId: string, sentBy: SentBy, ports: ApplyPor
     throw err;
   }
 
-  const record: SentRecord = { to: message.to, subject: message.subject, body: message.text, attachments: ['resume.pdf'], at: ports.now().toISOString(), messageId: message.messageId };
+  const record: SentRecord = { to: message.to, subject: message.subject, body: message.text, attachments: [names.resume], at: ports.now().toISOString(), messageId: message.messageId };
   return recordSent(jobId, sentBy, folder, record, ports);
 }
 
@@ -189,9 +195,17 @@ export async function sendByAts(jobId: string, sentBy: SentBy, ports: ApplyPorts
   if (!job.applyUrl) throw new SendBlockedError("This job has no form link, so Applio can't open its application. Use the manual handoff.");
   const coverLetter = join(folder, 'cover-letter.pdf');
   const url = atsFormUrl(job.applyUrl);
+  // Forms upload a file by its name on disk, so the documents go up as copies named for the operator.
+  const names = documentNames(ports.owner().name, draft.headline);
+  const upload = (from: string, as: string) => {
+    const to = join(folder, as);
+    ports.copyFile(from, to);
+    return to;
+  };
+  const withLetter = draft.kind === 'cover-letter' && ports.fileExists(coverLetter);
   const input: FillInput = {
     applicant: { fullName: ports.owner().name, email: ports.owner().email },
-    files: { resume, ...(draft.kind === 'cover-letter' && ports.fileExists(coverLetter) ? { coverLetter } : {}) },
+    files: { resume: upload(resume, names.resume), ...(withLetter ? { coverLetter: upload(coverLetter, names.letter) } : {}) },
     letter: draft.coverLetter,
     // The draft's own answers first: they were written for this posting.
     answers: [...draft.answers.map(({ question, answer }) => ({ question, answer })), ...ports.bankAnswers()],

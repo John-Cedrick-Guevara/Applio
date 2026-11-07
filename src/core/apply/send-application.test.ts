@@ -38,6 +38,7 @@ const setup = (over: Partial<Job> = {}, opts: { sentToday?: number; perChannel?:
     folder: () => job.folderPath,
     fileExists: () => true,
     writeFile: (path, text) => void (files[path] = text),
+    copyFile: vi.fn(),
     owner: () => ({ name: 'Sam Rivera', email: 'sam@gmail.com' }),
     caps: () => ({ gmailDaily: 100, perChannel: opts.perChannel ?? 10 }),
     dayStart: () => '2026-11-06T00:00:00.000Z',
@@ -56,8 +57,25 @@ describe('approveDraft over email', () => {
     await approveDraft('j1', ports);
     expect(outbox).toEqual([{
       from: '"Sam Rivera" <sam@gmail.com>', to: 'jobs@acme.com', subject: 'Application: Senior Backend Engineer — Sam Rivera',
-      text: 'Dear Acme team,\n\nI build APIs.', attachments: [{ filename: 'resume.pdf', path: '/out/acme/resume.pdf' }], messageId: '<j1.1@applio.local>',
+      text: 'Dear Acme team,\n\nI build APIs.', attachments: [{ filename: 'Rivera_Senior_Backend_Engineer.pdf', path: '/out/acme/resume.pdf' }], messageId: '<j1.1@applio.local>',
     }]);
+  });
+
+  it('leaves an older draft unsigned, since its letter carries its own sign-off', async () => {
+    const { ports, outbox } = setup();
+    ports.owner = () => ({ name: 'Sam Rivera', email: 'sam@gmail.com', contact: { phone: '+1 555', location: '', links: [], education: '', notes: '' } });
+    await approveDraft('j1', ports);
+    expect(outbox[0]).toMatchObject({ text: 'Dear Acme team,\n\nI build APIs.' });
+  });
+
+  it('uses the subject Claude wrote, and signs off from Profile', async () => {
+    const { ports, outbox } = setup();
+    const base = ports.draft('j1')!;
+    const draft = { ...base, subject: 'AI Engineer — Sam Rivera', resume: base.resume.map((s) => ({ ...s, group: s.heading })) };
+    ports.draft = () => draft;
+    ports.owner = () => ({ name: 'Sam Rivera', email: 'sam@gmail.com', contact: { phone: '+1 555', location: '', links: [{ label: 'Site', url: 'https://sam.dev' }], education: '', notes: '' } });
+    await approveDraft('j1', ports);
+    expect(outbox[0]).toMatchObject({ subject: 'AI Engineer — Sam Rivera', text: 'Dear Acme team,\n\nI build APIs.\n\nSam Rivera\n+1 555 | sam.dev' });
   });
 
   it('quotes the sender name, so a comma in it stays one address', async () => {
@@ -72,7 +90,7 @@ describe('approveDraft over email', () => {
     expect((await approveDraft('j1', ports)).status).toBe('applied');
     expect(job()).toMatchObject({ status: 'applied', sentBy: 'you-app' });
     const md = files['/out/acme/sent.md'] as string;
-    for (const part of ['To: jobs@acme.com', 'Subject: Application: Senior Backend Engineer — Sam Rivera', 'Channel: email', 'Sent: 2026-11-06T09:00:00.000Z', 'Tokens: 5200', 'Attachments: resume.pdf', 'Dear Acme team,\n\nI build APIs.']) {
+    for (const part of ['To: jobs@acme.com', 'Subject: Application: Senior Backend Engineer — Sam Rivera', 'Channel: email', 'Sent: 2026-11-06T09:00:00.000Z', 'Tokens: 5200', 'Attachments: Rivera_Senior_Backend_Engineer.pdf', 'Dear Acme team,\n\nI build APIs.']) {
       expect(md).toContain(part);
     }
   });
@@ -147,12 +165,14 @@ describe('approveDraft on a standard ATS form', () => {
       url: 'https://jobs.lever.co/acme/123/apply',
       input: {
         applicant: { fullName: 'Sam Rivera', email: 'sam@gmail.com' },
-        files: { resume: '/out/acme/resume.pdf', coverLetter: '/out/acme/cover-letter.pdf' },
+        files: { resume: '/out/acme/Rivera_Senior_Backend_Engineer.pdf', coverLetter: '/out/acme/Rivera_Senior_Backend_Engineer_Cover_Letter.pdf' },
         letter: 'Dear Acme team,\n\nI build APIs.',
         answers: [{ question: 'Why us?', answer: 'Your API work.' }, { question: 'Notice?', answer: 'Two weeks' }, { question: 'Phone', answer: '+63 917 555 0100' }],
       },
       visible: true,
     });
+    // Uploaded under the operator's file names, copied from the files Applio keeps.
+    expect(ports.copyFile).toHaveBeenCalledWith('/out/acme/resume.pdf', '/out/acme/Rivera_Senior_Backend_Engineer.pdf');
     expect(job()).toMatchObject({ status: 'applied', sentBy: 'you-app' });
     expect(files['/out/acme/sent.md']).toContain('Email: sam@gmail.com');
     expect(files['/out/acme/sent.md']).toContain('To: https://jobs.lever.co/acme/123/apply');

@@ -27,6 +27,14 @@ export function modeLabel(job: Job, sourceAutonomy: Autonomy): string {
   return sendsOnApprove(job.channel) ? AUTONOMY_LABEL[capAutonomy(sourceAutonomy, job.channel)] : 'Manual handoff';
 }
 
+/**
+ * How much effort an application deserves, from its match score (the operator's
+ * prompt, 0–10 there): High 75+, Medium 50–74, Quick under 50.
+ */
+export function effortLevel(score: number): 'High' | 'Medium' | 'Quick' {
+  return score >= 75 ? 'High' : score >= 50 ? 'Medium' : 'Quick';
+}
+
 /** Why a job is still waiting: its last failure note, or what's left to do. */
 export function pendingReason(job: Pick<Job, 'status' | 'history'>): string {
   return job.history.findLast((e) => e.note)?.note ?? (job.status === 'found' ? 'Not scored yet' : 'Not drafted yet');

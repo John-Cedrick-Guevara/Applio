@@ -98,6 +98,8 @@ export interface SuggestedAnswer {
 /** Tailored resume as structured data; every bullet cites the fact it came from. */
 export interface ResumeSection {
   heading: string;
+  /** The fact-bank section it draws from; set on drafts made with the locked layout. */
+  group?: string;
   items: { text: string; factId: string }[];
 }
 
@@ -114,6 +116,10 @@ export interface Draft {
   edited: boolean;
   answers: SuggestedAnswer[];
   createdAt: string;
+  /** The email subject Claude wrote; email sends use it (SPEC F4). */
+  subject?: string;
+  /** The posting's keywords the operator can claim (each with its proof) and the gaps. */
+  keywords?: { claimed: { keyword: string; factId: string }[]; gaps: string[] };
 }
 
 /** A verified fact about the operator — the only material AI may draw from. */

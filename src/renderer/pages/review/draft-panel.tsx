@@ -12,7 +12,7 @@ import { CHANNEL_LABEL } from '../../lib/labels';
 import { navigate } from '../../lib/router';
 import type { DocumentOwner } from '../../../shared/templates/application-documents';
 import { DraftDocument, type DocTab } from './draft-document';
-import { modeLabel, primaryAction, sentLine } from './review-model';
+import { modeLabel, primaryAction, sentLine, effortLevel } from './review-model';
 import { SourceCredit } from '../../components/source-credit';
 
 interface DraftPanelProps {
@@ -113,6 +113,20 @@ function DraftDetail({ job, draft, nextId, thresholds, owner, autonomyBySource, 
           </ul>
         </div>
       </div>
+
+      {draft?.keywords ? (
+        <div className="draft-keywords">
+          <h3 className="section-label">Keywords · Effort: {effortLevel(job.score ?? 0)}</h3>
+          <ul className="tag-row list-plain" aria-label="Keywords you can claim">
+            {draft.keywords.claimed.map((k) => <li key={k.keyword} className="tag">{k.keyword}</li>)}
+          </ul>
+          {draft.keywords.gaps.length ? (
+            <ul className="tag-row list-plain keyword-gaps" aria-label="Keyword gaps">
+              {draft.keywords.gaps.map((g) => <li key={g} className="tag tag-warning">{g}</li>)}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
 
       {draft ? (
         <DraftDocument

@@ -13,11 +13,12 @@ import './review.css';
 
 /** Everything Review needs, loaded together so the split view renders in one pass. */
 async function loadReview(api: ReturnType<typeof useApi>) {
-  const [drafted, scored, found, settings, sources, status] = await Promise.all([
+  const [drafted, scored, found, settings, profile, sources, status] = await Promise.all([
     api.listJobs({ statuses: ['drafted'] }),
     api.listJobs({ statuses: ['scored'] }),
     api.listJobs({ statuses: ['found'] }),
     api.getSettings(),
+    api.getProfile(),
     api.listSources(),
     api.getStatus(),
   ]);
@@ -27,7 +28,7 @@ async function loadReview(api: ReturnType<typeof useApi>) {
     waiting: [...scored.filter((j) => (j.score ?? 0) >= settings.draftThreshold), ...found],
     below: scored.filter((j) => (j.score ?? 0) < settings.draftThreshold).sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
     thresholds: { draft: settings.draftThreshold, auto: settings.autoSendThreshold },
-    owner: { name: settings.fullName, email: settings.gmailAddress },
+    owner: { name: settings.fullName, email: settings.gmailAddress, contact: profile.contact, groups: profile.factGroups },
     autonomyBySource: Object.fromEntries(sources.map((s) => [s.id, s.autonomy])) as Record<string, Autonomy>,
     status,
   };

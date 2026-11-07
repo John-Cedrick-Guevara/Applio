@@ -360,7 +360,7 @@ describe('createBackend discovery', () => {
       const call = (name: string, input: unknown) => tools.find((t) => t.name === name)!.call(input);
       // Scoring is one turn that answers with JSON; drafting goes through the tools.
       if (prompt.startsWith('Score')) return { text: JSON.stringify(jobIds.map((jobId) => ({ jobId, score: 90, roleSummary: 'APIs', descriptionSummary: 'Remote', strengths: [{ text: 'Fast APIs', factId: fact.id }], gaps: [] }))), inputTokens: 900, outputTokens: 100 };
-      for (const jobId of jobIds) call('save_draft', { jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ heading: 'Acme', items: [{ text: 'Cut latency 40%', factId: fact.id }] }], coverLetter: 'Dear team', answers: [] });
+      for (const jobId of jobIds) call('save_draft', { jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ group: 'Acme — Engineer', items: [{ text: 'Cut latency 40%', factId: fact.id }] }], coverLetter: 'Dear team', answers: [] });
       return { text: 'done', inputTokens: 900, outputTokens: 100 };
     });
     deps.engines['claude-code'] = { complete, check: async () => ({ ready: true, message: 'ok' }) };
@@ -385,7 +385,7 @@ describe('createBackend discovery', () => {
       if (down && prompt.startsWith(failingStep)) throw new Error('Claude Code couldn\'t finish: API Error: 429');
       if (prompt.startsWith('Score')) return { text: JSON.stringify(jobIds.map((jobId) => ({ jobId, score: 90, roleSummary: 'APIs', descriptionSummary: 'Remote', strengths: [{ text: 'Fast APIs', factId: fact.id }], gaps: [] }))), inputTokens: 900, outputTokens: 100 };
       const tools = createTools(createToolPorts(deps.db, jobIds, () => new Date()));
-      for (const jobId of jobIds) await tools.find((t) => t.name === 'save_draft')!.call({ jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ heading: 'Acme', items: [{ text: 'Cut latency 40%', factId: fact.id }] }], coverLetter: 'Dear team', answers: [] });
+      for (const jobId of jobIds) await tools.find((t) => t.name === 'save_draft')!.call({ jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ group: 'Acme — Engineer', items: [{ text: 'Cut latency 40%', factId: fact.id }] }], coverLetter: 'Dear team', answers: [] });
       return { text: 'done', inputTokens: 900, outputTokens: 100 };
     });
     deps.engines['claude-code'] = { complete, check: async () => ({ ready: true, message: 'ok' }) };
@@ -413,7 +413,7 @@ describe('createBackend discovery', () => {
         const call = (name: string, input: unknown) => tools.find((t) => t.name === name)!.call(input);
         // Scoring is one turn that answers with JSON; drafting goes through the tools.
         if (prompt.startsWith('Score')) return { text: JSON.stringify(jobIds.map((jobId) => ({ jobId, score: 90, roleSummary: 'APIs', descriptionSummary: 'Remote', strengths: [{ text: 'Fast APIs', factId: fact.id }], gaps: [] }))), inputTokens: 900, outputTokens: 100 };
-        for (const jobId of jobIds) call('save_draft', { jobId, kind: 'cover-letter', headline: 'Backend engineer', summary: 's', resume: [{ heading: 'Acme', items: [{ text: 'Cut latency 40%', factId: fact.id }] }], coverLetter: 'Dear team', answers: [] });
+        for (const jobId of jobIds) call('save_draft', { jobId, kind: 'cover-letter', headline: 'Backend engineer', summary: 's', resume: [{ group: 'Acme — Engineer', items: [{ text: 'Cut latency 40%', factId: fact.id }] }], coverLetter: 'Dear team', answers: [] });
         return { text: 'done', inputTokens: 900, outputTokens: 100 };
       },
     };
@@ -426,7 +426,7 @@ describe('createBackend discovery', () => {
     const { job, deps } = await draftedBackend();
     expect(job.folderPath).toMatch(/Applio\/\d{4}-\d{2}\/Acme — Senior Backend Engineer \(90%\)$/);
     expect(readdirSync(job.folderPath!).sort()).toEqual(['cover-letter.pdf', 'job.md', 'resume.pdf']);
-    expect(readFileSync(join(job.folderPath!, 'resume.pdf'), 'utf8')).toContain('<h1>Sam Rivera</h1>');
+    expect(readFileSync(join(job.folderPath!, 'resume.pdf'), 'utf8')).toContain('<h1 class="name">SAM RIVERA</h1>');
     expect(readFileSync(join(job.folderPath!, 'job.md'), 'utf8')).toContain(`applio_job_id: ${job.id}`);
     expect(deps.printPdf).toHaveBeenCalledTimes(2);
   });
@@ -464,7 +464,7 @@ describe('createBackend discovery', () => {
         const call = (name: string, input: unknown) => createTools(createToolPorts(b.deps.db, jobIds, () => new Date())).find((t) => t.name === name)!.call(input);
         // Scoring is one turn that answers with JSON; drafting goes through the tools.
         if (prompt.startsWith('Score')) return { text: JSON.stringify(jobIds.map((jobId) => ({ jobId, score: 90, roleSummary: 'r', descriptionSummary: 'd', strengths: [], gaps: [] }))), inputTokens: 900, outputTokens: 100 };
-        for (const jobId of jobIds) call('save_draft', { jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ heading: 'A', items: [{ text: 'Shipped APIs', factId: fact.id }] }], coverLetter: 'Hi', answers: [] });
+        for (const jobId of jobIds) call('save_draft', { jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ group: 'Acme', items: [{ text: 'Shipped APIs', factId: fact.id }] }], coverLetter: 'Hi', answers: [] });
         return { text: 'done', inputTokens: 1, outputTokens: 1 };
       },
     };
@@ -488,7 +488,7 @@ describe('createBackend discovery', () => {
     const { api, job } = await emailJob();
     expect(await api.approveDraft(job.id)).toMatchObject({ status: 'applied', sentBy: 'you-app' });
     expect(outbox).toHaveLength(1);
-    expect(outbox[0]).toMatchObject({ to: 'jobs@acme.com', subject: 'Application: Senior Backend Engineer — Sam Rivera', text: 'Dear team' });
+    expect(outbox[0]).toMatchObject({ to: 'jobs@acme.com', subject: 'Application: Senior Backend Engineer — Sam Rivera', text: 'Dear team\n\nSam Rivera' });
     expect(readFileSync(join(job.folderPath!, 'sent.md'), 'utf8')).toContain('To: jobs@acme.com');
   });
 
@@ -558,7 +558,7 @@ describe('createBackend discovery', () => {
         const call = (name: string, input: unknown) => createTools(createToolPorts(b.deps.db, jobIds, () => new Date())).find((t) => t.name === name)!.call(input);
         // Scoring is one turn that answers with JSON; drafting goes through the tools.
         if (prompt.startsWith('Score')) return { text: JSON.stringify(jobIds.map((jobId) => ({ jobId, score: 92, roleSummary: 'r', descriptionSummary: 'd', strengths: [], gaps: [] }))), inputTokens: 900, outputTokens: 100 };
-        for (const jobId of jobIds) call('save_draft', { jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ heading: 'A', items: [{ text: 'Shipped APIs', factId: fact.id }] }], coverLetter: 'Dear team', answers: [] });
+        for (const jobId of jobIds) call('save_draft', { jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ group: 'Acme', items: [{ text: 'Shipped APIs', factId: fact.id }] }], coverLetter: 'Dear team', answers: [] });
         return { text: 'done', inputTokens: 1, outputTokens: 1 };
       },
     };
@@ -640,7 +640,7 @@ describe('createBackend discovery', () => {
         const call = (name: string, input: unknown) => createTools(createToolPorts(b.deps.db, jobIds, () => new Date())).find((t) => t.name === name)!.call(input);
         // Scoring is one turn that answers with JSON; drafting goes through the tools.
         if (prompt.startsWith('Score')) return { text: JSON.stringify(jobIds.map((jobId) => ({ jobId, score: 90, roleSummary: 'Builds APIs.', descriptionSummary: 'd', strengths: [], gaps: [] }))), inputTokens: 900, outputTokens: 100 };
-        for (const jobId of jobIds) call('save_draft', { jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ heading: 'A', items: [{ text: 'Shipped APIs', factId: fact.id }] }], coverLetter: 'Dear team, this letter stays private.', answers: [] });
+        for (const jobId of jobIds) call('save_draft', { jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ group: 'Acme', items: [{ text: 'Shipped APIs', factId: fact.id }] }], coverLetter: 'Dear team, this letter stays private.', answers: [] });
         return { text: 'done', inputTokens: 1, outputTokens: 1 };
       },
     };
@@ -697,7 +697,7 @@ describe('createBackend discovery', () => {
           return { text: JSON.stringify({ company: 'Brightline Studio', title: 'Senior TypeScript Engineer', location: 'Remote', employmentType: 'contract', salary: null, tags: ['Contract'], roleSummary: 'TypeScript back end.', descriptionSummary: 'Async.', applyEmail: 'hiring@brightline.io', applyUrl: null, score: 84, strengths: [{ text: 'Node APIs', factId: fact.id }], gaps: [] }), inputTokens: 900, outputTokens: 100 };
         }
         const call = (name: string, input: unknown) => createTools(createToolPorts(b.deps.db, jobIds, () => new Date())).find((t) => t.name === name)!.call(input);
-        for (const jobId of jobIds) call('save_draft', { jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ heading: 'A', items: [{ text: 'Built Node APIs', factId: fact.id }] }], coverLetter: 'Dear team', answers: [] });
+        for (const jobId of jobIds) call('save_draft', { jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ group: 'Acme', items: [{ text: 'Built Node APIs', factId: fact.id }] }], coverLetter: 'Dear team', answers: [] });
         return { text: 'done', inputTokens: 500, outputTokens: 100 };
       },
     };
