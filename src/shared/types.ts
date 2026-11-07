@@ -348,6 +348,8 @@ export interface AppStatus {
   lastRun?: RunSummary;
   /** Moves whenever any job changes; pages showing jobs reload when it does. */
   jobsVersion?: number;
+  /** Jobs Claude is drafting right now, from Add job or answered questions. */
+  drafting?: string[];
 }
 
 /** What "Add job" learned from a pasted post or link, before it joins the queue. */

@@ -423,7 +423,7 @@ describe('createBackend discovery', () => {
       { question: 'Can you start in December?', answer: 'Yes, from Dec 1.' },
       { question: 'Did you lead the Acme migration?', answer: 'Led the Acme Postgres migration end to end.', saveTo: 'Acme — Engineer' },
     ]);
-    expect(job.status).toBe('drafted');
+    await vi.waitFor(async () => expect((await api.getJob(job.id)).status).toBe('drafted'));
     expect(prompts.at(-1)).toContain('Q: Can you start in December?\nA: Yes, from Dec 1.');
     expect(await api.listQuestions()).toEqual([]);
     const facts = (await api.getProfile()).facts.map((f) => [f.group, f.text]);
@@ -751,13 +751,16 @@ describe('createBackend discovery', () => {
     return b;
   };
 
-  it('analyzes a pasted post, then adds it, drafted and in Review, without sending it', async () => {
-    const { api } = await analyzingBackend();
+  it('adds a pasted post at once and drafts it in the background, showing it as drafting meanwhile, without sending it', async () => {
+    const { api, deps } = await analyzingBackend();
     const preview = await api.analyzeJob({ kind: 'text', value: 'Brightline is hiring a Senior TypeScript Engineer. Email hiring@brightline.io' });
     expect(preview).toMatchObject({ company: 'Brightline Studio', score: 84, channel: 'email', route: 'Sends from your Gmail to hiring@brightline.io', sourceName: 'pasted by you' });
     const job = await api.addJob(preview);
-    expect(job).toMatchObject({ status: 'drafted', sourceId: 'clip', channel: 'email', score: 84 });
-    expect((await api.listJobs({ statuses: ['drafted'] })).map((j) => j.id)).toContain(job.id);
+    expect(job).toMatchObject({ sourceId: 'clip', channel: 'email', score: 84 });
+    expect(deps.onStatus).toHaveBeenCalledWith(expect.objectContaining({ drafting: [job.id] }));
+    // Cleared only once the draft and its files are done.
+    await vi.waitFor(() => expect(deps.onStatus).toHaveBeenLastCalledWith(expect.objectContaining({ drafting: [] })));
+    expect((await api.getJob(job.id)).status).toBe('drafted');
     expect(outbox).toEqual([]);
   });
 
@@ -780,7 +783,8 @@ describe('createBackend discovery', () => {
 
   it('refuses to add a job Applio already has, naming it', async () => {
     const { api } = await analyzingBackend();
-    await api.addJob(await api.analyzeJob({ kind: 'text', value: 'post' }));
+    const first = await api.addJob(await api.analyzeJob({ kind: 'text', value: 'post' }));
+    await vi.waitFor(async () => expect((await api.getJob(first.id)).status).toBe('drafted'));
     const again = await api.analyzeJob({ kind: 'text', value: 'post' });
     expect(again.route).toMatch(/^Already in Applio \(drafted\)/);
     await expect(api.addJob(again)).rejects.toThrow('Senior TypeScript Engineer at Brightline Studio is already in Applio (drafted).');
