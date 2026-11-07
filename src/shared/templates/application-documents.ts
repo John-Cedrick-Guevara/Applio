@@ -26,12 +26,12 @@ export const DOC_CSS = `.applio-doc{font-family:Helvetica,Arial,sans-serif;color
 .applio-doc ul{margin:0;padding-left:14pt}
 .applio-doc li{margin:0 0 2pt}
 .applio-doc p{margin:0 0 8pt}
-.applio-doc .strategist{font-family:"Times New Roman",Times,serif;font-size:10pt;line-height:1.25;color:#000}
+.applio-doc .strategist{font-family:"Times New Roman",Times,serif;font-size:9.7pt;line-height:1.2;color:#000}
 .strategist .name{text-align:center;font-size:15pt;font-weight:bold;margin:0}
 .strategist .title,.strategist .contact,.strategist .links{text-align:center;margin:1pt 0}
 .strategist .title{font-weight:bold}
 .strategist a{color:#000}
-.strategist h2{font-size:10.5pt;text-transform:none;letter-spacing:.03em;border-bottom:.75pt solid #000;margin:7pt 0 3pt;padding-bottom:1pt}
+.strategist h2{font-size:10.5pt;text-transform:none;letter-spacing:.03em;border-bottom:.75pt solid #000;margin:6pt 0 2pt;padding-bottom:1pt}
 .strategist .entry-head{display:flex;justify-content:space-between;gap:8pt;margin-top:3pt}
 .strategist .context{margin:0 0 1pt;font-style:italic}
 .strategist p{margin:0 0 2pt}
