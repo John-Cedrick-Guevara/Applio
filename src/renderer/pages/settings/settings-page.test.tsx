@@ -10,6 +10,8 @@ describe('SettingsPage', () => {
     const { api } = renderWithApp(<SettingsPage />);
     await userEvent.click(await screen.findByRole('switch', { name: 'Use Jobicy' }));
     expect((await api.listSources()).find((s) => s.id === 'jobicy')?.enabled).toBe(false);
+    // Settings save on change, so each change confirms itself.
+    expect(await screen.findByText('Jobicy turned off')).toBeInTheDocument();
     const group = screen.getByRole('group', { name: 'Autonomy for Remotive' });
     await userEvent.click(within(group).getByRole('button', { name: 'Autonomous' }));
     expect((await api.listSources()).find((s) => s.id === 'remotive')?.autonomy).toBe('autonomous');

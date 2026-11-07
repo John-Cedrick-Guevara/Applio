@@ -70,6 +70,7 @@ describe('ProfilePage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Replace' }));
     const review = await screen.findByRole('region', { name: 'Facts found in resume.pdf' });
     expect(screen.getByText(/found 2 facts/)).toBeInTheDocument();
+    expect(screen.getByText('Found 2 new facts in resume.pdf. Add the ones that are right.')).toBeInTheDocument();
     expect((await api.getProfile()).facts.some((f) => f.text.startsWith('Cut monthly AWS'))).toBe(false);
 
     const first = within(review).getByText(/Cut monthly AWS spend/).closest('li')!;

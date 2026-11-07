@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Job } from '../../../shared/types';
-import { modeLabel, pendingReason, primaryAction, queueState, runLine } from './review-model';
+import { modeLabel, pendingReason, primaryAction, queueState, runLine, runResult } from './review-model';
 
 const job = (over: Partial<Job>): Job => ({
   id: 'x', sourceId: 's', sourceName: 'S', company: 'C', title: 'T', url: '', location: '', employmentType: 'full-time',
@@ -74,5 +74,18 @@ describe('pendingReason', () => {
   it('falls back to what is still to do', () => {
     expect(pendingReason(job('found'))).toBe('Not scored yet');
     expect(pendingReason(job('scored'))).toBe('Not drafted yet');
+  });
+});
+
+describe('runResult', () => {
+  const at = '2026-11-07T08:00:00.000Z';
+  it('says what a run produced', () => {
+    expect(runResult({ at, found: 62, newAfterDedup: 47, passedFilters: 9, drafted: 4 })).toBe('Run finished: 9 jobs passed your filters, 4 drafted.');
+  });
+  it('says plainly when nothing passed', () => {
+    expect(runResult({ at, found: 62, newAfterDedup: 47, passedFilters: 0, drafted: 0 })).toBe('Run finished: nothing new passed your filters.');
+  });
+  it('says when the sources had no polls left', () => {
+    expect(runResult({ at, found: 0, newAfterDedup: 0, passedFilters: 0, drafted: 0, atLimit: 8 })).toBe("Nothing was fetched: every source has used today's polls. They poll again tomorrow.");
   });
 });

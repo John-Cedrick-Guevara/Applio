@@ -1,8 +1,9 @@
 import type { AppStatus } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { Button } from '../../components/button';
+import { useToast } from '../../components/toast';
 import { useAction } from '../../hooks/use-action';
-import { runLine } from './review-model';
+import { runLine, runResult } from './review-model';
 
 interface ReviewHeaderProps {
   status: AppStatus;
@@ -15,6 +16,7 @@ export function ReviewHeader({ status, onStatusChange, onRunComplete }: ReviewHe
   const api = useApi();
   const pause = useAction();
   const runner = useAction();
+  const toast = useToast();
 
   const togglePause = async () => {
     const next = await pause.run(status.paused ? 'resume automation' : 'pause automation', () => api.setAutomationPaused(!status.paused));
@@ -23,7 +25,11 @@ export function ReviewHeader({ status, onStatusChange, onRunComplete }: ReviewHe
 
   const runNow = async () => {
     const run = await runner.run('run discovery', () => api.runDiscovery());
-    if (run) onRunComplete();
+    if (!run) return;
+    // The stored summary knows which sources were at their limit; the returned one doesn't.
+    const latest = (await api.getStatus().catch(() => undefined))?.lastRun ?? run;
+    toast.show(runResult(latest), latest.found === 0 && latest.atLimit ? 'info' : 'success');
+    onRunComplete();
   };
 
   const line = runner.pending ? 'Running now · fetching sources, then dedup and filters…' : runLine(status.lastRun);
