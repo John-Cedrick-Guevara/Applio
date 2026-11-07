@@ -65,6 +65,41 @@ describe('ProfilePage', () => {
     expect((await api.getProfile()).preferences.targetRoles).toEqual(['Staff Engineer', 'Tech Lead']);
   });
 
+  it('saves contact details and links for the résumé header', async () => {
+    const { api } = renderWithApp(<ProfilePage />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit contact and links' }));
+    const phone = screen.getByLabelText('Phone');
+    await userEvent.clear(phone);
+    await userEvent.type(phone, '+63 954 115 2016');
+    const links = screen.getByLabelText(/Links/);
+    await userEvent.clear(links);
+    await userEvent.type(links, 'Portfolio https://guevix.com{enter}LinkedIn https://linkedin.com/in/x');
+    await userEvent.click(screen.getByRole('button', { name: 'Save contact and links' }));
+    expect(await screen.findByRole('link', { name: 'LinkedIn' })).toHaveAttribute('href', 'https://linkedin.com/in/x');
+    expect((await api.getProfile()).contact).toMatchObject({ phone: '+63 954 115 2016', links: [{ label: 'Portfolio', url: 'https://guevix.com' }, { label: 'LinkedIn', url: 'https://linkedin.com/in/x' }] });
+  });
+
+  it('points at a link line with no web address instead of saving', async () => {
+    renderWithApp(<ProfilePage />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit contact and links' }));
+    const links = screen.getByLabelText(/Links/);
+    await userEvent.clear(links);
+    await userEvent.type(links, 'GitHub github.com/x');
+    await userEvent.click(screen.getByRole('button', { name: 'Save contact and links' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Line 1 needs a label and a link starting with https://');
+  });
+
+  it("edits a section's kind, dates, context and link", async () => {
+    const { api } = renderWithApp(<ProfilePage />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit section Projects' }));
+    await userEvent.selectOptions(screen.getByLabelText('Kind'), 'project');
+    await userEvent.type(screen.getByLabelText('Context line'), 'Offline-first desktop app. Electron, SQLite.');
+    await userEvent.type(screen.getByLabelText('Link'), 'https://example.com/app');
+    await userEvent.click(screen.getByRole('button', { name: 'Save section' }));
+    expect(await screen.findByText('Offline-first desktop app. Electron, SQLite.')).toBeInTheDocument();
+    expect((await api.getProfile()).factGroups.find((g) => g.name === 'Projects')).toEqual({ name: 'Projects', kind: 'project', context: 'Offline-first desktop app. Electron, SQLite.', link: 'https://example.com/app' });
+  });
+
   it('imports a résumé and adds only the suggested facts the operator accepts', async () => {
     const { api } = renderWithApp(<ProfilePage />);
     await userEvent.click(await screen.findByRole('button', { name: 'Replace' }));

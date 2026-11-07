@@ -506,6 +506,8 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     saveAnswer: later(profile.saveAnswer),
     deleteAnswer: later(profile.deleteAnswer),
     savePreferences: later(profile.savePreferences),
+    saveContact: later(profile.saveContact),
+    saveFactGroup: later(profile.saveFactGroup),
 
     listSources: later(settings.listSources),
     updateSource: later(settings.updateSource),

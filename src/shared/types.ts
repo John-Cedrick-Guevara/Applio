@@ -128,9 +128,34 @@ export interface Fact {
 }
 
 /** A fact-bank section, in display order. */
+/** What a fact-bank section is, so the résumé can lay it out (SPEC F4). */
+export type FactGroupKind = 'experience' | 'project' | 'skills' | 'certifications' | 'other';
+
 export interface FactGroup {
   name: string;
   dates?: string;
+  kind?: FactGroupKind;
+  /** Experience: one plain context line. Project: one-line description and core stack. */
+  context?: string;
+  /** A project's product link, printed as its label. */
+  link?: string;
+}
+
+/** A labelled link for the résumé header, e.g. Portfolio → https://guevix.com. */
+export interface ContactLink {
+  label: string;
+  url: string;
+}
+
+/** Résumé header and letter sign-off details; the operator's, never Claude's to change. */
+export interface Contact {
+  phone: string;
+  /** E.g. "Philippines • Open to Remote". */
+  location: string;
+  links: ContactLink[];
+  education: string;
+  /** Personal rules for Claude, e.g. "Never call the Afterhours role an internship". */
+  notes: string;
 }
 
 /** A saved answer to a recurring application-form question. */
@@ -180,6 +205,7 @@ export interface Profile {
   answers: Answer[];
   preferences: Preferences;
   referenceResume?: ReferenceResume;
+  contact: Contact;
 }
 
 export type SourceKind = 'board' | 'ats-watchlist' | 'api' | 'clip';

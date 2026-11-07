@@ -35,6 +35,8 @@ const short = z.string().max(500, 'is too long (500 characters max)');
 /** A letter, posting or note body. */
 const long = z.string().max(50_000, 'is too long (50,000 characters max)');
 const url = z.string().max(2048, 'is too long (2,048 characters max)');
+/** A link printed on a résumé: only http(s), so nothing else can become a hyperlink in the PDF. */
+const webUrl = url.regex(/^https?:\/\/[^\s]+$/i, 'must be a web link (https://…)');
 const score = z.number().finite().min(0).max(100);
 const count = (max: number) => z.number().int().min(0).max(max);
 const list = <T extends z.ZodType>(item: T, max = 200) => z.array(item).max(max, 'has too many items');
@@ -126,6 +128,15 @@ export const API_ARGS = {
   saveAnswer: z.tuple([z.strictObject({ id: id.optional(), question: z.string().min(1, "can't be empty").max(1000, 'is too long'), answer: z.string().min(1, "can't be empty").max(10_000, 'is too long') })]),
   deleteAnswer: z.tuple([id]),
   savePreferences: z.tuple([PreferencesSchema]),
+  saveContact: z.tuple([z.strictObject({
+    phone: z.string().max(60, 'is too long'), location: short, education: short, notes: z.string().max(4000, 'is too long'),
+    links: z.array(z.strictObject({ label: z.string().max(60, 'is too long'), url: webUrl })).max(10, 'has too many links (10 max)'),
+  })]),
+  saveFactGroup: z.tuple([z.strictObject({
+    name: short.min(1, "can't be empty"), dates: z.string().max(80, 'is too long').optional(),
+    kind: z.enum(['experience', 'project', 'skills', 'certifications', 'other']).optional(),
+    context: short.optional(), link: z.union([z.literal(''), webUrl]).optional(),
+  })]),
   importResume: none,
 
   listSources: none,

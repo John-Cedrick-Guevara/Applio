@@ -212,3 +212,27 @@
 .resume-suggestions .fact-row > button {
   flex-shrink: 0;
 }
+
+.profile-contact {
+  margin-top: var(--space-4);
+}
+
+.prefs-grid .span-2 {
+  grid-column: span 2;
+}
+
+.pre-line {
+  white-space: pre-line;
+}
+
+.group-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  padding: 0 var(--space-5) var(--space-2);
+}
+
+.group-editor {
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--border-soft);
+}

@@ -34,7 +34,33 @@ describe('profile service', () => {
     expect(setup().getProfile()).toEqual({
       facts: [], factGroups: [], skills: [], answers: [],
       preferences: { targetRoles: [], seniority: '', employmentTypes: ['full-time', 'contract', 'freelance'], remoteOnly: true, hoursOverlap: '', minimumPay: '' },
+      contact: { phone: '', location: '', links: [], education: '', notes: '' },
     });
+  });
+
+  it('saves contact details and links, trimmed', () => {
+    const profile = setup();
+    const saved = profile.saveContact({ phone: ' +63 954 115 2016 ', location: 'Philippines • Open to Remote', links: [{ label: ' GitHub ', url: 'https://github.com/x' }], education: 'BS Computer Science', notes: 'Never call it an internship.' });
+    expect(saved.phone).toBe('+63 954 115 2016');
+    expect(saved.links).toEqual([{ label: 'GitHub', url: 'https://github.com/x' }]);
+    expect(profile.getProfile().contact).toEqual(saved);
+  });
+
+  it('refuses a link without a label', () => {
+    expect(() => setup().saveContact({ phone: '', location: '', links: [{ label: ' ', url: 'https://x.dev' }], education: '', notes: '' })).toThrow('Give each link a label');
+  });
+
+  it('saves a group\'s kind, dates, context and link, keeping its place', () => {
+    const profile = setup();
+    profile.saveFact({ group: 'AI Developer — Afterhours PH', text: 'Cut latency 70%.' });
+    profile.saveFact({ group: 'Projects', text: 'Built Octivia.' });
+    const groups = profile.saveFactGroup({ name: 'AI Developer — Afterhours PH', kind: 'experience', dates: 'Jun 2026 – Oct 2026', context: 'Production AI support SaaS; 12+ tenants.', link: '' });
+    expect(groups[0]).toEqual({ name: 'AI Developer — Afterhours PH', kind: 'experience', dates: 'Jun 2026 – Oct 2026', context: 'Production AI support SaaS; 12+ tenants.' });
+    expect(groups.map((g) => g.name)).toEqual(['AI Developer — Afterhours PH', 'Projects']);
+  });
+
+  it('refuses details for a group that does not exist', () => {
+    expect(() => setup().saveFactGroup({ name: 'Nope' })).toThrow('That section no longer exists');
   });
 
   it('adds a new fact with a fresh id, and lists its group', () => {

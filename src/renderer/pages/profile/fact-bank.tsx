@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Fact, Profile } from '../../../shared/types';
+import type { Fact, FactGroup, FactGroupKind, Profile } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { Button } from '../../components/button';
 import { Icon } from '../../components/icons';
@@ -11,14 +11,16 @@ interface FactBankProps {
   adding: boolean;
   onCloseAdd: () => void;
   onChange: (facts: Fact[]) => void;
+  onGroupsChange: (groups: FactGroup[]) => void;
 }
 
 /**
  * Fact bank (SPEC F1): facts grouped by role, each with its tags and how often
  * drafts used it. Edit inline; the AI may only select and rephrase these.
  */
-export function FactBank({ profile, adding, onCloseAdd, onChange }: FactBankProps) {
+export function FactBank({ profile, adding, onCloseAdd, onChange, onGroupsChange }: FactBankProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingGroup, setEditingGroup] = useState<string | null>(null);
   const sections = groupFacts(profile.factGroups, profile.facts);
 
   const replace = (fact: Fact) => onChange(profile.facts.map((f) => (f.id === fact.id ? fact : f)));
@@ -40,7 +42,27 @@ export function FactBank({ profile, adding, onCloseAdd, onChange }: FactBankProp
           <div className="fact-group-head">
             <h3 id={`group-${section.name}`}>{section.name}</h3>
             <span className="cell-sub">{section.meta}</span>
+            <Button variant="icon" aria-label={`Edit section ${section.name}`} title="Edit section" onClick={() => setEditingGroup(section.name)}>
+              <Icon name="edit" />
+            </Button>
           </div>
+          {editingGroup === section.name ? (
+            <GroupEditor
+              group={profile.factGroups.find((g) => g.name === section.name) ?? { name: section.name }}
+              onDone={(groups) => {
+                setEditingGroup(null);
+                if (groups) onGroupsChange(groups);
+              }}
+            />
+          ) : (() => {
+            const g = profile.factGroups.find((x) => x.name === section.name);
+            return g?.context || g?.link ? (
+              <div className="group-details cell-sub">
+                {g.context ? <span>{g.context}</span> : null}
+                {g.link ? <a href={g.link} target="_blank" rel="noreferrer">{g.link.replace(/^https?:\/\//, '')}</a> : null}
+              </div>
+            ) : null;
+          })()}
           {section.facts.map((fact) =>
             fact.id === editingId ? (
               <FactEditor
@@ -135,6 +157,71 @@ function FactEditor({ fact, onCancel, onSaved, onDeleted }: { fact: Fact; onCanc
       <Button variant="danger" size="sm" busy={action.pending} onClick={remove}>Delete fact</Button>
       <Button variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
       <Button variant="strong" size="sm" busy={action.pending} onClick={save}>Save</Button>
+    </div>
+  );
+}
+
+const KINDS: { value: FactGroupKind; label: string }[] = [
+  { value: 'experience', label: 'Experience' },
+  { value: 'project', label: 'Project' },
+  { value: 'skills', label: 'Skills' },
+  { value: 'certifications', label: 'Certifications & achievements' },
+  { value: 'other', label: 'Other' },
+];
+
+/** A section's résumé details: what it is, its dates, its context line and its link. */
+function GroupEditor({ group, onDone }: { group: FactGroup; onDone: (groups: FactGroup[] | null) => void }) {
+  const api = useApi();
+  const action = useAction();
+  const [draft, setDraft] = useState({ kind: group.kind ?? '', dates: group.dates ?? '', context: group.context ?? '', link: group.link ?? '' });
+  const [error, setError] = useState<string | null>(null);
+  const set = (key: keyof typeof draft, value: string) => {
+    setDraft((d) => ({ ...d, [key]: value }));
+    setError(null);
+  };
+  const id = (k: string) => `g-${k}-${group.name}`;
+
+  const save = async () => {
+    const link = draft.link.trim();
+    if (link && !/^https?:\/\/\S+$/i.test(link)) return setError('The link should start with https://');
+    // Only filled-in details are sent; an emptied field clears that detail.
+    const next: FactGroup = { name: group.name };
+    if (draft.kind) next.kind = draft.kind as FactGroupKind;
+    if (draft.dates.trim()) next.dates = draft.dates.trim();
+    if (draft.context.trim()) next.context = draft.context.trim();
+    if (link) next.link = link;
+    const saved = await action.run('save the section', () => api.saveFactGroup(next), 'Section saved');
+    if (saved) onDone(saved);
+  };
+
+  return (
+    <div className="group-editor">
+      <div className="prefs-form">
+        <div className="field">
+          <label htmlFor={id('kind')}>Kind</label>
+          <select id={id('kind')} className="select" value={draft.kind} onChange={(e) => set('kind', e.target.value)}>
+            <option value="">Not set</option>
+            {KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor={id('dates')}>Dates</label>
+          <input id={id('dates')} className="input" placeholder="Jun 2026 – Oct 2026" value={draft.dates} onChange={(e) => set('dates', e.target.value)} />
+        </div>
+        <div className="field span-2">
+          <label htmlFor={id('context')}>Context line</label>
+          <input id={id('context')} className="input" placeholder="What the company or project is, and its scale or stack" value={draft.context} onChange={(e) => set('context', e.target.value)} />
+        </div>
+        <div className="field span-2">
+          <label htmlFor={id('link')}>Link</label>
+          <input id={id('link')} className="input" placeholder="https://" value={draft.link} aria-invalid={error ? true : undefined} onChange={(e) => set('link', e.target.value)} />
+          {error ? <p className="field-error" role="alert">{error}</p> : null}
+        </div>
+      </div>
+      <div className="form-actions">
+        <Button variant="ghost" size="sm" onClick={() => onDone(null)}>Cancel</Button>
+        <Button variant="strong" size="sm" busy={action.pending} onClick={save}>Save section</Button>
+      </div>
     </div>
   );
 }

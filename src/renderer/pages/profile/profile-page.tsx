@@ -6,6 +6,7 @@ import { Button } from '../../components/button';
 import { PageHeader } from '../../components/page-header';
 import { useAsync } from '../../hooks/use-async';
 import { AnswerBank } from './answer-bank';
+import { ContactCard } from './contact-card';
 import { FactBank } from './fact-bank';
 import { PreferencesCard } from './preferences-card';
 import { ReferenceResumeCard } from './reference-resume-card';
@@ -57,6 +58,8 @@ function ProfileBody({ profile, onChange }: { profile: Profile; onChange: (patch
         <PreferencesCard preferences={profile.preferences} onSaved={(preferences) => onChange({ preferences })} />
       </div>
 
+      <ContactCard contact={profile.contact} onSaved={(contact) => onChange({ contact })} />
+
       {templateOpen ? <TemplatePreview /> : null}
 
       {imported ? (
@@ -84,7 +87,7 @@ function ProfileBody({ profile, onChange }: { profile: Profile; onChange: (patch
           )}
         </div>
         {tab === 'facts' ? (
-          <FactBank profile={profile} adding={adding} onCloseAdd={() => setAdding(false)} onChange={(facts) => onChange({ facts })} />
+          <FactBank profile={profile} adding={adding} onCloseAdd={() => setAdding(false)} onChange={(facts) => onChange({ facts })} onGroupsChange={(factGroups) => onChange({ factGroups })} />
         ) : (
           <AnswerBank answers={profile.answers} adding={adding} onCloseAdd={() => setAdding(false)} onChange={(answers) => onChange({ answers })} />
         )}

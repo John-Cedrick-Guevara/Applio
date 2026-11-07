@@ -11,6 +11,8 @@ import type {
   JobStatus,
   Preferences,
   Profile,
+  Contact,
+  FactGroup,
   ResumeImport,
   RunSummary,
   SecretKey,
@@ -84,6 +86,10 @@ export interface ApplioApi {
   saveAnswer(answer: Pick<Answer, 'question' | 'answer'> & { id?: string }): Promise<Answer>;
   deleteAnswer(id: string): Promise<void>;
   savePreferences(preferences: Preferences): Promise<Preferences>;
+  /** Résumé header and sign-off details (phone, location, links, education, notes for Claude). */
+  saveContact(contact: Contact): Promise<Contact>;
+  /** Updates a fact-bank section's kind, dates, context and link; returns every section in order. */
+  saveFactGroup(group: FactGroup): Promise<FactGroup[]>;
   /**
    * Opens a file picker in main, reads the chosen PDF/DOCX résumé and suggests facts from it; null if cancelled.
    * Suggestions join the bank only when the operator accepts each one (via `saveFact`).
@@ -116,7 +122,7 @@ export const API_METHODS = [
   'getStatus', 'runDiscovery', 'setAutomationPaused',
   'openExternal', 'openJobFolder', 'openDraftFile', 'assistFill', 'chooseFolder', 'openOutputFolder',
   'analyzeJob', 'addJob',
-  'getProfile', 'saveFact', 'deleteFact', 'saveAnswer', 'deleteAnswer', 'savePreferences', 'importResume',
+  'getProfile', 'saveFact', 'deleteFact', 'saveAnswer', 'deleteAnswer', 'savePreferences', 'saveContact', 'saveFactGroup', 'importResume',
   'listSources', 'updateSource',
   'getUsage',
   'getSettings', 'saveSettings', 'setSecret', 'testConnection',
