@@ -35,14 +35,14 @@ import { createBotApi } from '../infra/telegram/bot-api';
 import { fetchPublicPage, isPlatformUrl } from '../infra/web/fetch-page';
 import { createSettingsService } from '../core/settings/settings-service';
 import {
-  createActivityRepo, createDraftsRepo, createJobsRepo, createSendsRepo, createPollsRepo, createProfileRepo, createSettingsRepo, createSourcesRepo, transaction,
+  createActivityRepo, createDraftsRepo, createJobsRepo, createSendsRepo, createPollsRepo, createProfileRepo, createSettingsRepo, createSourcesRepo, createQuestionsRepo, transaction,
 } from '../infra/db';
 import { createGmail, type MailTransport } from '../infra/email/gmail';
 import { findJobFolder, writeApplication } from '../infra/fs/application-files';
 import { readResumeText } from '../infra/resume/read-resume';
 import type { SecretStore } from '../infra/secrets/secret-store';
 import type { ApplioApi } from '../shared/api';
-import type { Draft, AiEngine as EngineKind, AppStatus, InterviewPrep, Job } from '../shared/types';
+import type { Draft, AiEngine as EngineKind, AppStatus, InterviewPrep, Job, QuestionAnswer } from '../shared/types';
 import { AUTONOMY_LEVELS } from '../shared/autonomy';
 import { nextStatuses } from '../shared/status';
 import { matchesFilter } from '../shared/job-filter';
@@ -105,6 +105,9 @@ const MANUAL_APPLY_FROM = new Set(['scored', 'drafted', 'approved']);
  */
 export function createBackend(getWindow: () => BrowserWindow | null, { db, secrets, sources, httpFor, onStatus, setLaunchAtLogin, printPdf, mailTransport, submitAts, fillPlatformForm, inbox = gmailImap, telegramFetch = (url, init) => fetch(url, init), showRoute = () => {}, pageFetch = (url, init) => fetch(url, init), engines }: BackendDeps): Backend {
   const kv = createSettingsRepo(db);
+  const questions = createQuestionsRepo(kv);
+  /** The operator's answers for one job's next draft, kept so a later re-draft still has them. */
+  const answersKey = (jobId: string) => `answers:${jobId}`;
   const jobs = createJobsRepo(db);
   const drafts = createDraftsRepo(db);
   const sends = createSendsRepo(db);
@@ -216,6 +219,8 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
   const draftPorts: DraftPorts = {
     ai: (request) => ai.run(request),
     hasDraft: (id) => drafts.get(id) !== undefined,
+    hasQuestions: (id) => questions.get(id) !== undefined,
+    answers: (id) => (kv.get(answersKey(id)) as QuestionAnswer[] | undefined) ?? [],
     job: (id) => jobs.get(id),
     autonomy: (sourceId) => sourcesRepo.get(sourceId)?.autonomy ?? 'draft',
     note: (id, text) => note(id, text),
@@ -566,6 +571,19 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       analyses.delete(previewId);
       await draftJobs([id], { trigger: 'operator' }, draftPorts);
       return getJob(id);
+    },
+
+    listQuestions: later(() => questions.list().filter((q) => jobs.get(q.jobId)?.status === 'scored')),
+
+    answerQuestions: async (jobId, answers) => {
+      if (!questions.get(jobId)) throw new Error('There are no open questions for this job.');
+      // Saved answers join the fact bank first, so this draft can already cite them.
+      for (const a of answers) if (a.saveTo) profile.saveFact({ group: a.saveTo, text: a.answer.trim() });
+      kv.set(answersKey(jobId), answers.map(({ question, answer }) => ({ question, answer: answer.trim() })));
+      questions.clear(jobId);
+      note(jobId, `You answered ${answers.length} question${answers.length === 1 ? '' : 's'}`);
+      await draftJobs([jobId], { trigger: 'operator' }, draftPorts);
+      return getJob(jobId);
     },
 
     markApplied: later((jobId) => {

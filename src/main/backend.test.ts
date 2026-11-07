@@ -396,6 +396,45 @@ describe('createBackend discovery', () => {
     expect(await api.listJobs({ statuses: ['drafted'] })).toHaveLength(1);
   });
 
+  it('waits for answers when Claude asks, then drafts with them and keeps the ones saved to the bank', async () => {
+    const { api, deps } = await searchingBackend();
+    const fact = await api.saveFact({ group: 'Acme — Engineer', text: 'Cut API latency 40%' });
+    const prompts: string[] = [];
+    deps.engines['claude-code'] = {
+      check: async () => ({ ready: true, message: 'ok' }),
+      complete: async ({ prompt, jobIds }) => {
+        prompts.push(prompt);
+        if (prompt.startsWith('Score')) return { text: JSON.stringify(jobIds.map((jobId) => ({ jobId, score: 90, roleSummary: 'APIs', descriptionSummary: 'Remote', strengths: [], gaps: [] }))), inputTokens: 900, outputTokens: 100 };
+        const tools = createTools(createToolPorts(deps.db, jobIds, () => new Date()));
+        const call = (input: unknown) => tools.find((t) => t.name === 'save_draft')!.call(input);
+        for (const jobId of jobIds) {
+          if (!prompt.includes('answered')) call({ jobId, questions: ['Can you start in December?', 'Did you lead the Acme migration?'] });
+          else call({ jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ group: 'Acme — Engineer', items: [{ text: 'Cut API latency 40%', factId: fact.id }] }], coverLetter: 'Dear team', answers: [] });
+        }
+        return { text: 'done', inputTokens: 900, outputTokens: 100 };
+      },
+    };
+    await api.runDiscovery();
+    const [open] = await api.listQuestions();
+    expect(open).toMatchObject({ questions: ['Can you start in December?', 'Did you lead the Acme migration?'] });
+    expect(await api.listJobs({ statuses: ['drafted'] })).toEqual([]);
+
+    const job = await api.answerQuestions(open!.jobId, [
+      { question: 'Can you start in December?', answer: 'Yes, from Dec 1.' },
+      { question: 'Did you lead the Acme migration?', answer: 'Led the Acme Postgres migration end to end.', saveTo: 'Acme — Engineer' },
+    ]);
+    expect(job.status).toBe('drafted');
+    expect(prompts.at(-1)).toContain('Q: Can you start in December?\nA: Yes, from Dec 1.');
+    expect(await api.listQuestions()).toEqual([]);
+    const facts = (await api.getProfile()).facts.map((f) => [f.group, f.text]);
+    expect(facts).toContainEqual(['Acme — Engineer', 'Led the Acme Postgres migration end to end.']);
+    expect(facts).not.toContainEqual(['Acme — Engineer', 'Yes, from Dec 1.']);
+  });
+
+  it('refuses answers for a job with no open questions', async () => {
+    await expect(backendIn().api.answerQuestions('nope', [{ question: 'Q', answer: 'A' }])).rejects.toThrow('There are no open questions for this job.');
+  });
+
   it('says plainly when there is no draft to edit', async () => {
     const { api } = backendIn();
     await expect(api.updateCoverLetter('nope', 'x')).rejects.toThrow('No draft for job nope');

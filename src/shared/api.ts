@@ -12,6 +12,8 @@ import type {
   Preferences,
   Profile,
   Contact,
+  OpenQuestions,
+  QuestionAnswer,
   FactGroup,
   ResumeImport,
   RunSummary,
@@ -86,6 +88,13 @@ export interface ApplioApi {
   saveAnswer(answer: Pick<Answer, 'question' | 'answer'> & { id?: string }): Promise<Answer>;
   deleteAnswer(id: string): Promise<void>;
   savePreferences(preferences: Preferences): Promise<Preferences>;
+  /** Jobs waiting on the operator's answers to Claude's questions, oldest first. */
+  listQuestions(): Promise<OpenQuestions[]>;
+  /**
+   * Answers Claude's questions for a job and drafts it again with them. Answers with
+   * `saveTo` become facts in that section; the rest are used for this job only.
+   */
+  answerQuestions(jobId: string, answers: QuestionAnswer[]): Promise<Job>;
   /** Résumé header and sign-off details (phone, location, links, education, notes for Claude). */
   saveContact(contact: Contact): Promise<Contact>;
   /** Updates a fact-bank section's kind, dates, context and link; returns every section in order. */
@@ -122,7 +131,7 @@ export const API_METHODS = [
   'getStatus', 'runDiscovery', 'setAutomationPaused',
   'openExternal', 'openJobFolder', 'openDraftFile', 'assistFill', 'chooseFolder', 'openOutputFolder',
   'analyzeJob', 'addJob',
-  'getProfile', 'saveFact', 'deleteFact', 'saveAnswer', 'deleteAnswer', 'savePreferences', 'saveContact', 'saveFactGroup', 'importResume',
+  'getProfile', 'saveFact', 'deleteFact', 'saveAnswer', 'deleteAnswer', 'savePreferences', 'listQuestions', 'answerQuestions', 'saveContact', 'saveFactGroup', 'importResume',
   'listSources', 'updateSource',
   'getUsage',
   'getSettings', 'saveSettings', 'setSecret', 'testConnection',
