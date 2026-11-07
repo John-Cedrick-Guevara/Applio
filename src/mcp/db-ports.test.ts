@@ -12,6 +12,7 @@ const setup = () => {
   const db = openDatabase(':memory:');
   const job = { ...(seedJobs(NOW)[0] as Job), status: 'found' as const, history: [{ status: 'found' as const, at: NOW.toISOString() }] };
   createJobsRepo(db).insert(job, { dedupKey: 'k', createdAt: NOW.toISOString() });
+  createProfileRepo(db).replaceFactGroups([{ name: 'Acme', kind: 'experience' }]);
   createProfileRepo(db).saveFact({ id: 'f1', group: 'Acme', text: 'Cut API latency 40%', tags: [], timesUsed: 0 });
   createProfileRepo(db).saveAnswer({ id: 'a1', question: 'Notice period?', answer: 'Two weeks', origin: 'you', timesReused: 2 });
   const tools = createTools(createToolPorts(db, [job.id], () => NOW));
@@ -30,7 +31,7 @@ describe('tools over the Applio database', () => {
     const { call, db, jobs, job } = setup();
     call('save_draft', {
       jobId: job.id, kind: 'cover-letter', headline: 'h', summary: 's',
-      resume: [{ heading: 'Acme', items: [{ text: 'Cut API latency 40%', factId: 'f1' }, { text: 'Latency down 40%', factId: 'f1' }] }],
+      resume: [{ group: 'Acme', items: [{ text: 'Cut API latency 40%', factId: 'f1' }, { text: 'Latency down 40%', factId: 'f1' }] }],
       coverLetter: 'Dear team', answers: [{ question: 'Notice?', answerId: 'a1' }],
     });
     expect(jobs.get(job.id)).toMatchObject({ status: 'drafted', factsUsed: 1 });

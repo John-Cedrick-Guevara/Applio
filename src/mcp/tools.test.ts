@@ -11,7 +11,12 @@ const setup = () => {
   const ports: ToolPorts = {
     scope: new Set([inScope.id]),
     profile: () => ({
-      facts: [{ id: 'f1', group: 'Acme — Engineer', text: 'Cut API latency 40%', tags: [], timesUsed: 0 }],
+      facts: [
+        { id: 'f1', group: 'Acme — Engineer', text: 'Cut API latency 40%', tags: [], timesUsed: 0 },
+        { id: 'f2', group: 'Languages', text: 'TypeScript, Python, SQL', tags: [], timesUsed: 0 },
+      ],
+      factGroups: [{ name: 'Acme — Engineer', kind: 'experience', dates: '2024 – 2026' }, { name: 'Languages', kind: 'skills' }],
+      contact: { phone: '+63 900', location: 'Philippines • Open to Remote', links: [{ label: 'Portfolio', url: 'https://x.dev' }], education: 'BS CS', notes: 'Never say internship.' },
       skills: ['TypeScript'],
       preferences: { ...DEFAULT_PREFERENCES, targetRoles: ['Backend Engineer'] },
     }),
@@ -29,8 +34,9 @@ const setup = () => {
 
 const draftInput = {
   jobId: inScope.id, kind: 'cover-letter', headline: 'Backend engineer', summary: 'Ships fast APIs.',
-  resume: [{ heading: 'Acme', items: [{ text: 'Cut API latency 40%', factId: 'f1' }] }],
-  coverLetter: 'Dear team…', answers: [{ question: 'Why us?', answer: 'Your API work.' }, { question: 'Notice period?', answerId: 'a1' }],
+  resume: [{ group: 'Acme — Engineer', items: [{ text: 'Cut API latency 40%', factId: 'f1' }] }],
+  coverLetter: 'Dear team…', subject: 'AI Engineer application — Sam Rivera',
+  keywords: { claimed: [{ keyword: 'API performance', factId: 'f1' }], gaps: ['Kafka'] }, answers: [{ question: 'Why us?', answer: 'Your API work.' }, { question: 'Notice period?', answerId: 'a1' }],
 };
 
 describe('MCP tools', () => {
@@ -43,10 +49,12 @@ describe('MCP tools', () => {
     expect(defs.length).toBeLessThan(4000); // ~1k tokens
   });
 
-  it('return the fact bank, skills and preferences, and nothing else', () => {
+  it('return the fact bank with its sections, skills, preferences and the notes for Claude, and nothing else', () => {
     const profile = JSON.parse(setup().call('get_profile')) as Record<string, unknown>;
-    expect(Object.keys(profile).sort()).toEqual(['facts', 'preferences', 'skills']);
-    expect(profile.facts).toEqual([{ id: 'f1', group: 'Acme — Engineer', text: 'Cut API latency 40%' }]);
+    expect(Object.keys(profile).sort()).toEqual(['contact', 'facts', 'preferences', 'sections', 'skills']);
+    expect(profile.sections).toEqual([{ name: 'Acme — Engineer', kind: 'experience', dates: '2024 – 2026' }, { name: 'Languages', kind: 'skills' }]);
+    expect(profile.contact).toEqual({ notes: 'Never say internship.' });
+    expect(profile.facts).toEqual([{ id: 'f1', group: 'Acme — Engineer', text: 'Cut API latency 40%' }, { id: 'f2', group: 'Languages', text: 'TypeScript, Python, SQL' }]);
   });
 
   it('return only the jobs of this task', () => {
@@ -115,16 +123,47 @@ describe('MCP tools', () => {
 
   it('reject a line whose number is not in the fact it cites, so metrics stay exactly as written', () => {
     const { call, ports } = setup();
-    const inflated = { ...draftInput, resume: [{ heading: 'Acme', items: [{ text: 'Cut API latency 45%', factId: 'f1' }] }] };
+    const inflated = { ...draftInput, resume: [{ group: 'Acme — Engineer', items: [{ text: 'Cut API latency 45%', factId: 'f1' }] }] };
     expect(() => call('save_draft', inflated)).toThrow('"Cut API latency 45%" has 45, which fact f1 doesn\'t say. Use its numbers exactly as written.');
     expect(ports.saveDraft).not.toHaveBeenCalled();
   });
 
   it('reject a draft citing a fact that is not in the bank, naming it', () => {
     const { call, ports } = setup();
-    const bad = { ...draftInput, resume: [{ heading: 'Acme', items: [{ text: 'Led 50 people', factId: 'f999' }] }] };
+    const bad = { ...draftInput, resume: [{ group: 'Acme — Engineer', items: [{ text: 'Led 50 people', factId: 'f999' }] }] };
     expect(() => call('save_draft', bad)).toThrow('These fact IDs are not in the fact bank: f999. Use only facts from get_profile.');
     expect(ports.saveDraft).not.toHaveBeenCalled();
+  });
+
+  it('store each section under its fact-bank name, with the subject and keywords', () => {
+    const { call, ports } = setup();
+    call('save_draft', draftInput);
+    const saved = vi.mocked(ports.saveDraft).mock.calls[0]![0] as Draft;
+    expect(saved.resume[0]).toEqual({ heading: 'Acme — Engineer', group: 'Acme — Engineer', items: [{ text: 'Cut API latency 40%', factId: 'f1' }] });
+    expect(saved).toMatchObject({ subject: 'AI Engineer application — Sam Rivera', keywords: { claimed: [{ keyword: 'API performance', factId: 'f1' }], gaps: ['Kafka'] } });
+  });
+
+  it('reject a section that is not in the fact bank, or a line filed under the wrong section', () => {
+    const { call } = setup();
+    expect(() => call('save_draft', { ...draftInput, resume: [{ group: 'Globex', items: [{ text: 'Cut API latency 40%', factId: 'f1' }] }] })).toThrow('"Globex" is not a section in the fact bank. Use a section name from get_profile.');
+    expect(() => call('save_draft', { ...draftInput, resume: [{ group: 'Languages', items: [{ text: 'Cut API latency 40%', factId: 'f1' }] }] })).toThrow('Fact f1 belongs to "Acme — Engineer", not "Languages".');
+  });
+
+  it('reject a skill the fact does not list', () => {
+    const { call } = setup();
+    const skills = { ...draftInput, resume: [...draftInput.resume, { group: 'Languages', items: [{ text: 'TypeScript, Go', factId: 'f2' }] }] };
+    expect(() => call('save_draft', skills)).toThrow('"Go" is not in fact f2. List only skills it names.');
+  });
+
+  it('reject a cover letter of 250 words or more', () => {
+    const { call } = setup();
+    expect(() => call('save_draft', { ...draftInput, coverLetter: Array(250).fill('word').join(' ') })).toThrow('The cover letter has 250 words; keep it under 250.');
+    expect(call('save_draft', { ...draftInput, coverLetter: Array(249).fill('word').join(' ') })).toBe('Saved.');
+  });
+
+  it('reject a claimed keyword whose proof is not in the fact bank', () => {
+    const { call } = setup();
+    expect(() => call('save_draft', { ...draftInput, keywords: { claimed: [{ keyword: 'Kafka', factId: 'f9' }], gaps: [] } })).toThrow('These fact IDs are not in the fact bank: f9.');
   });
 
   it('log a note on a job', () => {
