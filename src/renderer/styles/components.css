@@ -55,6 +55,39 @@
   cursor: not-allowed;
 }
 
+/* Busy: an inline spinner after 100ms, so a fast action never flashes one. */
+.btn[aria-busy='true'] {
+  cursor: progress;
+}
+
+.btn[aria-busy='true']::before,
+.spinner {
+  content: '';
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentcolor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  opacity: 0;
+  animation: spinner-in 0s linear 100ms forwards, spin 0.7s linear 100ms infinite;
+}
+
+@keyframes spinner-in {
+  to { opacity: 0.85; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn[aria-busy='true']::before,
+  .spinner {
+    animation: spinner-in 0s linear 100ms forwards;
+  }
+}
+
 .btn-sm {
   height: var(--control-h-sm);
   padding: 0 var(--space-3);
@@ -174,6 +207,9 @@ a.btn-secondary:hover { color: var(--text); }
   background-size: 200% 100%;
   animation: shimmer 1.4s ease-in-out infinite;
 }
+
+.skeleton-line { height: 12px; }
+.skeleton-title { height: 20px; }
 
 @keyframes shimmer {
   from { background-position: 100% 0; }
