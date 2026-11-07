@@ -301,6 +301,21 @@ describe('createBackend discovery', () => {
     expect(deps.onStatus).toHaveBeenLastCalledWith(expect.objectContaining({ paused: true }));
   });
 
+  it('pushes status on a tick only when a job changed since the last push, so open pages refresh', async () => {
+    const { api, deps } = await searchingBackend();
+    await api.runDiscovery();
+    const [job] = await api.listJobs({ statuses: ['found'] });
+    // Written straight to the database, as Claude's MCP process or a reply check would.
+    deps.db.prepare("INSERT INTO status_events (job_id, status, at, note) VALUES (?, 'found', ?, 'x')").run(job!.id, new Date().toISOString());
+    deps.onStatus.mockClear();
+    await api.tick();
+    expect(deps.onStatus).toHaveBeenCalledTimes(1);
+    expect(deps.onStatus.mock.calls[0]![0].jobsVersion).toBeGreaterThan(0);
+    deps.onStatus.mockClear();
+    await api.tick();
+    expect(deps.onStatus).not.toHaveBeenCalled();
+  });
+
   it('turns launch at login on and off with the setting', async () => {
     const { api, deps } = backendIn();
     await api.saveSettings({ launchAtLogin: true });
@@ -357,6 +372,28 @@ describe('createBackend discovery', () => {
     expect(await api.listJobs({ statuses: ['applied'] })).toEqual([]);
     await api.updateCoverLetter(job!.id, 'Dear Acme team');
     expect(await api.getDraft(job!.id)).toMatchObject({ coverLetter: 'Dear Acme team', edited: true });
+  });
+
+  it.each([
+    ['unscored', 'Score'],
+    ['undrafted', 'Draft'],
+  ])('retries a job an earlier run left %s once the engine works again', async (_, failingStep) => {
+    const { api, deps } = await searchingBackend();
+    const fact = await api.saveFact({ group: 'Acme — Engineer', text: 'Cut API latency 40%' });
+    let down = true;
+    const complete = vi.fn(async ({ prompt, jobIds }: { prompt: string; jobIds: readonly string[] }) => {
+      if (down && prompt.startsWith(failingStep)) throw new Error('Claude Code couldn\'t finish: API Error: 429');
+      if (prompt.startsWith('Score')) return { text: JSON.stringify(jobIds.map((jobId) => ({ jobId, score: 90, roleSummary: 'APIs', descriptionSummary: 'Remote', strengths: [{ text: 'Fast APIs', factId: fact.id }], gaps: [] }))), inputTokens: 900, outputTokens: 100 };
+      const tools = createTools(createToolPorts(deps.db, jobIds, () => new Date()));
+      for (const jobId of jobIds) await tools.find((t) => t.name === 'save_draft')!.call({ jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ heading: 'Acme', items: [{ text: 'Cut latency 40%', factId: fact.id }] }], coverLetter: 'Dear team', answers: [] });
+      return { text: 'done', inputTokens: 900, outputTokens: 100 };
+    });
+    deps.engines['claude-code'] = { complete, check: async () => ({ ready: true, message: 'ok' }) };
+    expect(await api.runDiscovery()).toMatchObject({ passedFilters: 1, drafted: 0 });
+    down = false;
+    // The job is a duplicate now, so only the retry can draft it.
+    expect(await api.runDiscovery()).toMatchObject({ passedFilters: 0, drafted: 1 });
+    expect(await api.listJobs({ statuses: ['drafted'] })).toHaveLength(1);
   });
 
   it('says plainly when there is no draft to edit', async () => {

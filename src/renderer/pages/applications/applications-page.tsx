@@ -5,6 +5,7 @@ import { AsyncView } from '../../components/async-view';
 import { Button } from '../../components/button';
 import { Icon } from '../../components/icons';
 import { useAsync } from '../../hooks/use-async';
+import { useJobsVersion } from '../../hooks/use-jobs-version';
 import { formatShortDate, formatTokens } from '../../lib/format';
 import { CHANNEL_LABEL } from '../../lib/labels';
 import { ApplicationDetail } from './application-detail';
@@ -25,11 +26,12 @@ const FILTERS: { id: FilterGroup | 'all'; label: string }[] = [
 /** Applications (prototype screen 3, SPEC F7): everything sent, with exactly what went out. */
 export default function ApplicationsPage() {
   const api = useApi();
+  const jobsChanges = useJobsVersion();
   const state = useAsync(async () => {
     const [jobs, settings] = await Promise.all([api.listJobs({ statuses: [...SENT_STATUSES] }), api.getSettings()]);
     const sorted = [...jobs].sort((a, b) => (sentAt(b) ?? '').localeCompare(sentAt(a) ?? ''));
     return { jobs: sorted, followUpDays: settings.followUpDays };
-  }, [api]);
+  }, [api, jobsChanges]);
 
   const replace = (job: Job) => state.setData((d) => ({ ...d, jobs: d.jobs.map((j) => (j.id === job.id ? job : j)) }));
 

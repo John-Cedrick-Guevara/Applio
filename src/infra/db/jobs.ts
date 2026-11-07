@@ -29,6 +29,8 @@ export interface JobsRepo {
    * @throws Error when the job doesn't exist.
    */
   transition(id: string, event: StatusEvent): Job;
+  /** Grows with every status event from any process (MCP drafts included); open pages reload when it moves. */
+  version(): number;
 }
 
 const toJob = (r: Row, history: StatusEvent[]): Job => ({
@@ -73,6 +75,7 @@ export function createJobsRepo(db: DatabaseSync): JobsRepo {
   const insertEvent = db.prepare('INSERT INTO status_events (job_id, status, at, note) VALUES (?, ?, ?, ?)');
   const selectEvents = db.prepare('SELECT status, at, note FROM status_events WHERE job_id = ? ORDER BY id');
   const selectById = db.prepare('SELECT * FROM jobs WHERE id = ?');
+  const selectVersion = db.prepare('SELECT COALESCE(MAX(id), 0) AS v FROM status_events');
   const selectByKey = db.prepare('SELECT * FROM jobs WHERE dedup_key = ?');
   const updateCounts = db.prepare(
     'UPDATE jobs SET facts_used = COALESCE(?, facts_used), tokens_used = COALESCE(?, tokens_used), folder_path = COALESCE(?, folder_path), sent_by = COALESCE(?, sent_by) WHERE id = ?',
@@ -115,6 +118,7 @@ export function createJobsRepo(db: DatabaseSync): JobsRepo {
       return rows.map((r) => hydrate(r) as Job);
     },
 
+    version: () => Number(selectVersion.get()?.v ?? 0),
     transition: (id, event) =>
       transaction(db, () => {
         if (updateStatus.run(event.status, id).changes === 0) throw new Error(`Job ${id} not found`);

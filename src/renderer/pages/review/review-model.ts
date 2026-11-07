@@ -27,10 +27,19 @@ export function modeLabel(job: Job, sourceAutonomy: Autonomy): string {
   return sendsOnApprove(job.channel) ? AUTONOMY_LABEL[capAutonomy(sourceAutonomy, job.channel)] : 'Manual handoff';
 }
 
+/** Why a job is still waiting: its last failure note, or what's left to do. */
+export function pendingReason(job: Pick<Job, 'status' | 'history'>): string {
+  return job.history.findLast((e) => e.note)?.note ?? (job.status === 'found' ? 'Not scored yet' : 'Not drafted yet');
+}
+
 /** One-line summary of the last discovery run for the Review header. */
 export function runLine(run: RunSummary | undefined): string {
   if (!run) return 'No runs yet. Run discovery to fill the queue.';
-  return `Last run ${formatClock(run.at)} · ${run.found} found · ${run.newAfterDedup} new after dedup · ${run.passedFilters} passed filters · ${run.drafted} drafted`;
+  const when = `Last run ${formatClock(run.at)}`;
+  if (run.found === 0 && run.atLimit) return `${when} · every source has used today's polls; they poll again tomorrow`;
+  // Jobs dropped by filters aren't stored, so "not yet in Applio" counts them again each run.
+  const line = `${when} · ${run.found} found · ${run.newAfterDedup} not yet in Applio · ${run.passedFilters} passed filters · ${run.drafted} drafted`;
+  return run.atLimit ? `${line} · ${run.atLimit} source${run.atLimit === 1 ? '' : 's'} at today's limit` : line;
 }
 
 /** Confirmation shown after an approved draft goes out. */

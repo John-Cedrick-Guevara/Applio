@@ -3,6 +3,7 @@ import type { AppStatus, Autonomy, Job } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { AsyncView } from '../../components/async-view';
 import { useAsync } from '../../hooks/use-async';
+import { useJobsVersion } from '../../hooks/use-jobs-version';
 import type { RouteParams } from '../../lib/router';
 import { DraftPanel } from './draft-panel';
 import { ReviewHeader } from './review-header';
@@ -11,15 +12,18 @@ import './review.css';
 
 /** Everything Review needs, loaded together so the split view renders in one pass. */
 async function loadReview(api: ReturnType<typeof useApi>) {
-  const [drafted, scored, settings, sources, status] = await Promise.all([
+  const [drafted, scored, found, settings, sources, status] = await Promise.all([
     api.listJobs({ statuses: ['drafted'] }),
     api.listJobs({ statuses: ['scored'] }),
+    api.listJobs({ statuses: ['found'] }),
     api.getSettings(),
     api.listSources(),
     api.getStatus(),
   ]);
   return {
     queue: [...drafted].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
+    // Unscored jobs and strong matches whose draft failed: the next run retries both.
+    waiting: [...scored.filter((j) => (j.score ?? 0) >= settings.draftThreshold), ...found],
     below: scored.filter((j) => (j.score ?? 0) < settings.draftThreshold).sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
     thresholds: { draft: settings.draftThreshold, auto: settings.autoSendThreshold },
     owner: { name: settings.fullName, email: settings.gmailAddress },
@@ -35,7 +39,8 @@ async function loadReview(api: ReturnType<typeof useApi>) {
  */
 export default function ReviewPage({ params }: { params: RouteParams }) {
   const api = useApi();
-  const state = useAsync(() => loadReview(api), [api]);
+  const jobsChanges = useJobsVersion();
+  const state = useAsync(() => loadReview(api), [api, jobsChanges]);
 
   /** Swaps an updated job into the queue (approved, skipped, edited). */
   const updateJob = (job: Job) => state.setData((d) => ({ ...d, queue: d.queue.map((j) => (j.id === job.id ? job : j)) }));
@@ -75,7 +80,7 @@ function ReviewLayout({ data, selectedId, onJobChange, onStatusChange, onRunComp
     <>
       <ReviewHeader status={data.status} onStatusChange={onStatusChange} onRunComplete={onRunComplete} />
       <div className="split">
-        <ReviewQueue jobs={data.queue} currentId={currentId} below={data.below} draftThreshold={data.thresholds.draft} />
+        <ReviewQueue jobs={data.queue} currentId={currentId} below={data.below} waiting={data.waiting} draftThreshold={data.thresholds.draft} />
         {currentId ? (
           <DraftPanel
             key={currentId}

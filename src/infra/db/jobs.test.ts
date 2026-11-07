@@ -17,6 +17,14 @@ describe('jobs repository', () => {
     expect(jobs.get(first.id)).toEqual(first);
   });
 
+  it('counts up whenever any job changes status, for live page refresh', () => {
+    const jobs = setup();
+    jobs.insert(first, { dedupKey: 'k', createdAt: NOW.toISOString() });
+    const before = jobs.version();
+    jobs.transition(first.id, { status: 'skipped', at: NOW.toISOString() });
+    expect(jobs.version()).toBeGreaterThan(before);
+  });
+
   it('returns undefined for an unknown job', () => {
     expect(setup().get('missing')).toBeUndefined();
   });

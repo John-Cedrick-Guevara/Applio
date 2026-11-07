@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Job } from '../../../shared/types';
-import { modeLabel, primaryAction, queueState, runLine } from './review-model';
+import { modeLabel, pendingReason, primaryAction, queueState, runLine } from './review-model';
 
 const job = (over: Partial<Job>): Job => ({
   id: 'x', sourceId: 's', sourceName: 'S', company: 'C', title: 'T', url: '', location: '', employmentType: 'full-time',
@@ -44,10 +44,35 @@ describe('runLine', () => {
   it('summarizes the last run', () => {
     const at = new Date(2026, 10, 3, 8, 0).toISOString();
     expect(runLine({ at, found: 62, newAfterDedup: 47, passedFilters: 9, drafted: 4 }))
-      .toBe('Last run 08:00 · 62 found · 47 new after dedup · 9 passed filters · 4 drafted');
+      .toBe('Last run 08:00 · 62 found · 47 not yet in Applio · 9 passed filters · 4 drafted');
+  });
+
+  it('says when every source was at its daily poll limit, instead of 0 found', () => {
+    const at = new Date(2026, 10, 3, 8, 0).toISOString();
+    expect(runLine({ at, found: 0, newAfterDedup: 0, passedFilters: 0, drafted: 0, atLimit: 8 }))
+      .toBe("Last run 08:00 · every source has used today's polls; they poll again tomorrow");
+  });
+
+  it('notes sources at their limit alongside what the others found', () => {
+    const at = new Date(2026, 10, 3, 8, 0).toISOString();
+    expect(runLine({ at, found: 5, newAfterDedup: 5, passedFilters: 1, drafted: 0, atLimit: 1 }))
+      .toBe("Last run 08:00 · 5 found · 5 not yet in Applio · 1 passed filters · 0 drafted · 1 source at today's limit");
   });
 
   it('handles a fresh install', () => {
     expect(runLine(undefined)).toBe('No runs yet. Run discovery to fill the queue.');
+  });
+});
+
+describe('pendingReason', () => {
+  const job = (status: 'found' | 'scored', note?: string) => ({ status, history: [{ status, at: '2026-11-06T00:00:00.000Z', ...(note ? { note } : {}) }] });
+
+  it('shows the last failure note when there is one', () => {
+    expect(pendingReason(job('scored', "Not drafted: Claude Code couldn't finish: API Error: 429"))).toBe("Not drafted: Claude Code couldn't finish: API Error: 429");
+  });
+
+  it('falls back to what is still to do', () => {
+    expect(pendingReason(job('found'))).toBe('Not scored yet');
+    expect(pendingReason(job('scored'))).toBe('Not drafted yet');
   });
 });

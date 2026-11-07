@@ -262,3 +262,7 @@
 .below-row:hover {
   text-decoration: underline;
 }
+
+.waiting-reason {
+  display: block;
+}

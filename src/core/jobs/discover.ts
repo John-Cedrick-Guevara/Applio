@@ -42,6 +42,11 @@ export interface DiscoverPorts {
   draft: (jobIds: readonly string[], runId: number) => Promise<DraftResult>;
   /** Replaces the run's stored details and drafted count once its AI work is done. */
   finishRun: (runId: number, details: RunDetails, drafted: number) => void;
+  /**
+   * Jobs earlier runs left behind: found but never scored, and strong matches
+   * whose draft failed. Each run retries them, so one engine outage doesn't strand them.
+   */
+  leftover: () => { unscored: readonly string[]; undrafted: readonly string[] };
   now: () => Date;
   newId: () => string;
 }
@@ -87,10 +92,13 @@ export async function discover(ports: DiscoverPorts): Promise<RunSummary> {
   const summary: RunSummary = { at, found: report.found, newAfterDedup: report.found - report.duplicates, passedFilters: report.passed, drafted: 0 };
   const jobs = passed.map((j) => ({ job: toJob(j, ports.newId(), at), dedupKey: j.dedupKey }));
   const details: RunDetails = { duplicates: report.duplicates, dropped: report.dropped, sources: polled.sources };
+  // Read before saving, so this run's new jobs aren't counted as left over too.
+  const leftover = ports.leftover();
   const runId = ports.save(jobs, details, summary);
   try {
-    const scoring = await ports.score(jobs.map((j) => j.job.id), runId);
-    const drafting = await ports.draft(scoring.toDraft, runId);
+    // ponytail: a job that always fails scoring is retried every run; the budget guard caps the cost.
+    const scoring = await ports.score([...jobs.map((j) => j.job.id), ...leftover.unscored], runId);
+    const drafting = await ports.draft([...scoring.toDraft, ...leftover.undrafted], runId);
     ports.finishRun(runId, { ...details, scoring, drafting }, drafting.drafted);
     return { ...summary, drafted: drafting.drafted };
   } catch (err) {

@@ -81,6 +81,13 @@ describe('activity repository', () => {
     expect(activity.latestRun()).toEqual({ at: '2026-11-04T12:00:00.000Z', found: 5, newAfterDedup: 1, passedFilters: 1, drafted: 0 });
   });
 
+  it('says how many sources the latest run skipped at their daily poll limit', () => {
+    const activity = createActivityRepo(openDatabase(':memory:'));
+    const at = (sourceId: string) => ({ sourceId, outcome: 'limit' as const, jobs: 0, dropped: 0 });
+    activity.addRun({ at: '2026-11-04T06:00:00.000Z', found: 0, newAfterDedup: 0, passedFilters: 0, drafted: 0 }, { duplicates: 0, dropped: { blocklist: 0, type: 0, remote: 0, role: 0, pay: 0, hours: 0 }, sources: [at('remotive'), at('hn')] });
+    expect(activity.latestRun()?.atLimit).toBe(2);
+  });
+
   it('totals recorded tokens by step since a given time', () => {
     const activity = createActivityRepo(openDatabase(':memory:'));
     activity.recordUsage({ at: '2026-11-03T23:00:00.000Z', step: 'score', tokens: 999 });

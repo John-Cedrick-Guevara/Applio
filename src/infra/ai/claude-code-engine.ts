@@ -91,7 +91,8 @@ export function createClaudeCodeEngine(options: Options): AiEngine {
       if (!result) throw new EngineError(code === 0 ? 'Claude Code returned no result.' : exited(code, err));
       if (result.is_error === true || result.subtype !== 'success') {
         if (/not logged in/i.test(String(result.result))) throw new EngineError(NOT_SIGNED_IN);
-        throw new EngineError(`Claude Code couldn't finish (${String(result.subtype)}).`);
+        const reason = typeof result.result === 'string' && result.result.trim() ? `: ${result.result.trim().slice(0, 300)}` : ` (${String(result.subtype)}).`;
+        throw new EngineError(`Claude Code couldn't finish${reason}`);
       }
       const usage = (result.usage ?? {}) as Record<string, unknown>;
       return {
