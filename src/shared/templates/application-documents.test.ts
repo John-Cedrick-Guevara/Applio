@@ -113,7 +113,7 @@ describe('locked résumé layout', () => {
     expect(page).toContain('size:A4');
     expect(page).toContain('margin:12.7mm');
     expect(page).toContain(`<div class="applio-doc">${html}</div>`);
-    expect(DOC_CSS).toMatch(/\.strategist\{font-family:"Times New Roman",Times,serif;font-size:10pt/);
+    expect(DOC_CSS).toMatch(/\.strategist\{font-family:"Times New Roman",Times,serif;font-size:9\.7pt/);
   });
 
   it('keeps an older draft in the old layout', () => {

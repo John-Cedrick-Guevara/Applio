@@ -45,6 +45,13 @@ describe('MCP tools', () => {
     expect(setup().tools.map((t) => t.name)).toEqual(['get_profile', 'get_jobs', 'save_match', 'save_draft', 'get_answers', 'log_event']);
   });
 
+  it('publish every input schema as a JSON object, as MCP requires, or Claude Code drops the whole server', () => {
+    for (const t of setup().tools) {
+      expect(t.inputSchema.type, t.name).toBe('object');
+      expect(t.inputSchema).not.toHaveProperty('anyOf');
+    }
+  });
+
   it('keep their definitions small', () => {
     const defs = JSON.stringify(setup().tools.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })));
     // ~1.1k tokens, paid once per call and cached; the draft's keywords, subject and questions form need the room.
@@ -180,6 +187,16 @@ describe('MCP tools', () => {
     expect(() => call('save_draft', { jobId: inScope.id, questions: ['1?', '2?', '3?', '4?', '5?', '6?'] })).toThrow();
     expect(() => call('save_draft', { jobId: inScope.id, questions: ['What is your Gmail app password?'] })).toThrow("Applio never asks for passwords, keys or tokens. Ask only about the operator's experience.");
     expect(ports.saveQuestions).not.toHaveBeenCalled();
+  });
+
+  it('name the missing field when a draft is incomplete, so Claude can fix it in one try', () => {
+    const { call } = setup();
+    expect(() => call('save_draft', { ...draftInput, coverLetter: undefined })).toThrow(/coverLetter/);
+  });
+
+  it('accept a draft with no screening answers', () => {
+    const { call } = setup();
+    expect(call('save_draft', { ...draftInput, answers: undefined })).toBe('Saved.');
   });
 
   it('log a note on a job', () => {

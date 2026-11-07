@@ -47,6 +47,7 @@ import { AUTONOMY_LEVELS } from '../shared/autonomy';
 import { nextStatuses } from '../shared/status';
 import { matchesFilter } from '../shared/job-filter';
 import { documentNames, letterBody, pageHtml, resumeBody } from '../shared/templates/application-documents';
+import { pdfPageCount } from '../infra/pdf/page-count';
 import { isSafeExternalUrl } from './security';
 
 /** Expands a leading `~` so stored folder paths work with the OS shell. */
@@ -199,8 +200,12 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     const job = getJob(jobId);
     const draft = drafts.get(jobId);
     if (!draft) return;
+    const resume = await printPdf(pageHtml(resumeBody(draft, owner()), 'Resume'));
+    // The locked layout is one page; say so when a draft runs over rather than cut it silently.
+    const pages = pdfPageCount(resume);
+    if (pages > 1) note(jobId, `The résumé prints on ${pages} pages. Trim a bullet or two in the draft, or approve as it is.`);
     const files = {
-      'resume.pdf': await printPdf(pageHtml(resumeBody(draft, owner()), 'Resume')),
+      'resume.pdf': resume,
       [letterName(draft)]: await letterFile(job, draft),
       'job.md': jobMarkdown(job),
     };

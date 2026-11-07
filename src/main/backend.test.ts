@@ -441,8 +441,10 @@ describe('createBackend discovery', () => {
   });
 
   /** A backend that has run once and drafted one job, with Claude played through the real tools. */
-  const draftedBackend = async () => {
+  /** `print`: what the fake printer outputs for a page's HTML (default: the HTML itself). */
+  const draftedBackend = async (print?: (html: string) => string) => {
     const b = await searchingBackend();
+    if (print) b.deps.printPdf.mockImplementation(async (html: string) => new TextEncoder().encode(print(html)));
     await b.api.saveSettings({ fullName: 'Sam Rivera' });
     const fact = await b.api.saveFact({ group: 'Acme — Engineer', text: 'Cut API latency 40%' });
     b.deps.engines['claude-code'] = {
@@ -467,6 +469,12 @@ describe('createBackend discovery', () => {
     expect(readdirSync(job.folderPath!).sort()).toEqual(['cover-letter.pdf', 'job.md', 'resume.pdf']);
     expect(readFileSync(join(job.folderPath!, 'resume.pdf'), 'utf8')).toContain('<h1 class="name">SAM RIVERA</h1>');
     expect(readFileSync(join(job.folderPath!, 'job.md'), 'utf8')).toContain(`applio_job_id: ${job.id}`);
+    expect(deps.printPdf).toHaveBeenCalledTimes(2);
+  });
+
+  it('notes a résumé that prints past one page, so it is never sent as a two-pager unnoticed', async () => {
+    const { job, deps } = await draftedBackend((html) => (html.includes('<title>Resume</title>') ? '/Type /Page\n/Type /Page' : '/Type /Page'));
+    expect(job.history.map((e) => e.note)).toContain('The résumé prints on 2 pages. Trim a bullet or two in the draft, or approve as it is.');
     expect(deps.printPdf).toHaveBeenCalledTimes(2);
   });
 

@@ -63,13 +63,20 @@ const DraftInput = z.strictObject({
   subject: text(200).optional(),
   keywords: z.strictObject({ claimed: z.array(z.strictObject({ keyword: text(80), factId: text(64) })).max(15), gaps: list(10) }).optional(),
   // A bank answer is cited by id and stored with the bank's own text; anything else is a new, AI-written answer.
-  answers: z.array(z.union([z.strictObject({ question: text(300), answerId: text(64) }), z.strictObject({ question: text(300), answer: text(2000) })])).max(20),
+  answers: z.array(z.union([z.strictObject({ question: text(300), answerId: text(64) }), z.strictObject({ question: text(300), answer: text(2000) })])).max(20).default([]),
 });
 
 /** Instead of a draft: up to 5 questions, when a truthful draft needs something the facts don't say. */
 const QuestionsInput = z.strictObject({ ...JobRef, questions: z.array(text(300)).min(1).max(5) });
 /** Questions are about the operator's experience; nothing here may fish for credentials (MNB-4). */
 const SECRET_ASK = /password|passcode|api[ -]?key|secret|token|credential|\bpin\b|2fa|one-time code/i;
+
+/**
+ * What Claude sees for save_draft: one object (MCP requires `type: object` at the top;
+ * a union becomes `anyOf`, and Claude Code then drops the whole server). Parsing uses
+ * the strict union, so a mixed draft-and-questions input is still refused.
+ */
+const SaveDraftPublished = DraftInput.partial().extend({ ...JobRef, questions: QuestionsInput.shape.questions.optional() });
 
 /** Every number in a line ("40%", "1,200", "3.5"), as written, for the metrics check. */
 const numbersIn = (s: string) => s.match(/\d+(?:[.,]\d+)*/g) ?? [];
@@ -105,9 +112,10 @@ export function createTools(ports: ToolPorts): McpTool[] {
     if (unknown.length > 0) throw new ToolInputError(`These fact IDs are not in the fact bank: ${unknown.join(', ')}. Use only facts from get_profile.`);
   };
 
-  const tool = <T>(name: string, description: string, schema: z.ZodType<T>, run: (input: T) => string): McpTool => {
+  /** `published`: the schema Claude sees, when the parsing schema can't be a single JSON object. */
+  const tool = <T>(name: string, description: string, schema: z.ZodType<T>, run: (input: T) => string, published: z.ZodType = schema): McpTool => {
     // `$schema` only costs tokens; both MCP and the Messages API read the rest.
-    const inputSchema = z.toJSONSchema(schema) as Record<string, unknown>;
+    const inputSchema = z.toJSONSchema(published) as Record<string, unknown>;
     delete inputSchema.$schema;
     return { name, description, inputSchema, call: (input) => run(parse(schema, input)) };
   };
@@ -135,7 +143,9 @@ export function createTools(ports: ToolPorts): McpTool[] {
       return 'Saved.';
     }),
 
-    tool('save_draft', 'Save a job\'s draft (résumé lines cite fact ids), or up to 5 questions when facts are missing or conflict.', z.union([DraftInput, QuestionsInput]), (input) => {
+    tool('save_draft', 'Save a job\'s draft (résumé lines cite fact ids), or up to 5 questions when facts are missing or conflict.', z.unknown(), (raw) => {
+      // Routed by shape rather than parsed as a union, so a rejection names the field to fix.
+      const input = raw && typeof raw === 'object' && 'questions' in raw ? parse(QuestionsInput, raw) : parse(DraftInput, raw);
       if ('questions' in input) {
         scoped(input.jobId);
         if (input.questions.some((q) => SECRET_ASK.test(q))) throw new ToolInputError("Applio never asks for passwords, keys or tokens. Ask only about the operator's experience.");
@@ -187,7 +197,7 @@ export function createTools(ports: ToolPorts): McpTool[] {
       const resume = d.resume.map((sec) => ({ heading: sec.group, group: sec.group, items: sec.items }));
       ports.saveDraft({ ...d, resume, kind: draftKind(job), edited: false, answers, createdAt: ports.now().toISOString() }, reused);
       return 'Saved.';
-    }),
+    }, SaveDraftPublished),
 
     tool('get_answers', "The operator's saved answers to form questions. Reuse these before writing new ones.", NoInput, () =>
       JSON.stringify(ports.answers().map(({ id, question, answer }) => ({ id, question, answer }))),
