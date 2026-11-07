@@ -10,7 +10,7 @@ const NOW = new Date('2026-11-05T06:00:00.000Z');
 const setup = (polled: RunSourcesResult, existing: string[] = [], targetRoles = ['Backend Engineer'], leftover = { unscored: [] as string[], undrafted: [] as string[] }) => {
   const saved: { jobs: { job: Job; dedupKey: string }[]; details: RunDetails }[] = [];
   const scoring: { runId: number; details: RunDetails; drafted: number }[] = [];
-  const draft = vi.fn(async (ids: readonly string[]) => ({ drafted: ids.length, notDrafted: 0, notifyOnly: 0 }));
+  const draft = vi.fn(async (ids: readonly string[]) => ({ drafted: ids.length, notDrafted: 0, notifyOnly: 0, asked: 0 }));
   const score = vi.fn(async (ids: readonly string[]) => ({ scored: ids.length, toDraft: [...ids], belowThreshold: 0, notScored: 0 }));
   let n = 0;
   const poll = vi.fn(async () => polled);

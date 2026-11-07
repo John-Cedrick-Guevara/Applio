@@ -23,6 +23,8 @@ export interface ToolPorts {
   saveMatch: (jobId: string, match: Match) => void;
   /** `reusedAnswerIds`: answer-bank entries the draft reused, so their reuse counts go up. */
   saveDraft: (draft: Draft, reusedAnswerIds: string[]) => void;
+  /** Questions for the operator in place of a draft; the job waits until they answer (SPEC F4). */
+  saveQuestions: (jobId: string, questions: string[]) => void;
   /** A note on the job's timeline; its status stays as it is. */
   logEvent: (jobId: string, message: string) => void;
   now: () => Date;
@@ -63,6 +65,11 @@ const DraftInput = z.strictObject({
   // A bank answer is cited by id and stored with the bank's own text; anything else is a new, AI-written answer.
   answers: z.array(z.union([z.strictObject({ question: text(300), answerId: text(64) }), z.strictObject({ question: text(300), answer: text(2000) })])).max(20),
 });
+
+/** Instead of a draft: up to 5 questions, when a truthful draft needs something the facts don't say. */
+const QuestionsInput = z.strictObject({ ...JobRef, questions: z.array(text(300)).min(1).max(5) });
+/** Questions are about the operator's experience; nothing here may fish for credentials (MNB-4). */
+const SECRET_ASK = /password|passcode|api[ -]?key|secret|token|credential|\bpin\b|2fa|one-time code/i;
 
 /** Every number in a line ("40%", "1,200", "3.5"), as written, for the metrics check. */
 const numbersIn = (s: string) => s.match(/\d+(?:[.,]\d+)*/g) ?? [];
@@ -128,7 +135,14 @@ export function createTools(ports: ToolPorts): McpTool[] {
       return 'Saved.';
     }),
 
-    tool('save_draft', 'Save the tailored résumé (every line cites a fact id and keeps its numbers exactly), cover letter or proposal, and form answers (answerId for a bank answer) for one job.', DraftInput, (d) => {
+    tool('save_draft', 'Save a job\'s draft (résumé lines cite fact ids), or up to 5 questions when facts are missing or conflict.', z.union([DraftInput, QuestionsInput]), (input) => {
+      if ('questions' in input) {
+        scoped(input.jobId);
+        if (input.questions.some((q) => SECRET_ASK.test(q))) throw new ToolInputError("Applio never asks for passwords, keys or tokens. Ask only about the operator's experience.");
+        ports.saveQuestions(input.jobId, input.questions);
+        return 'Asked. The operator answers in Applio, then you draft again.';
+      }
+      const d = input;
       const job = scoped(d.jobId);
       const items = d.resume.flatMap((s) => s.items);
       requireFacts([...items.map((i) => i.factId), ...(d.keywords?.claimed ?? []).map((k) => k.factId)]);

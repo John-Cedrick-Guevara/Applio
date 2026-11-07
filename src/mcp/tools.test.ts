@@ -24,6 +24,7 @@ const setup = () => {
     job: (id) => [inScope, outOfScope].find((j) => j.id === id),
     saveMatch: vi.fn(),
     saveDraft: vi.fn(),
+    saveQuestions: vi.fn(),
     logEvent: vi.fn(),
     now: () => NOW,
   };
@@ -46,7 +47,8 @@ describe('MCP tools', () => {
 
   it('keep their definitions small', () => {
     const defs = JSON.stringify(setup().tools.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })));
-    expect(defs.length).toBeLessThan(4000); // ~1k tokens
+    // ~1.1k tokens, paid once per call and cached; the draft's keywords, subject and questions form need the room.
+    expect(defs.length).toBeLessThan(4500);
   });
 
   it('return the fact bank with its sections, skills, preferences and the notes for Claude, and nothing else', () => {
@@ -164,6 +166,20 @@ describe('MCP tools', () => {
   it('reject a claimed keyword whose proof is not in the fact bank', () => {
     const { call } = setup();
     expect(() => call('save_draft', { ...draftInput, keywords: { claimed: [{ keyword: 'Kafka', factId: 'f9' }], gaps: [] } })).toThrow('These fact IDs are not in the fact bank: f9.');
+  });
+
+  it('save up to 5 questions for the operator instead of a draft', () => {
+    const { call, ports } = setup();
+    expect(call('save_draft', { jobId: inScope.id, questions: ['Did OpsMind ship to real users?', 'Can you start in December?'] })).toBe('Asked. The operator answers in Applio, then you draft again.');
+    expect(ports.saveQuestions).toHaveBeenCalledWith(inScope.id, ['Did OpsMind ship to real users?', 'Can you start in December?']);
+    expect(ports.saveDraft).not.toHaveBeenCalled();
+  });
+
+  it('refuse a 6th question, and any question asking for a password, key or token', () => {
+    const { call, ports } = setup();
+    expect(() => call('save_draft', { jobId: inScope.id, questions: ['1?', '2?', '3?', '4?', '5?', '6?'] })).toThrow();
+    expect(() => call('save_draft', { jobId: inScope.id, questions: ['What is your Gmail app password?'] })).toThrow("Applio never asks for passwords, keys or tokens. Ask only about the operator's experience.");
+    expect(ports.saveQuestions).not.toHaveBeenCalled();
   });
 
   it('log a note on a job', () => {

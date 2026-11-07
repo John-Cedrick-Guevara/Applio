@@ -122,6 +122,20 @@ export interface Draft {
   keywords?: { claimed: { keyword: string; factId: string }[]; gaps: string[] };
 }
 
+/** Questions Claude asked instead of drafting, waiting on the operator (SPEC F4). */
+export interface OpenQuestions {
+  jobId: string;
+  questions: string[];
+  askedAt: string;
+}
+
+/** The operator's answer to one of Claude's questions; `saveTo` names the fact-bank section to keep it in. */
+export interface QuestionAnswer {
+  question: string;
+  answer: string;
+  saveTo?: string;
+}
+
 /** A verified fact about the operator — the only material AI may draw from. */
 export interface Fact {
   id: string;
@@ -318,6 +332,8 @@ export interface RunSummary {
   drafted: number;
   /** Sources skipped because they'd used their polls for the day; set when the run's details are stored. */
   atLimit?: number;
+  /** Jobs where Claude asked questions instead of drafting; set when the run's details are stored. */
+  asked?: number;
 }
 
 /** Engine and scheduler state for the sidebar card and Review header. */
