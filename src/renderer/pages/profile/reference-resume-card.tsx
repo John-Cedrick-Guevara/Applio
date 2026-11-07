@@ -41,7 +41,7 @@ export function ReferenceResumeCard({ resume, templateOpen, onToggleTemplate, on
       </div>
       <p className="cell-sub">Sets tone and section order for every tailored resume. Output always uses the one ATS-safe template.</p>
       <div className="row card-actions">
-        <Button busy={action.pending} onClick={replace}>{resume ? 'Replace' : 'Upload resume'}</Button>
+        <Button busy={action.pending} onClick={replace}>{action.pending ? 'Reading…' : resume ? 'Replace' : 'Upload resume'}</Button>
         <Button aria-expanded={templateOpen} onClick={onToggleTemplate}>{templateOpen ? 'Hide template' : 'Preview template'}</Button>
       </div>
     </section>

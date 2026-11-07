@@ -173,4 +173,16 @@ describe('ReviewPage', () => {
       { question: 'Can you start within two weeks?', answer: 'Yes.' },
     ]);
   });
+
+  it('shows a job Claude is drafting in the background, live, until its draft lands', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const status = await api.getStatus();
+    vi.spyOn(api, 'getStatus').mockResolvedValue({ ...status, drafting: ['j5'] });
+    renderWithApp(<ReviewPage params={{ id: 'j5' }} />, api);
+    const queue = await screen.findByRole('region', { name: 'Queue' });
+    expect(within(queue).getByRole('list', { name: 'Drafting now' })).toHaveTextContent('Senior Software Engineer, Platform');
+    const panel = screen.getByRole('region', { name: 'Drafting' });
+    expect(panel).toHaveAttribute('aria-busy', 'true');
+    expect(panel).toHaveTextContent('Claude is writing the résumé and cover letter');
+  });
 });

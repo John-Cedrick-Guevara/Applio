@@ -166,7 +166,7 @@ function DraftDetail({ job, draft, nextId, thresholds, owner, autonomyBySource, 
             {primary.handoff ? (
               <a className={buttonClass('primary')} href={`#/handoff/${job.id}`}>{primary.label}</a>
             ) : (
-              <Button variant="primary" busy={action.pending} onClick={approve}>{primary.label}</Button>
+              <Button variant="primary" busy={action.pending} onClick={approve}>{action.pending ? (job.channel === 'email' ? 'Sending…' : 'Submitting…') : primary.label}</Button>
             )}
           </div>
         ) : null}

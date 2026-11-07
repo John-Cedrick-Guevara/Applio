@@ -220,6 +220,22 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     return found;
   };
 
+  /**
+   * Drafts one job the operator just added or answered, in the background, so
+   * their click returns at once; open pages see it in `drafting` until it lands.
+   */
+  const draftingNow = new Set<string>();
+  const draftInBackground = (id: string) => {
+    draftingNow.add(id);
+    pushStatus();
+    void draftJobs([id], { trigger: 'operator' }, draftPorts)
+      .catch((err: unknown) => note(id, `Not drafted: ${err instanceof Error ? err.message : String(err)}`))
+      .finally(() => {
+        draftingNow.delete(id);
+        pushStatus();
+      });
+  };
+
   // Drafting, from a run or from Add job: the same calls, files and autonomy gate either way.
   const draftPorts: DraftPorts = {
     ai: (request) => ai.run(request),
@@ -469,6 +485,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       dailyTokenBudget,
       lastRun: activity.latestRun(),
       jobsVersion: jobs.version(),
+      drafting: [...draftingNow],
     };
   };
   let pushedJobsVersion: number | undefined;
@@ -574,7 +591,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       const at = new Date().toISOString();
       jobs.insert({ ...analyzed, id, sourceId: 'clip', status: 'scored', factsUsed: 0, history: [{ status: 'found', at }, { status: 'scored', at }] }, { dedupKey: key, createdAt: at });
       analyses.delete(previewId);
-      await draftJobs([id], { trigger: 'operator' }, draftPorts);
+      draftInBackground(id);
       return getJob(id);
     },
 
@@ -587,7 +604,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       kv.set(answersKey(jobId), answers.map(({ question, answer }) => ({ question, answer: answer.trim() })));
       questions.clear(jobId);
       note(jobId, `You answered ${answers.length} question${answers.length === 1 ? '' : 's'}`);
-      await draftJobs([jobId], { trigger: 'operator' }, draftPorts);
+      draftInBackground(jobId);
       return getJob(jobId);
     },
 

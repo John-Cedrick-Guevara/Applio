@@ -87,9 +87,15 @@ export default function AddJobPage() {
       </section>
 
       {analyze.pending ? (
-        <section className="card" role="status">
-          <div className="analyzing">Reading the post and scoring it against your fact bank…</div>
-          <div className="score-bar progress"><div /></div>
+        <section className="card" role="status" aria-busy="true">
+          <div className="analyzing row"><span className="spinner" aria-hidden="true" />Claude is reading and scoring the post against your fact bank. This usually takes 20–40 seconds.</div>
+          {/* Shaped like the result card, so nothing jumps when it arrives. */}
+          <div className="skeleton-stack" aria-hidden="true">
+            <div className="skeleton skeleton-line" style={{ width: '30%' }} />
+            <div className="skeleton skeleton-title" style={{ width: '55%' }} />
+            <div className="skeleton skeleton-line" style={{ width: '90%' }} />
+            <div className="skeleton skeleton-line" style={{ width: '75%' }} />
+          </div>
         </section>
       ) : null}
 
@@ -141,7 +147,7 @@ function PreviewCard({ preview, draftThreshold, added, onAdded, onDiscard }: Pre
       </dl>
       {added ? (
         <div className="banner banner-success preview-done" role="status">
-          <span>Added. Drafting the resume and cover letter now; it will be in Review in about a minute.</span>
+          <span>Added. Claude is drafting the résumé and cover letter in the background (one to two minutes). Follow it in Review under Drafting now.</span>
           <span className="row">
             <Button size="sm" onClick={onDiscard}>Add another</Button>
             <a href={`#/review/${added.id}`}>Go to Review</a>
