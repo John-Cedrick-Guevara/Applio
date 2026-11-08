@@ -290,6 +290,41 @@ describe('createBackend discovery', () => {
     expect(after.deps.db.prepare("SELECT title, status FROM jobs").all()).toEqual([{ title: 'Senior Backend Engineer', status: 'found' }]);
   });
 
+  it('scores a scan\'s jobs but drafts none unless the scan asks', async () => {
+    const b = await searchingBackend();
+    const fact = await b.api.saveFact({ group: 'Acme', text: 'Shipped APIs' });
+    const complete = vi.fn(async ({ jobIds }: { jobIds: readonly string[] }) => ({ text: JSON.stringify(jobIds.map((jobId) => ({ jobId, score: 90, roleSummary: 'r', descriptionSummary: 'd', strengths: [{ text: 'APIs', factId: fact.id }], gaps: [] }))), inputTokens: 900, outputTokens: 100 }));
+    b.deps.engines['claude-code'] = { check: async () => ({ ready: true, message: 'ok' }), complete };
+    expect(await b.api.runDiscovery()).toMatchObject({ passedFilters: 1, drafted: 0 });
+    expect(complete).toHaveBeenCalledTimes(1);
+    expect(await b.api.listJobs({ statuses: ['scored'] })).toHaveLength(1);
+  });
+
+  it('polls only the sources chosen for this scan', async () => {
+    const { api } = await searchingBackend();
+    vi.mocked(fakeBoard.fetchJobs).mockClear();
+    expect(await api.runDiscovery({ sourceIds: ['remoteok'] })).toMatchObject({ found: 0 });
+    expect(fakeBoard.fetchJobs).not.toHaveBeenCalled();
+    expect(await api.runDiscovery({ sourceIds: ['remotive'] })).toMatchObject({ found: 2 });
+  });
+
+  it("pushes the scan's phase while it runs, and clears it once done", async () => {
+    const { api, deps } = await searchingBackend();
+    await api.runDiscovery();
+    const phases = deps.onStatus.mock.calls.map(([s]) => s.scan?.phase).filter(Boolean);
+    expect(phases).toEqual(expect.arrayContaining(['fetching', 'filtering', 'scoring']));
+    expect(deps.onStatus.mock.calls.at(-1)![0].scan).toBeUndefined();
+  });
+
+  it('stops a scan between phases when asked, keeping what it found', async () => {
+    const { api, deps } = await searchingBackend();
+    deps.onStatus.mockImplementation((s) => {
+      if (s.scan?.phase === 'filtering') void api.stopScan();
+    });
+    expect(await api.runDiscovery()).toMatchObject({ passedFilters: 1, stopped: true });
+    expect(await api.listJobs({ statuses: ['found'] })).toHaveLength(1);
+  });
+
   it('does not save the same job again on the next run', async () => {
     const { api } = await searchingBackend();
     await api.runDiscovery();
@@ -400,7 +435,7 @@ describe('createBackend discovery', () => {
       return { text: 'done', inputTokens: 900, outputTokens: 100 };
     });
     deps.engines['claude-code'] = { complete, check: async () => ({ ready: true, message: 'ok' }) };
-    expect(await api.runDiscovery()).toMatchObject({ passedFilters: 1, drafted: 1 });
+    expect(await api.runDiscovery({ draft: true })).toMatchObject({ passedFilters: 1, drafted: 1 });
     const [job] = await api.listJobs({ statuses: ['drafted'] });
     expect(job).toMatchObject({ factsUsed: 1, tokensUsed: 1000, strengths: ['Fast APIs'] });
     expect((await api.getDraft(job!.id))?.coverLetter).toBe('Dear team');
@@ -425,10 +460,10 @@ describe('createBackend discovery', () => {
       return { text: 'done', inputTokens: 900, outputTokens: 100 };
     });
     deps.engines['claude-code'] = { complete, check: async () => ({ ready: true, message: 'ok' }) };
-    expect(await api.runDiscovery()).toMatchObject({ passedFilters: 1, drafted: 0 });
+    expect(await api.runDiscovery({ draft: true })).toMatchObject({ passedFilters: 1, drafted: 0 });
     down = false;
     // The job is a duplicate now, so only the retry can draft it.
-    expect(await api.runDiscovery()).toMatchObject({ passedFilters: 0, drafted: 1 });
+    expect(await api.runDiscovery({ draft: true })).toMatchObject({ passedFilters: 0, drafted: 1 });
     expect(await api.listJobs({ statuses: ['drafted'] })).toHaveLength(1);
   });
 
@@ -450,7 +485,7 @@ describe('createBackend discovery', () => {
         return { text: 'done', inputTokens: 900, outputTokens: 100 };
       },
     };
-    await api.runDiscovery();
+    await api.runDiscovery({ draft: true });
     const [open] = await api.listQuestions();
     expect(open).toMatchObject({ questions: ['Can you start in December?', 'Did you lead the Acme migration?'] });
     expect(await api.listJobs({ statuses: ['drafted'] })).toEqual([]);
@@ -494,7 +529,7 @@ describe('createBackend discovery', () => {
         return { text: 'done', inputTokens: 900, outputTokens: 100 };
       },
     };
-    await b.api.runDiscovery();
+    await b.api.runDiscovery({ draft: true });
     const [job] = await b.api.listJobs({ statuses: ['drafted'] });
     return { ...b, job: job! };
   };
@@ -511,7 +546,7 @@ describe('createBackend discovery', () => {
         return { text: 'done', inputTokens: 1, outputTokens: 1 };
       },
     };
-    expect(await b.api.runDiscovery()).toMatchObject({ drafted: 0 });
+    expect(await b.api.runDiscovery({ draft: true })).toMatchObject({ drafted: 0 });
     const [below] = await b.api.listJobs({ statuses: ['scored'] });
     await b.api.draftJob(below!.id);
     await vi.waitFor(async () => expect((await b.api.getJob(below!.id)).status).toBe('drafted'));
@@ -610,7 +645,7 @@ describe('createBackend discovery', () => {
         return { text: 'done', inputTokens: 1, outputTokens: 1 };
       },
     };
-    expect(await b.api.runDiscovery()).toMatchObject({ drafted: 1 });
+    expect(await b.api.runDiscovery({ draft: true })).toMatchObject({ drafted: 1 });
     const [job] = await b.api.listJobs({ statuses: ['drafted'] });
     expect(job!.history.at(-1)?.note).toBe("Couldn't save the files: printing failed");
     expect(existsSync(join(home.dir, 'Applio'))).toBe(false);
@@ -769,7 +804,7 @@ describe('createBackend discovery', () => {
         return { text: 'done', inputTokens: 1, outputTokens: 1 };
       },
     };
-    await b.api.runDiscovery();
+    await b.api.runDiscovery({ draft: true });
     const [sent] = await b.api.listJobs({ statuses: ['applied'] });
     expect(sent).toMatchObject({ sentBy: 'autonomous' });
     expect(outbox).toHaveLength(1);
@@ -853,7 +888,7 @@ describe('createBackend discovery', () => {
         return { text: 'done', inputTokens: 1, outputTokens: 1 };
       },
     };
-    await b.api.runDiscovery();
+    await b.api.runDiscovery({ draft: true });
     await vi.waitFor(() => expect(telegram.some((t) => t.method === 'sendMessage')).toBe(true));
     const message = telegram.find((t) => t.method === 'sendMessage')!.body;
     expect(message).toMatchObject({ chat_id: '42', text: expect.stringContaining('Draft ready · 90%') });

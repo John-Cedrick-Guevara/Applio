@@ -1,8 +1,8 @@
-import type { RunSummary } from '../../shared/types';
+import type { RunSummary, ScanOptions } from '../../shared/types';
 import { NoTargetRolesError } from './discover';
 
 export interface ScanRunnerPorts {
-  run: () => Promise<RunSummary>;
+  run: (options: ScanOptions) => Promise<RunSummary>;
   /** Called when a scan starts or ends, so main can push status to the page. */
   onChange: () => void;
   log: (message: string, err: unknown) => void;
@@ -10,10 +10,10 @@ export interface ScanRunnerPorts {
 
 export interface ScanRunner {
   /**
-   * Starts a scan now, or returns the one already running.
+   * Starts a scan now, or returns the one already running (its options win).
    * @throws The scan's own error if it fails.
    */
-  runNow(): Promise<RunSummary>;
+  runNow(options?: ScanOptions): Promise<RunSummary>;
 }
 
 /**
@@ -23,11 +23,11 @@ export interface ScanRunner {
 export function createScanRunner(ports: ScanRunnerPorts): ScanRunner {
   let running: Promise<RunSummary> | null = null;
   return {
-    runNow: () => {
+    runNow: (options = {}) => {
       if (running) return running;
       ports.onChange();
       running = ports
-        .run()
+        .run(options)
         .catch((err: unknown) => {
           // No target role yet is the operator's next step, not a failure; the page says so.
           if (!(err instanceof NoTargetRolesError)) ports.log('[scan] run failed', err);

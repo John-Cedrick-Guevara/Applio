@@ -11,8 +11,10 @@ interface ReviewQueueProps {
   currentId?: string;
   /** Jobs scored below the draft threshold, best first: shown on request, never drafted. */
   below: Job[];
-  /** Jobs not scored yet, or strong matches whose draft failed; the next scan retries them. */
+  /** Jobs not scored yet; the next scan scores them. */
   waiting: Job[];
+  /** Strong matches with no draft yet, one click from one. */
+  toDraft: Job[];
   /** Jobs where Claude asked questions before drafting. */
   asking: Job[];
   /** Jobs Claude is drafting right now in the background. */
@@ -48,11 +50,11 @@ function moveSelection(e: KeyboardEvent<HTMLElement>) {
  * off) with a filter for each, two-line rows, and badges only for exceptions. The
  * list scrolls inside its card, so a long queue never pushes the draft out of view.
  */
-export function ReviewQueue({ jobs, currentId, below, waiting, asking, drafting, draftThreshold }: ReviewQueueProps) {
+export function ReviewQueue({ jobs, currentId, below, waiting, asking, drafting, toDraft, draftThreshold }: ReviewQueueProps) {
   const [filter, setFilter] = useState<QueueFilter | 'all'>('all');
   const [showBelow, setShowBelow] = useState(false);
   const [showWaiting, setShowWaiting] = useState(false);
-  const groups = queueGroups(jobs, asking, drafting);
+  const groups = queueGroups(jobs, asking, drafting, toDraft);
   const count = (f: QueueFilter | 'all') => groups.filter((g) => f === 'all' || g.filter === f).reduce((n, g) => n + g.jobs.length, 0);
   const shown = groups.filter((g) => filter === 'all' || g.filter === filter);
   const drafted = groups.filter((g) => g.key === 'send' || g.key === 'handoff').reduce((n, g) => n + g.jobs.length, 0);
@@ -82,7 +84,7 @@ export function ReviewQueue({ jobs, currentId, below, waiting, asking, drafting,
 
         {filter === 'all' && waiting.length > 0 ? (
           <div className="queue-footer">
-            {waiting.length} not scored or drafted yet; your next scan retries them.{' '}
+            {waiting.length} not scored yet; your next scan scores {waiting.length === 1 ? 'it' : 'them'}.{' '}
             <button type="button" className={buttonClass('link', 'sm', 'queue-footer-action')} aria-expanded={showWaiting} aria-label={showWaiting ? 'Hide waiting jobs' : 'Show waiting jobs'} onClick={() => setShowWaiting((s) => !s)}>
               {showWaiting ? 'Hide them' : 'Show them'}
             </button>

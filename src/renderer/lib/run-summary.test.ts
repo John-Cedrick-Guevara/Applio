@@ -40,4 +40,8 @@ describe('runResult', () => {
   it('says when the sources had no polls left', () => {
     expect(runResult({ at, found: 0, newAfterDedup: 0, passedFilters: 0, drafted: 0, atLimit: 8 })).toBe("Nothing was fetched: every source has used today's polls. They poll again tomorrow.");
   });
+
+  it('says a stopped scan kept what it found', () => {
+    expect(runResult({ at: '', found: 12, newAfterDedup: 9, passedFilters: 3, drafted: 0, stopped: true })).toBe('Scan stopped: 3 jobs passed your filters. Your next scan scores any it didn\'t.');
+  });
 });

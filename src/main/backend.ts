@@ -43,7 +43,7 @@ import { findJobFolder, writeApplication } from '../infra/fs/application-files';
 import { readResumeText } from '../infra/resume/read-resume';
 import type { SecretStore } from '../infra/secrets/secret-store';
 import type { ApplioApi } from '../shared/api';
-import type { ConnectionCheck, Draft, AiEngine as EngineKind, AppStatus, InterviewPrep, Job, QuestionAnswer, Settings } from '../shared/types';
+import type { ConnectionCheck, Draft, AiEngine as EngineKind, AppStatus, InterviewPrep, Job, QuestionAnswer, ScanOptions, Settings } from '../shared/types';
 import { AUTONOMY_LEVELS } from '../shared/autonomy';
 import { nextStatuses } from '../shared/status';
 import { matchesFilter } from '../shared/job-filter';
@@ -286,9 +286,16 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     return url && name ? { name, url } : undefined;
   };
 
-  const runDiscovery = () =>
-    discover({
-      poll: () => runSources({ sources, isEnabled: (id) => sourcesRepo.get(id)?.enabled ?? false, polls, httpFor, today: () => localDay(new Date()) }),
+  // The scan running now, pushed to open pages; and whether the operator asked it to stop.
+  let scan: AppStatus['scan'];
+  let stopRequested = false;
+
+  /** One scan: the chosen enabled sources (all of them by default), drafting only when asked. */
+  const runDiscovery = ({ sourceIds, draft = false }: ScanOptions) => {
+    stopRequested = false;
+    const chosen = (id: string) => (sourcesRepo.get(id)?.enabled ?? false) && (!sourceIds || sourceIds.includes(id));
+    return discover({
+      poll: () => runSources({ sources, isEnabled: chosen, polls, httpFor, today: () => localDay(new Date()) }),
       existingKeys: () => jobs.dedupKeys(),
       seenKeys: () => jobs.seenKeys(),
       filters: () => {
@@ -333,7 +340,15 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       },
       now: () => new Date(),
       newId: randomUUID,
+      onPhase: (phase) => {
+        scan = { phase, startedAt: scan?.startedAt ?? new Date().toISOString() };
+        pushStatus();
+      },
+      stopped: () => stopRequested,
+    }, { draft }).finally(() => {
+      scan = undefined;
     });
+  };
 
   const scans = createScanRunner({
     run: runDiscovery,
@@ -581,6 +596,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       jobsVersion: jobs.version(),
       drafting: [...draftingNow.keys()],
       draftingSince: Object.fromEntries(draftingNow),
+      ...(scan ? { scan } : {}),
       ...(ai.budgetStop() ? { budgetStop: ai.budgetStop() } : {}),
       ...(allSourcesAtLimit() ? { sourcesAtLimit: true } : {}),
     };
@@ -765,7 +781,10 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     },
 
     getStatus: later(getStatus),
-    runDiscovery: () => scans.runNow(),
+    runDiscovery: (options) => scans.runNow(options),
+    stopScan: later(() => {
+      stopRequested = true;
+    }),
     setAutomationPaused: later((paused) => {
       kv.set(PAUSED_KEY, paused);
       pushStatus();

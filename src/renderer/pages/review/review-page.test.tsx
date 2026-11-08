@@ -302,10 +302,21 @@ describe('ReviewPage', () => {
     await waitFor(() => expect(screen.queryByText(/more scored below your draft threshold/)).not.toBeInTheDocument());
   });
 
+  it('lists strong matches a scan left undrafted under Ready to draft, one click from a draft', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    await api.saveSettings({ draftThreshold: 60 });
+    renderWithApp(<ReviewPage params={{ id: 'j5' }} />, api);
+    const queue = await screen.findByRole('region', { name: 'Queue' });
+    expect(within(queue).getByRole('list', { name: 'Ready to draft' })).toHaveTextContent('Senior Software Engineer, Platform');
+    const detail = screen.getByRole('region', { name: 'Job detail' });
+    expect(detail).toHaveTextContent('Strong match (67, your draft score is 60). Not drafted yet: scans only draft when you ask.');
+    expect(within(detail).getByRole('button', { name: 'Draft this one' })).toBeEnabled();
+  });
+
   it('lists jobs still waiting to be scored or drafted, with the reason, so none go missing', async () => {
     open();
     const queue = await screen.findByRole('region', { name: 'Queue' });
-    expect(within(queue).getByText(/1 not scored or drafted yet; your next scan retries them\./)).toBeInTheDocument();
+    expect(within(queue).getByText(/1 not scored yet; your next scan scores it\./)).toBeInTheDocument();
     await userEvent.click(within(queue).getByRole('button', { name: 'Show waiting jobs' }));
     const link = within(queue).getByRole('link', { name: /Frontend Developer/ });
     expect(link).toHaveTextContent('Not scored yet');

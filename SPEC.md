@@ -38,7 +38,7 @@ Status: personal tool first, open source once polished.
 - **Preferences:** target roles, seniority, min salary, timezones, remote-only, full-time / contract / freelance.
 
 ### F2. Discovery (operator-triggered: runs only when the operator starts a scan)
-No scan runs on a timer, on launch or on wake, so no tokens are spent without a click. The operator starts one from the app or the tray.
+No scan runs on a timer, on launch or on wake, so no tokens are spent without a click. The operator starts one from Find jobs (choosing its sources) or the tray, and can stop it between phases; what it found is kept.
 
 | Source | Access |
 |---|---|
@@ -53,7 +53,7 @@ No scan runs on a timer, on launch or on wake, so no tokens are spent without a 
 1. **Dedup** across sources (company + normalized title; boards each give their own URL, so the apply URL can't be part of the key).
 2. **Free prefilter** (no AI): role keywords, remote, salary, timezone, blocklist. Target: drop 80–90%.
 3. **AI scoring** (batched): match score 0–100, role summary, job description summary, gaps.
-4. Jobs above the threshold go to generation.
+4. Jobs above the threshold go to generation when the operator asks: per scan ("Also draft strong matches", off by default) or one job at a time from Review.
 
 ### F4. Generation
 - Tailored resume as structured data → one ATS-safe template → PDF.

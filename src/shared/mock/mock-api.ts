@@ -245,11 +245,13 @@ export function createMockApi({ latencyMs = 250, now = () => new Date(), sendFai
 
     getStatus: () => respond(status()),
 
-    runDiscovery: () =>
+    runDiscovery: (options) =>
       run(() => {
-        lastRun = { at: now().toISOString(), found: 14, newAfterDedup: 11, passedFilters: 2, drafted: 0 };
+        lastRun = { at: now().toISOString(), found: 14, newAfterDedup: 11, passedFilters: 2, drafted: options?.draft ? 1 : 0 };
         return lastRun;
       }),
+
+    stopScan: () => respond(undefined),
 
     setAutomationPaused: (next) =>
       run(() => {

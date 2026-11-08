@@ -14,3 +14,8 @@
 .find-jobs-funnel { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); }
 .find-jobs-funnel li { padding: var(--space-3); border: 1px solid var(--border-soft); border-radius: var(--radius); color: var(--text-muted); font-size: var(--text-sm); }
 .find-jobs-count { display: block; color: var(--text); font-size: var(--text-3xl); font-weight: 500; }
+.find-jobs-source { display: flex; align-items: center; gap: var(--space-3); width: 100%; min-height: 44px; }
+.find-jobs-source > span:nth-child(2) { flex: 1; }
+.find-jobs-sources li { padding: 0; }
+.find-jobs-draft { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-4); border-radius: var(--radius); background: var(--surface-subtle); }
+.find-jobs-draft input, .find-jobs-source input { width: 18px; height: 18px; accent-color: var(--accent); }

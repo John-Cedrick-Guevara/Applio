@@ -165,6 +165,12 @@ describe('queueGroups', () => {
     ]);
   });
 
+  it('puts strong matches a scan left undrafted under Ready to draft, after drafting now', () => {
+    const strong = job({ id: 's', status: 'scored', score: 85 });
+    const groups = queueGroups([email], [], [], [strong]);
+    expect(groups.map((g) => [g.key, g.label])).toEqual([['todraft', 'Ready to draft'], ['send', 'Ready to send']]);
+  });
+
   it('files each group under one filter, so the filter counts add up', () => {
     const groups = queueGroups([email, site, unsent], [asking], []);
     expect(groups.map((g) => g.filter)).toEqual(['attention', 'attention', 'send', 'handoff']);

@@ -102,7 +102,7 @@ export function traceLine(draft: Pick<Draft, 'edited' | 'check'>, factsUsed: num
 export type QueueFilter = 'attention' | 'send' | 'handoff';
 
 export interface QueueGroup {
-  key: 'unsent' | 'asking' | 'drafting' | 'send' | 'handoff';
+  key: 'unsent' | 'asking' | 'drafting' | 'todraft' | 'send' | 'handoff';
   label: string;
   filter: QueueFilter;
   jobs: Job[];
@@ -110,16 +110,18 @@ export interface QueueGroup {
 
 /**
  * The Review queue grouped by what the operator does next, most urgent first:
- * approved but not sent, Claude's questions, drafting now, then drafts to send
- * and drafts to hand off. Each group is best match first; empty groups are left out.
+ * approved but not sent, Claude's questions, drafting now, strong matches a scan
+ * left undrafted, then drafts to send and drafts to hand off. Each group is best
+ * match first; empty groups are left out.
  */
-export function queueGroups(queue: readonly Job[], asking: readonly Job[], drafting: readonly Job[]): QueueGroup[] {
+export function queueGroups(queue: readonly Job[], asking: readonly Job[], drafting: readonly Job[], toDraft: readonly Job[] = []): QueueGroup[] {
   const best = (jobs: readonly Job[]) => [...jobs].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
   const drafted = queue.filter((j) => j.status !== 'approved');
   const groups: QueueGroup[] = [
     { key: 'unsent', label: 'Approved, not sent', filter: 'attention', jobs: best(queue.filter((j) => j.status === 'approved')) },
     { key: 'asking', label: 'Needs your answers', filter: 'attention', jobs: best(asking) },
     { key: 'drafting', label: 'Drafting now', filter: 'attention', jobs: best(drafting) },
+    { key: 'todraft', label: 'Ready to draft', filter: 'attention', jobs: best(toDraft) },
     { key: 'send', label: 'Ready to send', filter: 'send', jobs: best(drafted.filter((j) => sendsOnApprove(j.channel))) },
     { key: 'handoff', label: 'To hand off', filter: 'handoff', jobs: best(drafted.filter((j) => !sendsOnApprove(j.channel))) },
   ];
