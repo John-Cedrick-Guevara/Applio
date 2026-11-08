@@ -33,8 +33,40 @@ describe('listJobs', () => {
   });
 });
 
+/** Saves a Gmail address and app password, which email sends need. */
+const setUpGmail = async (on: ApplioApi) => {
+  await on.saveSettings({ gmailAddress: 'sam@gmail.com', fullName: 'Sam Rivera' });
+  await on.setSecret('gmailAppPassword', 'abcd efgh ijkl mnop');
+};
+
 describe('approveDraft', () => {
+  it('refuses an email send while Gmail is not set up, and leaves the draft waiting', async () => {
+    const draftOnEmail = (await api.listJobs({ statuses: ['drafted'] })).find((j) => j.channel === 'email')!;
+    await expect(api.approveDraft(draftOnEmail.id)).rejects.toThrow('Set up Gmail in Settings first');
+    expect((await api.getJob(draftOnEmail.id)).status).toBe('drafted');
+    expect(await api.getSend(draftOnEmail.id)).toBeNull();
+  });
+
+  it('logs exactly what went out, and nothing for a job it never sent', async () => {
+    await setUpGmail(api);
+    const draftOnEmail = (await api.listJobs({ statuses: ['drafted'] })).find((j) => j.channel === 'email')!;
+    await api.approveDraft(draftOnEmail.id);
+    expect(await api.getSend(draftOnEmail.id)).toMatchObject({ state: 'sent', to: draftOnEmail.applyTarget, subject: `Application: ${draftOnEmail.title} — Sam Rivera` });
+    expect(await api.getSend('j3')).toBeNull();
+  });
+
+  it('leaves a refused send approved with the reason, and a retry sends it', async () => {
+    let refuse: string | undefined = 'Gmail rejected the app password.';
+    const failing = createMockApi({ latencyMs: 0, sendFailure: () => refuse });
+    await setUpGmail(failing);
+    await expect(failing.approveDraft('j1')).rejects.toThrow('Gmail rejected the app password.');
+    expect(await failing.getJob('j1')).toMatchObject({ status: 'approved', history: expect.arrayContaining([expect.objectContaining({ note: 'Not sent: Gmail rejected the app password.' })]) });
+    refuse = undefined;
+    expect((await failing.approveDraft('j1')).status).toBe('applied');
+  });
+
   it('sends immediately on email/ATS channels', async () => {
+    await setUpGmail(api);
     const draftOnEmail = (await api.listJobs({ statuses: ['drafted'] })).find((j) => j.channel === 'email')!;
     const approved = await api.approveDraft(draftOnEmail.id);
     expect(approved.status).toBe('applied');
@@ -116,6 +148,7 @@ describe('follow-ups', () => {
   });
 
   it('records who sent an approved application', async () => {
+    await setUpGmail(api);
     expect((await api.approveDraft('j1')).sentBy).toBe('you-app');
     expect((await api.markApplied('j3')).sentBy).toBe('you-manual');
   });

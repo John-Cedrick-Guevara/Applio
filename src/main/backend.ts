@@ -357,6 +357,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     note,
     sendLog: sends,
     sendEmail: (message) => gmail().send(message),
+    checkSetup: (channel) => void (channel === 'email' && gmail()),
     folder: (job) => jobFolder(job),
     fileExists: existsSync,
     writeFile: (path, text) => writeFileSync(path, text),
@@ -516,6 +517,12 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     listJobs: later((filter = {}) => jobs.list(filter.statuses ? { statuses: filter.statuses } : undefined).filter((j) => matchesFilter(j, filter))),
     getJob: later(getJob),
     getDraft: later((jobId) => drafts.get(jobId) ?? null),
+    getSend: later((id) => {
+      const row = sends.get(id);
+      if (!row) return null;
+      const { jobId: _jobId, ...record } = row;
+      return record;
+    }),
     updateCoverLetter: async (jobId, coverLetter) => {
       const draft = drafts.get(jobId);
       if (!draft) throw new Error(`No draft for job ${jobId}`);

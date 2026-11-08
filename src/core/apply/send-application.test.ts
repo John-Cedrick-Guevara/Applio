@@ -45,6 +45,7 @@ const setup = (over: Partial<Job> = {}, opts: { sentToday?: number; perChannel?:
     now: () => NOW,
     saveAiAnswers: vi.fn(),
     newMessageId: () => '<j1.1@applio.local>',
+    checkSetup: () => {},
     bankAnswers: () => [{ question: 'Phone', answer: '+63 917 555 0100' }],
     submitAts: vi.fn(async () => ({ kind: 'submitted' as const, filled: [{ selector: '#email', label: 'Email', action: 'type' as const, value: 'sam@gmail.com' }] })),
   };
@@ -126,10 +127,10 @@ describe('approveDraft over email', () => {
     expect((await approveDraft('j1', ports)).status).toBe('applied');
   });
 
-  it("stops at Gmail's daily cap", async () => {
+  it("stops at Gmail's daily cap and leaves the job waiting in Review", async () => {
     const { ports, job } = setup({}, { sentToday: 100, perChannel: 500 });
     await expect(approveDraft('j1', ports)).rejects.toThrow("Gmail's daily cap is reached (100 sends today). Applio sends again tomorrow.");
-    expect(job().status).toBe('approved');
+    expect(job().status).toBe('drafted');
     expect(ports.sendEmail).not.toHaveBeenCalled();
   });
 
@@ -138,10 +139,22 @@ describe('approveDraft over email', () => {
     await expect(approveDraft('j1', ports)).rejects.toThrow("Today's cap for email applications is reached (10). Raise it in Guardrails, or send tomorrow.");
   });
 
-  it("refuses to send before the résumé PDF is saved", async () => {
-    const { ports } = setup();
+  it("refuses to send before the résumé PDF is saved, without approving", async () => {
+    const { ports, job } = setup();
     ports.fileExists = () => false;
     await expect(approveDraft('j1', ports)).rejects.toThrow("The résumé PDF isn't saved yet, so there's nothing to attach. Open the job folder to check it.");
+    expect(ports.sendEmail).not.toHaveBeenCalled();
+    expect(job().status).toBe('drafted');
+  });
+
+  it('refuses to approve while Gmail is not set up, so the draft stays in Review with its Approve button', async () => {
+    const { ports, job } = setup();
+    ports.checkSetup = () => {
+      throw new Error('Set up Gmail in Settings first: your address and an app password.');
+    };
+    await expect(approveDraft('j1', ports)).rejects.toThrow('Set up Gmail in Settings first');
+    expect(job().status).toBe('drafted');
+    expect(ports.saveAiAnswers).not.toHaveBeenCalled();
     expect(ports.sendEmail).not.toHaveBeenCalled();
   });
 });

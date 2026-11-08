@@ -66,7 +66,9 @@ beforeEach(() => ((telegram = []), (telegramUpdates = [])));
 
 /** Messages "sent" through the fake SMTP transport, newest last. */
 let outbox: { to?: unknown; subject?: unknown; text?: unknown; attachments?: unknown }[] = [];
-beforeEach(() => (outbox = []));
+/** Set to make the fake SMTP refuse the next sends, like a wrong app password or a dropped network. */
+let smtpRefuses: string | undefined;
+beforeEach(() => ((outbox = []), (smtpRefuses = undefined)));
 
 /** A fake Gmail inbox holding the given messages, so no test reaches real IMAP. */
 const fakeInbox = (messages: { uid: number; envelope: object; headers?: Buffer; bodyStructure?: object }[] = []) => (): InboxClient =>
@@ -91,7 +93,12 @@ const backendIn = (folder = (dir = mkdtempSync(join(tmpdir(), 'applio-backend-')
     // Stands in for printToPDF: the "PDF" is the page's HTML, so tests can read what was printed.
     printPdf: vi.fn(async (html: string) => new TextEncoder().encode(html)),
     // Stands in for Gmail's SMTP: records each message instead of sending it.
-    mailTransport: () => ({ sendMail: async (m) => void outbox.push(m) }),
+    mailTransport: () => ({
+      sendMail: async (m) => {
+        if (smtpRefuses) throw new Error(smtpRefuses);
+        outbox.push(m);
+      },
+    }),
     // Stands in for Applio's form window: "submits" and reports what it filled.
     inbox: fakeInbox(),
     // Stands in for the assisted-fill window: reports what it filled; it has no way to submit.
@@ -537,6 +544,29 @@ describe('createBackend discovery', () => {
     expect(outbox).toHaveLength(1);
     expect(outbox[0]).toMatchObject({ to: 'jobs@acme.com', subject: 'Application: Senior Backend Engineer — Sam Rivera', text: 'Dear team\n\nSam Rivera' });
     expect(readFileSync(join(job.folderPath!, 'sent.md'), 'utf8')).toContain('To: jobs@acme.com');
+  });
+
+  it('refuses to approve while Gmail is not set up, leaving the draft in Review with nothing logged', async () => {
+    const { api, job, deps } = await draftedBackend();
+    deps.db.prepare("UPDATE jobs SET channel = 'email', apply_target = 'jobs@acme.com' WHERE id = ?").run(job.id);
+    await expect(api.approveDraft(job.id)).rejects.toThrow('Set up Gmail in Settings first');
+    expect((await api.getJob(job.id)).status).toBe('drafted');
+    expect(await api.getSend(job.id)).toBeNull();
+    expect(outbox).toEqual([]);
+  });
+
+  it('keeps a refused send approved and unlogged, then a retry sends exactly once and logs exactly what went out', async () => {
+    const { api, job } = await emailJob();
+    smtpRefuses = 'Invalid login: 535 Username and Password not accepted';
+    await expect(api.approveDraft(job.id)).rejects.toThrow('Invalid login');
+    expect(await api.getJob(job.id)).toMatchObject({ status: 'approved' });
+    expect((await api.getJob(job.id)).history.at(-1)?.note).toMatch(/^Not sent: .*Invalid login/);
+    expect(await api.getSend(job.id)).toBeNull();
+
+    smtpRefuses = undefined;
+    expect((await api.approveDraft(job.id)).status).toBe('applied');
+    expect(outbox).toHaveLength(1);
+    expect(await api.getSend(job.id)).toMatchObject({ state: 'sent', to: outbox[0]!.to, subject: outbox[0]!.subject, body: outbox[0]!.text });
   });
 
   it('never sends twice, even on a double click', async () => {
