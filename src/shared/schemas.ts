@@ -104,6 +104,7 @@ export const API_ARGS = {
   getSend: z.tuple([id]),
   updateCoverLetter: z.tuple([id, long]),
   approveDraft: z.tuple([id]),
+  draftJob: z.tuple([id]),
   skipJob: z.tuple([id]),
   markApplied: z.tuple([id]),
   setStatus: z.tuple([id, JobStatusSchema, short.optional()]),

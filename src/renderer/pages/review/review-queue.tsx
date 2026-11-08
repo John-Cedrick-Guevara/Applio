@@ -117,7 +117,7 @@ export function ReviewQueue({ jobs, currentId, below, waiting, asking, drafting,
             <ul className="list-plain below-list">
               {waiting.map((job) => (
                 <li key={job.id}>
-                  <a href={job.url || undefined} target="_blank" rel="noreferrer" className="below-row">
+                  <a href={`#/review/${job.id}`} className="below-row" aria-current={job.id === currentId ? 'true' : undefined}>
                     <span>{job.title}<span className="cell-sub"> · {job.company}</span><span className="cell-sub waiting-reason">{pendingReason(job)}</span></span>
                   </a>
                 </li>
@@ -136,10 +136,9 @@ export function ReviewQueue({ jobs, currentId, below, waiting, asking, drafting,
             <ul className="list-plain below-list">
               {below.map((job) => (
                 <li key={job.id}>
-                  {/* The posting opens in the system browser (the window refuses to navigate away). */}
-                  <a href={job.url || undefined} target="_blank" rel="noreferrer" className="below-row">
+                  <a href={`#/review/${job.id}`} className="below-row" aria-current={job.id === currentId ? 'true' : undefined}>
                     <span className="queue-score mono">{job.score}</span>
-                    <span>{job.title}<span className="cell-sub"> · {job.company}</span></span>
+                    <span>{job.title}<span className="cell-sub"> · {job.company} · {job.sourceName}</span></span>
                   </a>
                 </li>
               ))}

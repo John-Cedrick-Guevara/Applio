@@ -173,14 +173,33 @@ describe('ReviewPage', () => {
     expect(screen.getByRole('button', { name: 'Run now' })).toBeDisabled();
   });
 
-  it('lists the jobs scored below the draft threshold when asked, each linking to its posting', async () => {
+  it('lists the jobs scored below the draft threshold when asked, each opening its detail', async () => {
     open();
     const queue = await screen.findByRole('region', { name: 'Queue' });
     expect(within(queue).queryByText('Senior Software Engineer, Platform')).not.toBeInTheDocument();
     await userEvent.click(within(queue).getByRole('button', { name: 'Show them' }));
     const link = within(queue).getByRole('link', { name: /Senior Software Engineer, Platform/ });
     expect(link).toHaveTextContent('67');
-    expect(link).toHaveAttribute('href', 'https://example.com/jobs/j5');
+    expect(link).toHaveAttribute('href', '#/review/j5');
+  });
+
+  it("shows a below-threshold job's fit and post, and drafts it on request", async () => {
+    const { api } = open('j5');
+    const detail = await screen.findByRole('region', { name: 'Job detail' });
+    expect(within(detail).getByRole('heading', { name: 'Senior Software Engineer, Platform' })).toBeInTheDocument();
+    expect(within(detail).getByText(/below your draft score \(75\)/)).toBeInTheDocument();
+    expect(within(detail).getByRole('link', { name: 'Original post' })).toHaveAttribute('href', 'https://example.com/jobs/j5');
+    await userEvent.click(within(detail).getByRole('button', { name: /Draft this one/ }));
+    await waitFor(async () => expect((await api.getJob('j5')).status).toBe('drafted'));
+    expect(await screen.findByRole('region', { name: 'Draft detail' })).toBeInTheDocument();
+  });
+
+  it('dismisses a below-threshold job, which leaves the list for good', async () => {
+    const { api } = open('j5');
+    const detail = await screen.findByRole('region', { name: 'Job detail' });
+    await userEvent.click(within(detail).getByRole('button', { name: 'Dismiss' }));
+    await waitFor(async () => expect((await api.getJob('j5')).status).toBe('skipped'));
+    expect(screen.queryByText(/more scored below your draft threshold/)).not.toBeInTheDocument();
   });
 
   it('lists jobs still waiting to be scored or drafted, with the reason, so none go missing', async () => {

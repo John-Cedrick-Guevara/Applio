@@ -84,6 +84,19 @@ describe('approveDraft', () => {
   });
 });
 
+describe('draftJob', () => {
+  it('drafts a scored job on request', async () => {
+    const [scored] = await api.listJobs({ statuses: ['scored'] });
+    expect((await api.draftJob(scored!.id)).status).toBe('drafted');
+    expect(await api.getDraft(scored!.id)).not.toBeNull();
+  });
+
+  it('refuses a job that is not waiting to be drafted', async () => {
+    const [applied] = await api.listJobs({ statuses: ['applied'] });
+    await expect(api.draftJob(applied!.id)).rejects.toThrow('Only scored jobs can be drafted');
+  });
+});
+
 describe('setStatus', () => {
   it('records allowed moves in history', async () => {
     const [applied] = await api.listJobs({ statuses: ['applied'] });
