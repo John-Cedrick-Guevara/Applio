@@ -19,7 +19,7 @@ describe('interviewPrep', () => {
     const { ports } = setup();
     expect(await interviewPrep('j1', ports)).toEqual({ told: ['Cut latency 40%'], likelyQuestions: ['How did you cut latency?'], askThem: ['What breaks most?'], tokens: 2000 });
     const req = vi.mocked(ports.ai).mock.calls[0]![0];
-    expect(req).toMatchObject({ step: 'prep', jobIds: ['j1'], trigger: 'operator' });
+    expect(req).toMatchObject({ step: 'prep', jobIds: ['j1'] });
     expect(req.prompt).toContain('Dear team, I cut latency 40%.');
   });
 

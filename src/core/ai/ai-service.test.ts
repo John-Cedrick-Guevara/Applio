@@ -5,7 +5,7 @@ import type { AiEngine } from './engine';
 const NOW = new Date(2026, 10, 15, 10, 0);
 
 /** Usage so far today and this month, as the usage table would total them. */
-const setup = ({ today = 0, month = 0, paused = false, recent = undefined as number | undefined } = {}) => {
+const setup = ({ today = 0, month = 0, recent = undefined as number | undefined } = {}) => {
   const recorded: UsageEntry[] = [];
   const engine: AiEngine = {
     complete: vi.fn(async () => ({ text: 'ok', inputTokens: 300, outputTokens: 100 })),
@@ -17,14 +17,13 @@ const setup = ({ today = 0, month = 0, paused = false, recent = undefined as num
     tokensSince: (since) => (since === new Date(2026, 10, 15).toISOString() ? today : month) + recorded.reduce((n, r) => n + r.tokens, 0),
     recentCost: () => recent,
     record: (entry) => void recorded.push(entry),
-    isPaused: () => paused,
     now: () => NOW,
     warn: vi.fn(),
   };
   return { ai: createAi(ports), engine, recorded, ports };
 };
 
-const request = { step: 'score' as const, prompt: 'Score these jobs', jobIds: ['j1', 'j2'], trigger: 'scheduled' as const };
+const request = { step: 'score' as const, prompt: 'Score these jobs', jobIds: ['j1', 'j2'] };
 
 describe('AI service', () => {
   it('passes the call\'s jobs to the engine as the tools\' scope', async () => {
@@ -67,7 +66,7 @@ describe('AI service', () => {
 
   it('refuses every call once today reaches the daily budget, without contacting the engine', async () => {
     const { ai, engine } = setup({ today: 10_000, month: 10_000 });
-    await expect(ai.run({ ...request, trigger: 'operator' })).rejects.toThrow(
+    await expect(ai.run(request)).rejects.toThrow(
       "Today's Claude token budget is used up (10,000 of 10,000). AI resumes tomorrow, or raise the budget in Settings.",
     );
     expect(engine.complete).not.toHaveBeenCalled();
@@ -77,17 +76,6 @@ describe('AI service', () => {
     const { ai, engine } = setup({ today: 0, month: 100_000 });
     await expect(ai.run(request)).rejects.toThrow("This month's Claude token budget is used up (100,000 of 100,000). AI resumes next month, or raise the budget in Settings.");
     expect(engine.complete).not.toHaveBeenCalled();
-  });
-
-  it('refuses scheduled calls while automation is paused', async () => {
-    const { ai, engine } = setup({ paused: true });
-    await expect(ai.run(request)).rejects.toThrow('Automation is paused');
-    expect(engine.complete).not.toHaveBeenCalled();
-  });
-
-  it('still runs a call the operator asked for while paused', async () => {
-    const { ai } = setup({ paused: true });
-    expect((await ai.run({ ...request, trigger: 'operator' })).text).toBe('ok');
   });
 
   it('records nothing when the engine fails', async () => {

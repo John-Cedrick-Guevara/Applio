@@ -297,14 +297,22 @@ describe('createBackend discovery', () => {
     expect(await api.runDiscovery()).toMatchObject({ found: 2, newAfterDedup: 0, passedFilters: 0 });
   });
 
-  it('stays paused across a restart, refuses Run now, and shows no next run', async () => {
-    const { api, deps, folder } = backendIn();
-    expect((await api.getStatus()).nextRunAt).toBeDefined();
+  it('stays paused across a restart, and still runs a scan the operator starts', async () => {
+    const { api, deps, folder } = await searchingBackend();
     await api.setAutomationPaused(true);
     deps.db.close();
     const after = backendIn(folder).api;
-    expect(await after.getStatus()).toMatchObject({ paused: true, nextRunAt: undefined });
-    await expect(after.runDiscovery()).rejects.toThrow('Automation is paused. Resume it to run discovery');
+    expect(await after.getStatus()).toMatchObject({ paused: true });
+    // Pause stops sends that go out on their own; a scan only runs on a click (SPEC F2).
+    await expect(after.runDiscovery()).resolves.toMatchObject({ found: 2 });
+  });
+
+  it('never starts a scan on its own, on launch or on a tick', async () => {
+    const { api } = await searchingBackend();
+    await api.tick();
+    await api.tick();
+    expect((await api.getStatus()).lastRun).toBeUndefined();
+    expect(await api.listJobs()).toEqual([]);
   });
 
   it('pushes the new status when automation is paused or a run ends', async () => {

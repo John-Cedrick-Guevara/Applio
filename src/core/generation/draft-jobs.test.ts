@@ -69,7 +69,7 @@ describe('draftJobs', () => {
   it("gives Claude the operator's answers when it drafts again", async () => {
     const { ports, requests } = setup({ j1: { employmentType: 'full-time', sourceId: 'remotive' } });
     ports.answers = () => [{ question: 'Can you start in December?', answer: 'Yes, from Dec 1.' }];
-    await draftJobs(['j1'], { trigger: 'operator' }, ports);
+    await draftJobs(['j1'], {}, ports);
     expect(requests[0]!.prompt).toBe('Draft a cover letter application for job j1.\nThe operator answered your questions; use these as facts for this job:\nQ: Can you start in December?\nA: Yes, from Dec 1.');
   });
 

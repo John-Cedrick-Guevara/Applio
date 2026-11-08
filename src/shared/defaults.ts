@@ -14,7 +14,6 @@ export const DEFAULT_SETTINGS: Omit<Settings, 'secretsSet' | 'checks'> = {
   maxPerChannelPerDay: 10,
   dailyTokenBudget: 150_000,
   monthlyTokenBudget: 3_000_000,
-  discoveryIntervalHours: 6,
   launchAtLogin: false,
   blocklist: [],
 };

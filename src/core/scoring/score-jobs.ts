@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { QuotaExceededError, type AiRequest } from '../ai/ai-service';
 import type { AiReply } from '../ai/engine';
-import { AutomationPausedError } from '../jobs/scheduler';
 
 /** Ten per call (spec Decisions); one turn each, so a batch costs about one prompt and one answer. */
 const BATCH_SIZE = 10;
@@ -71,7 +70,7 @@ const firstArray = (answer: string): unknown[] => {
  * prefix (instructions, fact bank) as the system prompt and the jobs' cards as the
  * message; Claude answers with JSON. Each answer is checked (score range, facts in
  * the bank, jobs from this batch) before it's saved. Jobs missing from the answer,
- * or a failed call, get one retry; then a note. A budget stop or pause ends scoring.
+ * or a failed call, get one retry; then a note. A budget stop ends scoring.
  */
 export async function scoreJobs(jobIds: readonly string[], { runId, draftThreshold }: { runId?: number; draftThreshold: number }, ports: ScorePorts): Promise<ScoreResult> {
   const todo = jobIds.filter((id) => ports.score(id) === undefined);
@@ -100,12 +99,12 @@ export async function scoreJobs(jobIds: readonly string[], { runId, draftThresho
     try {
       const reply = await ports.ai({
         step: 'score', system: ports.prefix(), prompt: `Score these jobs:\n${JSON.stringify(ports.cards(batch))}`, jobIds: batch, tools: false,
-        ...(runId !== undefined ? { runId } : {}), trigger: 'scheduled',
+        ...(runId !== undefined ? { runId } : {}),
       });
       saveAnswers(reply.text, batch);
       return undefined;
     } catch (err) {
-      if (err instanceof QuotaExceededError || err instanceof AutomationPausedError) {
+      if (err instanceof QuotaExceededError) {
         stopped = err.message;
         return err.message;
       }

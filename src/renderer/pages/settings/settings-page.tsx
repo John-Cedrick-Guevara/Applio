@@ -7,7 +7,7 @@ import { ChannelsSection } from './channels-section';
 import { ConnectionsSection } from './connections-section';
 import { GuardrailsSection } from './guardrails-section';
 import { OutputFolderSection } from './output-folder-section';
-import { ScheduleSection } from './schedule-section';
+import { StartupSection } from './startup-section';
 import { SourcesSection } from './sources-section';
 import './settings.css';
 
@@ -31,7 +31,7 @@ export default function SettingsPage() {
             <SourcesSection sources={sources} onChange={setSource} />
             <ChannelsSection settings={settings} onChange={setSettings} />
             <GuardrailsSection settings={settings} onChange={setSettings} />
-            <ScheduleSection settings={settings} onChange={setSettings} />
+            <StartupSection settings={settings} onChange={setSettings} />
             <OutputFolderSection settings={settings} onChange={setSettings} />
             <ConnectionsSection settings={settings} onChange={setSettings} />
           </>

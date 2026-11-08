@@ -37,7 +37,9 @@ Status: personal tool first, open source once polished.
 - **Answer bank:** saved answers to form questions (salary, notice period, work authorization, "why us" patterns). Reused before calling the AI.
 - **Preferences:** target roles, seniority, min salary, timezones, remote-only, full-time / contract / freelance.
 
-### F2. Discovery (scheduler, every 4–6h, catches up after sleep)
+### F2. Discovery (operator-triggered: runs only when the operator starts a scan)
+No scan runs on a timer, on launch or on wake, so no tokens are spent without a click. The operator starts one from the app or the tray.
+
 | Source | Access |
 |---|---|
 | RemoteOK, Remotive, Himalayas, Jobicy, Arbeitnow, WeWorkRemotely | Public JSON / RSS (polite polling + attribution) |

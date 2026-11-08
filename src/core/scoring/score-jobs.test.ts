@@ -39,7 +39,7 @@ describe('scoreJobs', () => {
     const { ports, requests } = setup(all(23, 80));
     const result = await scoreJobs(ids(23), opts, ports);
     expect(requests.map((r) => r.jobIds.length)).toEqual([10, 10, 3]);
-    expect(requests[0]).toMatchObject({ step: 'score', runId: 4, trigger: 'scheduled', tools: false, system: 'PREFIX' });
+    expect(requests[0]).toMatchObject({ step: 'score', runId: 4, tools: false, system: 'PREFIX' });
     expect(requests[0]!.prompt).toContain('"title":"Job j1"');
     expect(result).toMatchObject({ scored: 23, notScored: 0 });
   });

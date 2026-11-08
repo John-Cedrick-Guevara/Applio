@@ -177,7 +177,7 @@ app.whenReady().then(() => {
     log: console.error,
   });
 
-  // Catch-up: a run missed while asleep starts on the first tick after wake (or launch).
+  // Replies, no-reply marks and limit warnings; scans only run when the operator starts one (SPEC F2).
   const tick = () => void backend.tick();
   tick();
   setInterval(tick, TICK_MS);

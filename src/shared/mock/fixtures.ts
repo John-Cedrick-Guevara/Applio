@@ -275,7 +275,6 @@ export function seedSettings(): Settings {
     maxPerChannelPerDay: 10,
     dailyTokenBudget: 150_000,
     monthlyTokenBudget: 3_000_000,
-    discoveryIntervalHours: 6,
     launchAtLogin: false,
     blocklist: ['[Current employer]', 'Quillstack'],
     secretsSet: { anthropicApiKey: false, gmailAppPassword: false, telegramBotToken: false },

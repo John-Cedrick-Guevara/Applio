@@ -45,21 +45,21 @@ export function ReviewHeader({ status, onStatusChange, onRunComplete }: ReviewHe
         </div>
         <div className="page-actions">
           <Button busy={pause.pending} onClick={togglePause}>
-            {status.paused ? 'Resume automation' : 'Pause automation'}
+            {status.paused ? 'Resume auto-send' : 'Pause auto-send'}
           </Button>
-          <Button variant="strong" busy={runner.pending} disabled={status.paused || status.sourcesAtLimit} title={status.sourcesAtLimit ? AT_LIMIT : undefined} onClick={runNow}>
+          <Button variant="strong" busy={runner.pending} disabled={status.sourcesAtLimit} title={status.sourcesAtLimit ? AT_LIMIT : undefined} onClick={runNow}>
             {runner.pending ? 'Running…' : 'Run now'}
           </Button>
         </div>
       </header>
-      {status.sourcesAtLimit && !status.paused ? (
+      {status.sourcesAtLimit ? (
         <div className="banner banner-warning">
           <span>{AT_LIMIT}</span>
         </div>
       ) : null}
       {status.paused ? (
         <div className="banner banner-warning">
-          <span>Automation is paused. Scheduled runs and auto-sends are off; drafts below still work.</span>
+          <span>Auto-send is paused. Nothing goes out on its own; scans and drafts still work.</span>
           <Button size="sm" className="banner-action" busy={pause.pending} onClick={togglePause}>Resume</Button>
         </div>
       ) : null}

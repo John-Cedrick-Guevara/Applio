@@ -129,16 +129,13 @@ describe('profile', () => {
 });
 
 describe('automation', () => {
-  it('reports the last run and the next scheduled slot', async () => {
+  it('reports the last scan', async () => {
     const status = await api.getStatus();
     expect(status.lastRun?.found).toBeGreaterThan(0);
-    expect(status.nextRunAt).toBeDefined();
   });
 
-  it('refuses to run discovery while paused, and resumes', async () => {
+  it('runs a scan the operator starts, even while auto-send is paused', async () => {
     expect((await api.setAutomationPaused(true)).paused).toBe(true);
-    await expect(api.runDiscovery()).rejects.toThrow(/paused/);
-    await api.setAutomationPaused(false);
     expect((await api.runDiscovery()).found).toBeGreaterThanOrEqual(0);
   });
 });

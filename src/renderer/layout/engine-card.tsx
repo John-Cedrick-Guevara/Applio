@@ -5,7 +5,7 @@ import { formatClock, formatTokens } from '../lib/format';
 import { usePath } from '../lib/router';
 
 /**
- * Sidebar status: engine readiness, next scheduled run and today's token use.
+ * Sidebar status: engine readiness, when the last scan ran and today's token use.
  * Main pushes each change (scheduler AC-5). Browser dev has no push, so it
  * also reloads on navigation.
  */
@@ -36,8 +36,8 @@ export function EngineCard() {
         </div>
       ) : null}
       <div className="engine-line">
-        <span>Next run</span>
-        <span className="mono">{status.paused || !status.nextRunAt ? 'Paused' : formatClock(status.nextRunAt)}</span>
+        <span>Last scan</span>
+        <span className="mono">{status.lastRun ? formatClock(status.lastRun.at) : 'None yet'}</span>
       </div>
       <div>
         <div className="engine-line">
