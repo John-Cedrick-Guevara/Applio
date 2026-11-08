@@ -62,6 +62,35 @@ describe('HN Who is hiring (Algolia)', () => {
     expect(jobs[0]!.description).toMatch(/^Simple Analytics \| DevOps Engineer/);
   });
 
+  /** One HN comment per text, served without the network. */
+  const comments = (...texts: string[]): HttpGet => ({
+    getText: async () => '',
+    getJson: async (url) =>
+      url.includes('search_by_date')
+        ? { hits: [{ objectID: '1', title: 'Ask HN: Who is hiring? (November 2026)' }] }
+        : { children: texts.map((text, i) => ({ id: 100 + i, created_at_i: 1_793_000_000, text })) },
+  });
+
+  it('keeps a web address out of the company name (QA 2026-11-07 #15)', async () => {
+    const { jobs } = await hackerNews.fetchJobs(comments('Distru (https://www.distru.com) | Backend Engineer | Remote (US)'));
+    expect(jobs[0]).toMatchObject({ company: 'Distru', title: 'Backend Engineer' });
+  });
+
+  it('cuts a location that runs on into the post, at the glued sentence, and caps it at 80 characters', async () => {
+    const { jobs } = await hackerNews.fetchJobs(comments(
+      'Khaero | Software Engineer | REMOTE (US) or ONSITE in Reno, NVWe build long-endurance autonomous aircraft and the software used to operate them.',
+      `Acme | Engineer | ${'Remote anywhere in the Americas Europe or Asia with travel to '.repeat(3)}`,
+    ));
+    expect(jobs[0]!.location).toBe('REMOTE (US) or ONSITE in Reno, NV');
+    expect(jobs[1]!.location.length).toBeLessThanOrEqual(80);
+    expect(jobs[1]!.location).not.toMatch(/\s$/);
+  });
+
+  it("leaves company and role to the AI when the post doesn't follow the Company | Role line", async () => {
+    const { jobs } = await hackerNews.fetchJobs(comments('Claims processing startup looking for engineers who love Rust. Email us.'));
+    expect(jobs[0]).toMatchObject({ company: 'Unknown company', title: 'See post', location: '' });
+  });
+
   it('reads ONSITE posts as not remote', async () => {
     const { jobs } = await hackerNews.fetchJobs(recorded().http);
     expect(jobs.find((j) => j.company.startsWith('University of Cambridge'))?.remote).toBe(false);
