@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, type KeyboardEvent } from 'react';
 import type { Job } from '../../../shared/types';
 import { buttonClass } from '../../components/button';
 import { CHANNEL_LABEL } from '../../lib/labels';
+import { navigate } from '../../lib/router';
 import { pendingReason, queueGroups, queueState, sendsOnApprove, type QueueFilter, type QueueGroup } from './review-model';
 
 interface ReviewQueueProps {
@@ -9,7 +10,7 @@ interface ReviewQueueProps {
   currentId?: string;
   /** Jobs scored below the draft threshold, best first: shown on request, never drafted. */
   below: Job[];
-  /** Jobs not scored yet, or strong matches whose draft failed; the next run retries them. */
+  /** Jobs not scored yet, or strong matches whose draft failed; the next scan retries them. */
   waiting: Job[];
   /** Jobs where Claude asked questions before drafting. */
   asking: Job[];
@@ -29,6 +30,18 @@ const FILTERS: { id: QueueFilter | 'all'; label: string }[] = [
 const CROWDED = 12;
 const LOW_DRAFT_SCORE = 50;
 
+/** ↑ and ↓ move between queue rows and open the one they land on, like a mail list. */
+function moveSelection(e: KeyboardEvent<HTMLElement>) {
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  const rows = [...e.currentTarget.querySelectorAll<HTMLAnchorElement>('a.queue-row')];
+  const at = rows.indexOf(document.activeElement as HTMLAnchorElement);
+  if (at < 0) return;
+  e.preventDefault();
+  const next = rows[Math.min(rows.length - 1, Math.max(0, at + (e.key === 'ArrowDown' ? 1 : -1)))]!;
+  next.focus();
+  navigate(next.getAttribute('href')!.replace(/^#/, ''));
+}
+
 /**
  * "Waiting on you", grouped by what the operator does next (needs you, send, hand
  * off) with a filter for each, two-line rows, and badges only for exceptions. The
@@ -44,7 +57,7 @@ export function ReviewQueue({ jobs, currentId, below, waiting, asking, drafting,
   const drafted = groups.filter((g) => g.key === 'send' || g.key === 'handoff').reduce((n, g) => n + g.jobs.length, 0);
 
   return (
-    <section className="card card-flush review-queue" aria-label="Queue">
+    <section className="card card-flush review-queue" aria-label="Queue" onKeyDown={moveSelection}>
       <div className="card-header queue-head">
         <h2 className="queue-title">Waiting on you <span className="queue-count">{count('all')}</span></h2>
         <div className="queue-filters" role="group" aria-label="Show">
@@ -68,7 +81,7 @@ export function ReviewQueue({ jobs, currentId, below, waiting, asking, drafting,
 
         {filter === 'all' && waiting.length > 0 ? (
           <div className="queue-footer">
-            {waiting.length} not scored or drafted yet; the next run retries them.{' '}
+            {waiting.length} not scored or drafted yet; your next scan retries them.{' '}
             <button type="button" className={buttonClass('link', 'sm', 'queue-footer-action')} aria-expanded={showWaiting} aria-label={showWaiting ? 'Hide waiting jobs' : 'Show waiting jobs'} onClick={() => setShowWaiting((s) => !s)}>
               {showWaiting ? 'Hide them' : 'Show them'}
             </button>

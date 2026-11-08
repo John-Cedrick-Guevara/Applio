@@ -12,7 +12,8 @@ describe('App routing', () => {
   it('keeps a page mounted when only its route params change', async () => {
     window.location.hash = '#/review';
     renderWithApp(<App />);
-    await userEvent.click(await screen.findByRole('button', { name: 'Skip' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Skip job' }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Skip job' }));
     await waitFor(() => expect(window.location.hash).toBe('#/review/j2'));
     await new Promise((r) => setTimeout(r, 50)); // let a remount (the bug) happen if it's going to
     // The skipped draft stays in the live queue, marked Skipped, instead of the page reloading.

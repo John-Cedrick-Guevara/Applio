@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import type { Autonomy, Draft, Job, SendRecord } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { AsyncView } from '../../components/async-view';
 import { Button, buttonClass } from '../../components/button';
+import { ConfirmDialog } from '../../components/confirm-dialog';
 import { Icon } from '../../components/icons';
+import { Callout, Stepper } from '../../components/job-state';
 import { ScoreBlock } from '../../components/score-block';
 import { useAction } from '../../hooks/use-action';
 import { useAsync } from '../../hooks/use-async';
@@ -13,7 +15,7 @@ import { CHANNEL_LABEL } from '../../lib/labels';
 import { navigate } from '../../lib/router';
 import type { DocumentOwner } from '../../../shared/templates/application-documents';
 import { DraftDocument, type DocTab } from './draft-document';
-import { filesState, modeLabel, primaryAction, sendState, effortLevel, type SendState } from './review-model';
+import { filesState, jobSteps, modeLabel, primaryAction, sendState, effortLevel, type SendState } from './review-model';
 import { SourceCredit } from '../../components/source-credit';
 
 interface DraftPanelProps {
@@ -77,6 +79,8 @@ function DraftDetail({ job, draft, send, nextId, thresholds, owner, autonomyBySo
   const [editing, setEditing] = useState(false);
   // A suspicious post needs a second, explicit click to send (QA 2026-11-07 #7).
   const [confirming, setConfirming] = useState(false);
+  const [askingSkip, setAskingSkip] = useState(false);
+  const blockId = useId();
   const primary = primaryAction(job);
   const state = sendState(job, send);
   const waiting = job.status === 'drafted';
@@ -102,11 +106,23 @@ function DraftDetail({ job, draft, send, nextId, thresholds, owner, autonomyBySo
   };
 
   const skip = async () => {
+    setAskingSkip(false);
     const next = await action.run('skip the job', () => api.skipJob(job.id), `Skipped ${job.title} at ${job.company}`);
     if (!next) return;
     onJob(next, send);
     if (nextId) navigate(`/review/${nextId}`);
   };
+
+  // Reprints only: the draft is already saved, so this costs no tokens.
+  const saveFiles = async () => {
+    const next = await action.run('save the PDFs', () => api.saveDraftFiles(job.id), 'PDFs saved');
+    if (next) onJob(next, send);
+  };
+
+  /** Why Approve is off, said beside it (never a silent disabled button). */
+  const approveBlock = files.kind !== 'ready' ? 'Approve turns on once the PDFs are saved.'
+    : draft?.check?.placeholders?.length ? 'Replace the placeholders in the letter first.'
+    : undefined;
 
   const redraft = async () => {
     const next = await action.run('redraft', () => api.redraft(job.id), 'Redrafting from your current profile. It shows under Drafting now.');
@@ -130,13 +146,12 @@ function DraftDetail({ job, draft, send, nextId, thresholds, owner, autonomyBySo
           </span>
         </div>
       ) : null}
+      <div className="draft-steps"><Stepper label="Progress" steps={jobSteps(job, { send })} /></div>
       <div className="draft-head">
         <div className="draft-head-text">
           <div className="cell-sub">{job.company} · <SourceCredit job={job} /> · found {formatRelative(foundAt)}</div>
           <h2 className="draft-title">{job.title}</h2>
-          <div className="tag-row">
-            {job.tags.map((t) => <span key={t} className="tag">{t}</span>)}
-          </div>
+          {job.tags.length ? <p className="draft-facts">{job.tags.join(' · ')}</p> : null}
         </div>
         {job.score !== undefined ? (
           <ScoreBlock score={job.score} highAt={thresholds.auto} note={`Draft at ${thresholds.draft} · Auto at ${thresholds.auto}`} />
@@ -219,15 +234,11 @@ function DraftDetail({ job, draft, send, nextId, thresholds, owner, autonomyBySo
             </div>
           </div>
         ) : null}
-        {waiting && files.kind === 'saving' ? (
-          <div className="banner banner-warning" role="status">
-            <span className="row"><span className="spinner" aria-hidden="true" />Saving the résumé and letter PDFs. Approve comes on in a moment.</span>
-          </div>
-        ) : null}
+        {waiting && files.kind === 'saving' ? <Callout tone="busy" title="Saving the résumé and letter PDFs.">Approve comes on in a moment.</Callout> : null}
         {waiting && files.kind === 'failed' ? (
-          <div className="banner banner-danger" role="alert">
-            <span>{files.reason} The draft is here, but there's nothing to attach yet. Redraft to print it again.</span>
-          </div>
+          <Callout tone="failed" title="PDFs didn't save:" action={{ label: 'Retry saving PDFs', onClick: saveFiles, busy: action.pending }}>
+            {files.reason.replace(/^Couldn't save the files: /, '')}. The draft is safe, and retrying costs no tokens.
+          </Callout>
         ) : null}
         {waiting && needsGmail ? (
           <div className="banner banner-warning">
@@ -239,20 +250,26 @@ function DraftDetail({ job, draft, send, nextId, thresholds, owner, autonomyBySo
           <span>Mode <strong>{modeLabel(job, autonomyBySource[job.sourceId] ?? 'draft')}</strong></span>
           <span className="mono">{formatTokens(job.tokensUsed)} tokens</span>
         </div>
+        {waiting && approveBlock && !primary.handoff && !needsGmail ? <span id={blockId} className="cell-sub draft-block">{approveBlock}</span> : null}
         {waiting ? (
           <div className="row">
-            <Button busy={action.pending || sending.pending} onClick={skip}>Skip</Button>
+            <Button busy={action.pending || sending.pending} onClick={() => setAskingSkip(true)}>Skip job</Button>
             <Button disabled={!draft} onClick={() => { setTab('letter'); setEditing(true); }}>Edit</Button>
             {primary.handoff ? (
               <a className={buttonClass('primary')} href={`#/handoff/${job.id}`}>{primary.label}</a>
             ) : needsGmail ? (
               <a className={buttonClass('primary')} href="#/settings">{needsGmail.action}</a>
             ) : (
-              <Button variant="primary" busy={sending.pending} disabled={files.kind !== 'ready' || !!draft?.check?.placeholders?.length} onClick={job.suspicious && !confirming ? () => setConfirming(true) : approve}>{sending.pending ? (job.channel === 'email' ? 'Sending…' : 'Submitting…') : primary.label}</Button>
+              <Button variant="primary" busy={sending.pending} disabled={!!approveBlock} aria-describedby={approveBlock ? blockId : undefined} onClick={job.suspicious && !confirming ? () => setConfirming(true) : approve}>{sending.pending ? (job.channel === 'email' ? 'Sending…' : 'Submitting…') : primary.label}</Button>
             )}
           </div>
         ) : null}
       </div>
+      {askingSkip ? (
+        <ConfirmDialog title={`Skip job "${job.title}" at ${job.company}?`} confirmLabel="Skip job" onConfirm={skip} onCancel={() => setAskingSkip(false)}>
+          It leaves your queue and nothing is sent.
+        </ConfirmDialog>
+      ) : null}
     </>
   );
 }

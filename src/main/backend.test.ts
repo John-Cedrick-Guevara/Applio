@@ -579,6 +579,23 @@ describe('createBackend discovery', () => {
     expect(electron.shell.openPath).toHaveBeenLastCalledWith(join(job.folderPath!, 'cover-letter.pdf'));
   });
 
+  it("prints a draft's files again on request, without calling AI", async () => {
+    const b = await draftedBackend();
+    b.deps.db.prepare('UPDATE jobs SET folder_path = NULL WHERE id = ?').run(b.job.id);
+    const complete = vi.fn();
+    b.deps.engines['claude-code'] = { check: async () => ({ ready: true, message: 'ok' }), complete };
+    b.deps.printPdf.mockClear();
+    const job = await b.api.saveDraftFiles(b.job.id);
+    expect(job.folderPath).toBeTruthy();
+    expect(b.deps.printPdf).toHaveBeenCalledTimes(2);
+    expect(complete).not.toHaveBeenCalled();
+  });
+
+  it('says plainly when there is no draft to print', async () => {
+    const { api } = backendIn();
+    await expect(api.saveDraftFiles('nope')).rejects.toThrow('No draft for job nope');
+  });
+
   it('keeps the draft and notes why when the files cannot be written', async () => {
     const b = await searchingBackend();
     vi.mocked(b.deps.printPdf).mockRejectedValue(new Error('printing failed'));

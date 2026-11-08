@@ -32,7 +32,7 @@ async function loadReview(api: ReturnType<typeof useApi>) {
   const questions = new Map(openQuestions.map((q) => [q.jobId, q.questions]));
   return {
     queue: [...approved, ...drafted].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
-    // Unscored jobs and strong matches whose draft failed: the next run retries both.
+    // Unscored jobs and strong matches whose draft failed: the next scan retries both.
     waiting: [...scored.filter((j) => (j.score ?? 0) >= settings.draftThreshold && !questions.has(j.id)), ...found],
     // Claude asked before drafting these; they wait for the operator (SPEC F4).
     asking: scored.filter((j) => questions.has(j.id)),
@@ -89,7 +89,11 @@ interface LayoutProps {
 function ReviewLayout({ data, selectedId, onJobChange, onStatusChange, onRunComplete }: LayoutProps) {
   // Which jobs Claude is drafting right now, kept live from main's status pushes.
   const [draftingIds, setDraftingIds] = useState<string[]>(data.status.drafting ?? []);
-  useEffect(() => window.applioEvents?.onStatus((s) => setDraftingIds(s.drafting ?? [])), []);
+  const [draftingSince, setDraftingSince] = useState(data.status.draftingSince ?? {});
+  useEffect(() => window.applioEvents?.onStatus((s) => {
+    setDraftingIds(s.drafting ?? []);
+    setDraftingSince(s.draftingSince ?? {});
+  }), []);
   const drafting = data.undrafted.filter((j) => draftingIds.includes(j.id));
   const isDrafting = (id: string) => draftingIds.includes(id);
   const currentId = selectedId ?? data.queue[0]?.id;
@@ -112,7 +116,7 @@ function ReviewLayout({ data, selectedId, onJobChange, onStatusChange, onRunComp
           draftThreshold={data.thresholds.draft}
         />
         {currentId && isDrafting(currentId) && !data.queue.some((j) => j.id === currentId) ? (
-          <DraftingPanel job={drafting.find((j) => j.id === currentId)} />
+          <DraftingPanel job={drafting.find((j) => j.id === currentId)} since={draftingSince[currentId]} />
         ) : currentId && data.questions.has(currentId) ? (
           <QuestionsPanel
             key={currentId}

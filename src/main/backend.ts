@@ -648,6 +648,19 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       return getJob(jobId);
     }),
 
+    saveDraftFiles: async (jobId) => {
+      if (!drafts.get(jobId)) throw new Error(`No draft for job ${jobId}`);
+      try {
+        await saveFiles(jobId);
+      } catch (err) {
+        // Same note as a failed save after drafting, so Review shows the newest reason.
+        note(jobId, `Couldn't save the files: ${err instanceof Error ? err.message : String(err)}`);
+        throw err;
+      }
+      pushStatus();
+      return getJob(jobId);
+    },
+
     getProfile: later(profile.getProfile),
     saveFact: later(profile.saveFact),
     deleteFact: later(profile.deleteFact),

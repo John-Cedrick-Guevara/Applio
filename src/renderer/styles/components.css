@@ -284,6 +284,11 @@ a.btn-secondary:hover { color: var(--text); }
   font-size: var(--text-sm);
 }
 
+.input[aria-invalid='true'],
+.textarea[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
 .input,
 .select,
 .textarea {

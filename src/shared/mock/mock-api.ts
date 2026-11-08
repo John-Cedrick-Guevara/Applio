@@ -182,6 +182,14 @@ export function createMockApi({ latencyMs = 250, now = () => new Date(), sendFai
         return transition(job, 'drafted', 'Redrafted from your current profile');
       }),
 
+    saveDraftFiles: (jobId) =>
+      run(() => {
+        const job = findJob(jobId);
+        if (!drafts.some((d) => d.jobId === jobId)) throw new Error(`No draft for job ${jobId}`);
+        job.folderPath = `~/Applio/2026-11/${job.company} - ${job.title}`;
+        return job;
+      }),
+
     // The mock drafts at once; main drafts in the background and reports it in `drafting`.
     draftJob: (jobId) =>
       run(() => {

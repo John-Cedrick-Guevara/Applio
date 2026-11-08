@@ -129,6 +129,28 @@ describe('ReviewPage', () => {
     const detail = await screen.findByRole('region', { name: 'Draft detail' });
     expect(await within(detail).findByText(/Saving the résumé and letter PDFs/)).toBeInTheDocument();
     expect(within(detail).getByRole('button', { name: 'Approve & send email' })).toBeDisabled();
+    expect(within(detail).getByText('Approve turns on once the PDFs are saved.')).toBeInTheDocument();
+    expect(within(within(detail).getByRole('list', { name: 'Progress' })).getByRole('listitem', { name: 'PDFs saved: in progress' })).toHaveAttribute('aria-current', 'step');
+  });
+
+  it('retries saving the PDFs without drafting again, after a failed save', async () => {
+    const api = await withGmail();
+    const failed = { status: 'drafted' as const, at: '2026-11-08T09:00:00.000Z', note: "Couldn't save the files: printing took longer than 60 s" };
+    let saved = false;
+    const flaky = { ...api, getJob: async (id: string) => {
+      const job = await api.getJob(id);
+      return saved ? job : { ...job, folderPath: undefined, history: [...job.history, failed] };
+    } };
+    const save = vi.spyOn(flaky, 'saveDraftFiles').mockImplementation(async (id) => ((saved = true), api.getJob(id)));
+    const redraft = vi.spyOn(flaky, 'redraft');
+    renderWithApp(<ReviewPage params={{ id: 'j1' }} />, flaky);
+    const detail = await screen.findByRole('region', { name: 'Draft detail' });
+    const alert = await within(detail).findByRole('alert');
+    expect(alert).toHaveTextContent(/PDFs didn't save.*printing took longer than 60 s/);
+    await userEvent.click(within(alert).getByRole('button', { name: 'Retry saving PDFs' }));
+    expect(save).toHaveBeenCalledWith('j1');
+    expect(redraft).not.toHaveBeenCalled();
+    await waitFor(() => expect(within(detail).getByRole('button', { name: 'Approve & send email' })).toBeEnabled());
   });
 
   it('turns Approve on by itself once main reports the PDFs were saved (QA 2026-11-08)', async () => {
@@ -219,10 +241,28 @@ describe('ReviewPage', () => {
     expect(await screen.findByText('Run finished: 2 jobs passed your filters, 0 drafted.')).toBeInTheDocument();
   });
 
-  it('confirms a skip', async () => {
-    open();
-    await userEvent.click(await screen.findByRole('button', { name: 'Skip' }));
+  it('asks before skipping, naming the job, and skips only on confirm', async () => {
+    const { api } = open('j1');
+    await userEvent.click(await screen.findByRole('button', { name: 'Skip job' }));
+    const dialog = screen.getByRole('dialog', { name: 'Skip job "Senior Backend Engineer" at Northwind Labs?' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect((await api.getJob('j1')).status).toBe('drafted');
+    await userEvent.click(screen.getByRole('button', { name: 'Skip job' }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Skip job' }));
     expect(await screen.findByText(/^Skipped /)).toBeInTheDocument();
+    expect((await api.getJob('j1')).status).toBe('skipped');
+  });
+
+  it('moves through the queue with the arrow keys', async () => {
+    open();
+    const queue = await screen.findByRole('region', { name: 'Queue' });
+    const [first, second] = within(queue).getAllByRole('link');
+    first!.focus();
+    await userEvent.keyboard('{ArrowDown}');
+    expect(second).toHaveFocus();
+    await waitFor(() => expect(location.hash).toBe(second!.getAttribute('href')));
+    await userEvent.keyboard('{ArrowUp}');
+    expect(first).toHaveFocus();
   });
 
   it('pauses auto-send and still lets the operator start a scan', async () => {
@@ -274,7 +314,7 @@ describe('ReviewPage', () => {
   it('lists jobs still waiting to be scored or drafted, with the reason, so none go missing', async () => {
     open();
     const queue = await screen.findByRole('region', { name: 'Queue' });
-    expect(within(queue).getByText(/1 not scored or drafted yet; the next run retries them\./)).toBeInTheDocument();
+    expect(within(queue).getByText(/1 not scored or drafted yet; your next scan retries them\./)).toBeInTheDocument();
     await userEvent.click(within(queue).getByRole('button', { name: 'Show waiting jobs' }));
     const link = within(queue).getByRole('link', { name: /Frontend Developer/ });
     expect(link).toHaveTextContent('Not scored yet');
@@ -307,7 +347,6 @@ describe('ReviewPage', () => {
     renderWithApp(<ReviewPage params={{ id: 'j5' }} />, api);
     const panel = await screen.findByRole('region', { name: 'Questions from Claude' });
     const submit = within(panel).getByRole('button', { name: 'Answer and draft' });
-    expect(submit).toBeDisabled();
     await userEvent.type(within(panel).getByLabelText('Have you worked with healthcare or HIPAA-regulated data?'), 'Yes, patient intake forms at Acme.');
     await userEvent.click(within(panel).getAllByRole('checkbox', { name: 'Save to fact bank' })[0]!);
     await userEvent.selectOptions(within(panel).getAllByLabelText('Section')[0]!, 'Projects');
@@ -317,6 +356,33 @@ describe('ReviewPage', () => {
       { question: 'Have you worked with healthcare or HIPAA-regulated data?', answer: 'Yes, patient intake forms at Acme.', saveTo: 'Projects' },
       { question: 'Can you start within two weeks?', answer: 'Yes.' },
     ]);
+  });
+
+  it('says which answer is missing when Answer and draft is clicked early, and drafts nothing', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    vi.spyOn(api, 'listQuestions').mockResolvedValue([{ jobId: 'j5', questions: ['Have you worked with healthcare or HIPAA-regulated data?', 'Can you start within two weeks?'], askedAt: '2026-11-07T08:00:00.000Z' }]);
+    const answer = vi.spyOn(api, 'answerQuestions');
+    renderWithApp(<ReviewPage params={{ id: 'j5' }} />, api);
+    const panel = await screen.findByRole('region', { name: 'Questions from Claude' });
+    await userEvent.type(within(panel).getByLabelText(/Have you worked with healthcare/), 'Yes.');
+    await userEvent.click(within(panel).getByRole('button', { name: 'Answer and draft' }));
+    const second = within(panel).getByLabelText(/Can you start within two weeks/);
+    expect(second).toHaveFocus();
+    expect(second).toHaveAccessibleDescription('Add an answer so Claude can draft this part.');
+    expect(answer).not.toHaveBeenCalled();
+    await userEvent.type(second, 'Yes');
+    expect(second).not.toHaveAccessibleDescription();
+  });
+
+  it('shows how long Claude has been drafting, stage by stage', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const status = await api.getStatus();
+    vi.spyOn(api, 'getStatus').mockResolvedValue({ ...status, drafting: ['j5'], draftingSince: { j5: new Date(Date.now() - 90_000).toISOString() } });
+    renderWithApp(<ReviewPage params={{ id: 'j5' }} />, api);
+    const panel = await screen.findByRole('region', { name: 'Drafting' });
+    expect(panel).toHaveTextContent(/1:3\d elapsed/);
+    const steps = within(panel).getByRole('list', { name: 'Drafting steps' });
+    expect(within(steps).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Claude writes the résumé and letter from your fact bankIn progress', 'Save the PDFs']);
   });
 
   it('shows a job Claude is drafting in the background, live, until its draft lands', async () => {
