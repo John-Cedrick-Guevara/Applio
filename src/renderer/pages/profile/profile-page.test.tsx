@@ -1,6 +1,7 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
+import { createMockApi } from '../../../shared/mock/mock-api';
 import { renderWithApp } from '../../../test/render';
 import ProfilePage from './profile-page';
 
@@ -63,6 +64,33 @@ describe('ProfilePage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save preferences' }));
     expect(await screen.findByText('Tech Lead')).toBeInTheDocument();
     expect((await api.getProfile()).preferences.targetRoles).toEqual(['Staff Engineer', 'Tech Lead']);
+  });
+
+  it('edits work type and remote-only, and saves pay with its currency and period', async () => {
+    const { api } = renderWithApp(<ProfilePage />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit preferences' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Freelance' }));
+    await userEvent.click(screen.getByRole('switch', { name: 'Remote only' }));
+    await userEvent.clear(screen.getByLabelText('Minimum pay amount'));
+    await userEvent.type(screen.getByLabelText('Minimum pay amount'), '30000');
+    await userEvent.selectOptions(screen.getByLabelText('Currency'), 'PHP');
+    await userEvent.selectOptions(screen.getByLabelText('Per'), 'month');
+    await userEvent.click(screen.getByRole('button', { name: 'Save preferences' }));
+    const saved = await waitFor(async () => {
+      const p = (await api.getProfile()).preferences;
+      expect(p.minimumPay).toBe('30,000 PHP / month');
+      return p;
+    });
+    // The seed has all three types and remote-only on; one click turns each off.
+    expect(saved.employmentTypes).toEqual(['full-time', 'contract']);
+    expect(saved.remoteOnly).toBe(false);
+  });
+
+  it('asks for a currency and period when the saved minimum pay has neither', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    await api.savePreferences({ ...(await api.getProfile()).preferences, minimumPay: '30,000' });
+    renderWithApp(<ProfilePage />, api);
+    expect(await screen.findByText(/Pick a currency and period so Applio can compare pay/)).toBeInTheDocument();
   });
 
   it('saves contact details and links for the résumé header', async () => {

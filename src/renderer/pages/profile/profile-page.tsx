@@ -55,7 +55,7 @@ function ProfileBody({ profile, onChange }: { profile: Profile; onChange: (patch
             setImported(result);
           }}
         />
-        <PreferencesCard preferences={profile.preferences} onSaved={(preferences) => onChange({ preferences })} />
+        <PreferencesCard preferences={profile.preferences} location={profile.contact.location} onSaved={(preferences) => onChange({ preferences })} />
       </div>
 
       <ContactCard contact={profile.contact} onSaved={(contact) => onChange({ contact })} />
