@@ -227,11 +227,16 @@ export function createMockApi({ latencyMs = 250, now = () => new Date(), sendFai
     analyzeJob: (input) =>
       run(() => {
         if (!input.value.trim()) throw new Error('Paste a job post or link first');
-        return analyze(input.value);
+        const preview = analyze(input.value);
+        // Like main's dedup key, roughly: same company and title means the same job.
+        const same = (a: string, b: string) => a.toLowerCase().replace(/[^a-z0-9]/g, '') === b.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const dupe = jobs.find((j) => same(j.company, preview.company) && same(j.title, preview.title));
+        return dupe ? { ...preview, duplicate: { jobId: dupe.id, status: dupe.status } } : preview;
       }),
 
     addJob: (preview) =>
       run(() => {
+        if (preview.duplicate) throw new Error(`${preview.title} at ${preview.company} is already in Applio (${preview.duplicate.status}).`);
         const id = `j${nextId++}`;
         const job: Job = {
           id, sourceId: 'clip', sourceName: preview.sourceName, company: preview.company, title: preview.title,

@@ -45,10 +45,10 @@ describe('analyzePost', () => {
     expect((await analyzePost({ text: 'post', sourceName: 'x', ...(platform ? { platform } : {}) }, ports)).preview.channel).toBe(channel);
   });
 
-  it('flags a job Applio already has in the route line', async () => {
+  it('names the job Applio already has, so the page can open it instead of adding it again', async () => {
     const { ports } = setup();
-    ports.existing = () => ({ title: 'Senior TypeScript Engineer', status: 'applied' });
-    expect((await analyzePost({ text: 'post', sourceName: 'x' }, ports)).preview.route).toMatch(/^Already in Applio \(applied\)\./);
+    ports.existing = () => ({ id: 'j9', title: 'Senior TypeScript Engineer', status: 'applied' });
+    expect((await analyzePost({ text: 'post', sourceName: 'x' }, ports)).preview.duplicate).toEqual({ jobId: 'j9', status: 'applied' });
   });
 
   it('refuses an answer that cannot be read, or that has no company, title or score', async () => {

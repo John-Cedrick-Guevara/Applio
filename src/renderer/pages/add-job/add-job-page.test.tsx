@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { createMockApi } from '../../../shared/mock/mock-api';
@@ -35,6 +35,21 @@ describe('AddJobPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add to review queue' }));
     expect(await screen.findByText(/Added\. Claude is drafting/)).toBeInTheDocument();
     expect((await api.listJobs({ statuses: ['drafted'] })).some((j) => j.company === 'Brightline Studio')).toBe(true);
+  });
+
+  it('offers Open existing instead of an Add button bound to fail when the job is already in Applio', async () => {
+    const { api } = renderWithApp(<AddJobPage />);
+    await userEvent.click(screen.getByRole('button', { name: 'Use an example' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Analyze job' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Add to review queue' }));
+    const added = (await api.listJobs()).find((j) => j.company === 'Brightline Studio')!;
+    await userEvent.click(await screen.findByRole('button', { name: 'Add another' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Use an example' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Analyze job' }));
+    const result = await screen.findByRole('region', { name: 'Parsed job' });
+    expect(within(result).getByRole('status')).toHaveTextContent('You already have this job in Applio (Drafted).');
+    expect(within(result).getByRole('link', { name: 'Open existing' })).toHaveAttribute('href', `#/review/${added.id}`);
+    expect(within(result).queryByRole('button', { name: 'Add to review queue' })).not.toBeInTheDocument();
   });
 
   it('caps platform links at draft → approve', async () => {
