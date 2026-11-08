@@ -28,6 +28,13 @@ describe('secret store', () => {
     expect(readFileSync(file, 'utf8')).not.toContain('123:secret-token');
   });
 
+  it("says plainly when the keychain won't decrypt a saved secret, with the fix", () => {
+    const file = tempFile();
+    createSecretStore(fakeEncryptor(), file).set('gmailAppPassword', 'abcd efgh');
+    const locked = createSecretStore({ ...fakeEncryptor(), decryptString: () => { throw new Error('Error while decrypting the ciphertext provided to safeStorage.decryptString. Decryption is not available.'); } }, file);
+    expect(() => locked.get('gmailAppPassword')).toThrow("Applio can't read your saved Gmail app password from the macOS keychain. Choose Always Allow when macOS asks, or save it again in Settings.");
+  });
+
   it('reports which secrets are set, and keeps them across restarts', () => {
     const file = tempFile();
     createSecretStore(fakeEncryptor(), file).set('gmailAppPassword', 'abcd efgh');
