@@ -2,6 +2,74 @@
 .review-queue {
   flex: 1 1 300px;
   max-width: 380px;
+  /* Stays in view beside a long draft; its list scrolls inside (.queue-scroll). */
+  position: sticky;
+  top: var(--space-4);
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 2 * var(--space-4));
+}
+
+.queue-head {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.queue-count {
+  margin-left: var(--space-1);
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* Segmented filter: one pill per group of work, each with its count. */
+.queue-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.queue-filter {
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-body);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.queue-filter[aria-pressed='true'] {
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--surface);
+}
+
+.queue-filter-count {
+  opacity: 0.7;
+}
+
+.queue-hint {
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  background: var(--warning-soft);
+  color: var(--warning-text);
+  font-size: var(--text-sm);
+}
+
+.queue-hint a {
+  color: inherit;
+  font-weight: 500;
+}
+
+.queue-scroll {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.queue-empty {
+  padding: var(--space-4);
 }
 
 .queue-title {
@@ -10,7 +78,7 @@
 
 .queue-row {
   display: block;
-  padding: 14px var(--space-4);
+  padding: 10px var(--space-4);
   border-bottom: 1px solid var(--border-soft);
   color: var(--text);
   text-decoration: none;
@@ -31,34 +99,47 @@
 
 .queue-row-top {
   display: flex;
-  align-items: flex-start;
+  align-items: baseline;
   gap: var(--space-3);
 }
 
-.queue-row-text {
+.queue-role {
   flex: 1;
   min-width: 0;
-}
-
-.queue-role {
+  overflow: hidden;
   font-weight: 600;
   line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.queue-score {
-  font-size: var(--text-lg);
-  font-weight: 500;
-}
-
-.queue-row-meta {
+.queue-row-sub {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-top: 10px;
+  min-width: 0;
+  margin-top: 2px;
+}
+
+.queue-row-where {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-row-sub .badge {
+  flex: none;
+}
+
+.queue-score {
+  font-size: var(--text-md);
+  font-weight: 500;
 }
 
 .queue-footer {
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--border-soft);
   color: var(--text-muted);
   font-size: var(--text-sm);
 }
@@ -268,8 +349,9 @@
 }
 
 .queue-footer-action {
-  display: flex;
-  margin-top: var(--space-2);
+  display: inline-flex;
+  padding: 0;
+  min-height: 0;
 }
 
 /* clip, not hidden: still rounds the corners but isn't a scroll box, so the footer can stick. */

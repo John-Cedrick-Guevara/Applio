@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Job } from '../../../shared/types';
 import type { SendRecord } from '../../../shared/types';
 import { formatClock } from '../../lib/format';
-import { effortLevel, filesState, gmailIssue, traceLine, modeLabel, pendingReason, primaryAction, queueState, runLine, runResult, sendState } from './review-model';
+import { queueGroups, effortLevel, filesState, gmailIssue, traceLine, modeLabel, pendingReason, primaryAction, queueState, runLine, runResult, sendState } from './review-model';
 
 const job = (over: Partial<Job>): Job => ({
   id: 'x', sourceId: 's', sourceName: 'S', company: 'C', title: 'T', url: '', location: '', employmentType: 'full-time',
@@ -211,5 +211,28 @@ describe('traceLine', () => {
   });
   it('never claims a trace it has no check for', () => {
     expect(traceLine({ edited: false }, 12)).toEqual({ text: 'Résumé traced to facts · cover letter not checked', ok: false });
+  });
+});
+
+describe('queueGroups', () => {
+  const email = job({ id: 'e', channel: 'email', score: 80 });
+  const site = job({ id: 'c', channel: 'custom', score: 90 });
+  const unsent = job({ id: 'u', status: 'approved', channel: 'email', score: 70 });
+  const flagged = job({ id: 'f', channel: 'email', score: 95, suspicious: 'The post addresses AI tools directly.' });
+  const asking = job({ id: 'q', status: 'scored', score: 60 });
+
+  it('orders groups by what the operator does next, leaving out empty ones', () => {
+    const groups = queueGroups([email, site, unsent, flagged], [asking], []);
+    expect(groups.map((g) => [g.key, g.jobs.map((j) => j.id)])).toEqual([
+      ['unsent', ['u']],
+      ['asking', ['q']],
+      ['send', ['f', 'e']],
+      ['handoff', ['c']],
+    ]);
+  });
+
+  it('files each group under one filter, so the filter counts add up', () => {
+    const groups = queueGroups([email, site, unsent], [asking], []);
+    expect(groups.map((g) => g.filter)).toEqual(['attention', 'attention', 'send', 'handoff']);
   });
 });
