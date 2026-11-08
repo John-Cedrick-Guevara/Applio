@@ -894,7 +894,7 @@ describe('createBackend discovery', () => {
     expect(preview).toMatchObject({ company: 'Brightline Studio', score: 84, channel: 'email', route: 'Sends from your Gmail to hiring@brightline.io', sourceName: 'pasted by you' });
     const job = await api.addJob(preview);
     expect(job).toMatchObject({ sourceId: 'clip', channel: 'email', score: 84 });
-    expect(deps.onStatus).toHaveBeenCalledWith(expect.objectContaining({ drafting: [job.id] }));
+    expect(deps.onStatus).toHaveBeenCalledWith(expect.objectContaining({ drafting: [job.id], draftingSince: { [job.id]: expect.stringMatching(/^\d{4}-\d\d-\d\dT/) } }));
     // Cleared only once the draft and its files are done.
     await vi.waitFor(() => expect(deps.onStatus).toHaveBeenLastCalledWith(expect.objectContaining({ drafting: [] })));
     expect((await api.getJob(job.id)).status).toBe('drafted');

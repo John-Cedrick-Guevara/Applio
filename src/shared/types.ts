@@ -400,6 +400,8 @@ export interface AppStatus {
   jobsVersion?: number;
   /** Jobs Claude is drafting right now, from Add job or answered questions. */
   drafting?: string[];
+  /** When each job in `drafting` started (ISO), so pages show real elapsed time. */
+  draftingSince?: Record<string, string>;
   /** Why AI is stopped (a daily or monthly token budget used up); absent while AI can run. */
   budgetStop?: string;
   /** Every enabled source has used today's polls, so Run now would fetch nothing. */
