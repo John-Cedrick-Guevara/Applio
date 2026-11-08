@@ -276,6 +276,7 @@ export function seedSettings(): Settings {
     launchAtLogin: false,
     blocklist: ['[Current employer]', 'Quillstack'],
     secretsSet: { anthropicApiKey: false, gmailAppPassword: false, telegramBotToken: false },
+    checks: {},
   };
 }
 

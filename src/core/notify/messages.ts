@@ -14,9 +14,12 @@ export const newMatch = (job: Job): BotMessage => ({
   text: `New match · ${job.score ?? 0}%\n${headline(job)}${job.roleSummary ? `\n${job.roleSummary}` : ''}`,
 });
 
+/** A suspicious post gets no one-tap Approve: the operator checks it in the app first (QA 2026-11-07 #7). */
 export const draftReady = (job: Job): BotMessage => ({
-  text: `Draft ready · ${job.score ?? 0}%\n${headline(job)}\nApprove to send it, or open it in Applio first.`,
-  buttons: [[{ text: 'Approve', data: `approve:${job.id}` }, { text: 'Open', data: `open:${job.id}` }, { text: 'Skip', data: `skip:${job.id}` }]],
+  text: job.suspicious
+    ? `Draft ready · ${job.score ?? 0}%\n${headline(job)}\nThis post looks like it tries to steer automated tools. Check the company in Applio before sending.`
+    : `Draft ready · ${job.score ?? 0}%\n${headline(job)}\nApprove to send it, or open it in Applio first.`,
+  buttons: [[...(job.suspicious ? [] : [{ text: 'Approve', data: `approve:${job.id}` }]), { text: 'Open', data: `open:${job.id}` }, { text: 'Skip', data: `skip:${job.id}` }]],
 });
 
 export const sentOnItsOwn = (job: Job): BotMessage => ({ text: `Sent on its own · ${job.score ?? 0}%\n${headline(job)}` });

@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { createMockApi } from '../../../shared/mock/mock-api';
@@ -87,6 +87,18 @@ describe('ReviewPage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Approve & send email' }));
     expect(await screen.findByText(/Sent to jobs@northwind-labs.example/)).toBeInTheDocument();
     expect((await api.getJob('j1')).status).toBe('applied');
+  });
+
+  it('warns in red about a suspicious post and sends it only after an explicit second confirm', async () => {
+    const api = await withGmail();
+    const flagged: typeof api = { ...api, getJob: async (id) => ({ ...(await api.getJob(id)), suspicious: 'The post addresses AI tools directly.' }) };
+    renderWithApp(<ReviewPage params={{ id: 'j1' }} />, flagged);
+    const detail = await screen.findByRole('region', { name: 'Draft detail' });
+    expect(await within(detail).findByText(/trying to manipulate automated tools/)).toBeInTheDocument();
+    await userEvent.click(within(detail).getByRole('button', { name: 'Approve & send email' }));
+    expect(await api.getSend('j1')).toBeNull();
+    await userEvent.click(within(detail).getByRole('button', { name: 'Send anyway' }));
+    await waitFor(async () => expect(await api.getSend('j1')).toMatchObject({ state: 'sent' }));
   });
 
   it('offers Set up Gmail instead of Approve while Gmail is not set up', async () => {

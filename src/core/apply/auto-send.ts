@@ -20,11 +20,12 @@ const NEVER = { platform: 'Platform jobs are never sent automatically.', custom:
  * when every gate passes. The daily caps and the double-send guard are checked
  * again by the send itself.
  */
-export function autoSendBlock(job: Pick<Job, 'channel' | 'score' | 'company' | 'platform'>, c: AutoSendContext): string | undefined {
+export function autoSendBlock(job: Pick<Job, 'channel' | 'score' | 'company' | 'platform' | 'suspicious'>, c: AutoSendContext): string | undefined {
   if (job.channel === 'platform' || job.channel === 'custom') return NEVER[job.channel];
   if (job.platform === 'Upwork') return 'Upwork proposals are never sent automatically.';
   if (capAutonomy(c.sourceAutonomy, job.channel) !== 'autonomous') return 'Its source is set to Draft → Approve.';
   if (c.paused) return 'Automation is paused.';
+  if (job.suspicious) return `${job.suspicious} Suspicious posts are never sent automatically.`;
   if (c.budgetStop) return c.budgetStop;
   if ((job.score ?? 0) < c.autoSendThreshold) return `Its match score (${job.score ?? 0}) is below the auto-send score (${c.autoSendThreshold}).`;
   if (c.blocklist.some((b) => companyKey(b) === companyKey(job.company))) return `${job.company} is on your blocklist.`;

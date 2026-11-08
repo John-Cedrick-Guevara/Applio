@@ -69,6 +69,8 @@ export interface Job {
   folderPath?: string;
   /** Who sent it, once sent. */
   sentBy?: SentBy;
+  /** Why the post looks like it's trying to steer automated tools, when it does; such a job is never sent on its own. */
+  suspicious?: string;
   history: StatusEvent[];
 }
 
@@ -338,6 +340,17 @@ export interface Settings {
   /** Companies never applied to (SPEC F6). */
   blocklist: string[];
   secretsSet: Record<SecretKey, boolean>;
+  /** The last sign-in check per connection, run when its credentials change and on every send. Derived in main, never saved by the page. */
+  checks: Partial<Record<'gmail' | 'telegram', ConnectionCheck>>;
+}
+
+/** Whether saved credentials actually worked, and when that was last known. */
+export interface ConnectionCheck {
+  ok: boolean;
+  at: string;
+  message: string;
+  /** The service couldn't be reached, so the credentials are unknown, not wrong. */
+  offline?: boolean;
 }
 
 export type ConnectionKind = 'gmail' | 'telegram' | 'ai';

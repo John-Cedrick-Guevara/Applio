@@ -23,6 +23,8 @@ interface MockOptions {
    * the way the real backend's does (approved, noted "Not sent: …", rejected).
    */
   sendFailure?: () => string | undefined;
+  /** Plays Gmail or Telegram refusing the saved credentials when Applio signs in to check them. */
+  signInFailure?: (kind: 'gmail' | 'telegram') => string | undefined;
 }
 
 /**
@@ -31,7 +33,7 @@ interface MockOptions {
  * main process will (status flow, channel caps, write-only secrets) so UI bugs
  * surface here rather than after integration.
  */
-export function createMockApi({ latencyMs = 250, now = () => new Date(), sendFailure = () => undefined }: MockOptions = {}): ApplioApi {
+export function createMockApi({ latencyMs = 250, now = () => new Date(), sendFailure = () => undefined, signInFailure = () => undefined }: MockOptions = {}): ApplioApi {
   const start = now();
   const jobs = seedJobs(start);
   const drafts = seedDrafts(jobs, start);
@@ -89,6 +91,15 @@ export function createMockApi({ latencyMs = 250, now = () => new Date(), sendFai
       dailyTokenBudget: settings.dailyTokenBudget,
       lastRun,
     };
+  };
+
+  /** Like main: signs in once both parts of a connection are saved and records how it went, dropping any older result. */
+  const verify = (kind: 'gmail' | 'telegram') => {
+    const { [kind]: _old, ...checks } = settings.checks;
+    const complete = kind === 'gmail' ? !!settings.gmailAddress && settings.secretsSet.gmailAppPassword : !!settings.telegramChatId && settings.secretsSet.telegramBotToken;
+    const refused = complete ? signInFailure(kind) : undefined;
+    const at = now().toISOString();
+    settings = { ...settings, checks: complete ? { ...checks, [kind]: refused ? { ok: false, at, message: refused } : { ok: true, at, message: 'Signed in.' } } : checks };
   };
 
   /** Wraps a sync mutation so thrown domain errors become rejected promises. */
@@ -316,12 +327,20 @@ export function createMockApi({ latencyMs = 250, now = () => new Date(), sendFai
 
     getSettings: () => respond(settings),
 
-    saveSettings: (patch) => run(() => (settings = { ...settings, ...patch })),
+    saveSettings: (patch) =>
+      run(() => {
+        settings = { ...settings, ...patch };
+        if (patch.gmailAddress !== undefined) verify('gmail');
+        if (patch.telegramChatId !== undefined) verify('telegram');
+        return settings;
+      }),
 
     setSecret: (key, value) =>
       run(() => {
         secrets.set(key, value);
         settings = { ...settings, secretsSet: { ...settings.secretsSet, [key]: value.length > 0 } };
+        if (key === 'gmailAppPassword') verify('gmail');
+        if (key === 'telegramBotToken') verify('telegram');
         return settings;
       }),
 

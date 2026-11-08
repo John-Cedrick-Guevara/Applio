@@ -110,6 +110,27 @@ describe('SettingsPage', () => {
     expect(screen.getByText('Needs setup')).toBeInTheDocument();
   });
 
+  it('never shows Connected for a Gmail password that was rejected, and says why', async () => {
+    const api = createMockApi({ latencyMs: 0, signInFailure: () => 'Gmail rejected the address or app password.' });
+    await api.saveSettings({ gmailAddress: 'sam@gmail.com' });
+    renderWithApp(<SettingsPage />, api);
+    await userEvent.type(await screen.findByLabelText('Gmail app password'), 'qafakeqafakeqafk');
+    await userEvent.click(within(screen.getByLabelText('Gmail app password').closest('.field')!).getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText("Can't sign in")).toBeInTheDocument();
+    expect(screen.queryByText('Connected')).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Gmail rejected the address or app password.');
+    expect(screen.getByLabelText('Gmail app password')).toBeInTheDocument();
+  });
+
+  it('shows Connected with when it was verified once Gmail signs in', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    await api.saveSettings({ gmailAddress: 'sam@gmail.com' });
+    await api.setSecret('gmailAppPassword', 'abcd efgh ijkl mnop');
+    renderWithApp(<SettingsPage />, api);
+    expect(await screen.findByText('Connected')).toBeInTheDocument();
+    expect(screen.getByText(/^Verified /)).toBeInTheDocument();
+  });
+
   it('lets a connected Telegram bot get a new token', async () => {
     const api = createMockApi({ latencyMs: 0 });
     await api.saveSettings({ telegramChatId: '42' });
@@ -120,7 +141,7 @@ describe('SettingsPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Change Telegram' }));
     await userEvent.type(screen.getByLabelText('Bot token'), '1:new');
     await userEvent.click(within(screen.getByLabelText('Bot token').closest('.field')!).getByRole('button', { name: 'Save' }));
-    expect(await screen.findByText(/Bot token saved to your system keychain/)).toBeInTheDocument();
-    expect(screen.getByLabelText('Chat ID')).toHaveValue('42');
+    expect(await screen.findByText('Telegram signed in')).toBeInTheDocument();
+    expect(screen.getByText('Connected')).toBeInTheDocument();
   });
 });

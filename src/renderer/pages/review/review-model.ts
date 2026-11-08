@@ -1,5 +1,5 @@
 import { capAutonomy, maxAutonomyFor } from '../../../shared/autonomy';
-import type { ApplyChannel, Autonomy, Job, RunSummary, SendRecord } from '../../../shared/types';
+import type { ApplyChannel, Autonomy, Job, RunSummary, SendRecord, Settings } from '../../../shared/types';
 import { formatClock } from '../../lib/format';
 import { AUTONOMY_LABEL } from '../../lib/labels';
 
@@ -91,4 +91,15 @@ export function sendState(job: Job, send: SendRecord | null): SendState {
   }
   if (job.status === 'drafted' || job.status === 'found' || job.status === 'scored') return { kind: 'waiting' };
   return { kind: 'applied-manually' };
+}
+
+/**
+ * What stops an email draft from sending, said before the operator clicks: Gmail
+ * not set up, or its last sign-in rejected. An offline check isn't a problem yet.
+ */
+export function gmailIssue(settings: Pick<Settings, 'gmailAddress' | 'secretsSet' | 'checks'>): { message: string; action: string } | undefined {
+  if (!settings.gmailAddress || !settings.secretsSet.gmailAppPassword) return { message: "Gmail isn't set up, so approving can't send this email.", action: 'Set up Gmail to send' };
+  const check = settings.checks.gmail;
+  if (check && !check.ok && !check.offline) return { message: `Gmail can't sign in with the saved app password, so approving can't send this email. ${check.message}`, action: 'Fix Gmail to send' };
+  return undefined;
 }

@@ -38,6 +38,12 @@ describe('Telegram messages', () => {
   it('offer Approve, Open and Skip on a draft', () => {
     expect(draftReady(job).buttons).toEqual([[{ text: 'Approve', data: 'approve:j1' }, { text: 'Open', data: 'open:j1' }, { text: 'Skip', data: 'skip:j1' }]]);
   });
+
+  it('leave out one-tap Approve for a suspicious post, and say why', () => {
+    const flagged = draftReady({ ...job, suspicious: 'The post tells automated tools to ignore their instructions.' });
+    expect(flagged.buttons).toEqual([[{ text: 'Open', data: 'open:j1' }, { text: 'Skip', data: 'skip:j1' }]]);
+    expect(flagged.text).toContain('This post looks like it tries to steer automated tools. Check the company in Applio before sending.');
+  });
 });
 
 describe('Telegram bot', () => {

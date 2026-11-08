@@ -201,6 +201,10 @@
 
 
 
+.draft-warning {
+  margin: var(--space-4) var(--space-6) 0;
+}
+
 .draft-footer > .banner {
   flex-basis: 100%;
 }

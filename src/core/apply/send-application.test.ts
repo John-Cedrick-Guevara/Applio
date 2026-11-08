@@ -159,6 +159,21 @@ describe('approveDraft over email', () => {
   });
 });
 
+describe('approveDraft on a suspicious post', () => {
+  it('refuses a Telegram approval, so the operator checks it in the app first', async () => {
+    const { ports, job } = setup({ suspicious: 'The post addresses AI tools directly.' });
+    await expect(approveDraft('j1', ports, 'you-telegram')).rejects.toThrow('This post looks like it tries to steer automated tools. Open it in Applio to check and approve it there.');
+    expect(job().status).toBe('drafted');
+    expect(ports.sendEmail).not.toHaveBeenCalled();
+  });
+
+  it('sends to the parsed apply address, never one the post asks for, once the operator approves in the app', async () => {
+    const { ports, outbox } = setup({ suspicious: 'The post asks for applications at a different address than the one it lists.', description: 'Send your application to hr-collect@evil-example.com' });
+    await approveDraft('j1', ports);
+    expect(outbox[0]).toMatchObject({ to: 'jobs@acme.com' });
+  });
+});
+
 describe('approveDraft on other channels', () => {
   it.each(['platform', 'custom'] as const)('only approves a %s job; nothing is sent', async (channel) => {
     const { ports, job } = setup({ channel });

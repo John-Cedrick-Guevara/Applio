@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite';
+import { suspiciousReason } from '../../core/jobs/suspicious';
 import type { ApplyChannel, EmploymentType, Job, JobStatus, SentBy, StatusEvent } from '../../shared/types';
 import { transaction } from './database';
 import { json, nullable, optNum, optText, type Row } from './rows';
@@ -55,6 +56,8 @@ const toJob = (r: Row, history: StatusEvent[]): Job => ({
   gaps: json<string[]>(r.gaps),
   applyTarget: String(r.apply_target),
   ...(r.apply_url == null ? {} : { applyUrl: String(r.apply_url) }),
+  // Derived on read, not stored, so every job (old ones too) gets the current check for free.
+  ...withSuspicious(String(r.description), String(r.apply_target)),
   platform: optText(r.platform),
   factsUsed: Number(r.facts_used),
   tokensUsed: Number(r.tokens_used),
@@ -66,6 +69,11 @@ const toJob = (r: Row, history: StatusEvent[]): Job => ({
 const toEvent = (r: Row): StatusEvent => ({ status: String(r.status) as JobStatus, at: String(r.at), note: optText(r.note) });
 
 /** SQLite-backed job store: jobs plus their append-only status history. */
+const withSuspicious = (description: string, applyTarget: string) => {
+  const suspicious = suspiciousReason(description, applyTarget);
+  return suspicious ? { suspicious } : {};
+};
+
 export function createJobsRepo(db: DatabaseSync): JobsRepo {
   const insertJob = db.prepare(`
     INSERT INTO jobs (id, dedup_key, source_id, source_name, company, title, url, location, salary, employment_type,
