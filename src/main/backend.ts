@@ -49,6 +49,7 @@ import { nextStatuses } from '../shared/status';
 import { matchesFilter } from '../shared/job-filter';
 import { documentNames, letterBody, pageHtml, resumeBody } from '../shared/templates/application-documents';
 import { pdfPageCount } from '../infra/pdf/page-count';
+import { withDeadline } from '../shared/deadline';
 import { isSafeExternalUrl } from './security';
 
 /** Expands a leading `~` so stored folder paths work with the OS shell. */
@@ -94,6 +95,8 @@ export type Backend = ApplioApi & { tick(): Promise<void>; telegramPoll(): Promi
 const PAUSED_KEY = 'automationPaused';
 /** Gmail sends per day before Applio stops (SPEC F10 default; Gmail itself allows about 500). */
 const GMAIL_DAILY_CAP = 100;
+/** A one-page PDF prints in under a second; a minute means the print hung. */
+const PRINT_DEADLINE_MS = 60_000;
 /** Statuses a job can be skipped from: anything before it was sent. */
 const SKIPPABLE = new Set(['found', 'scored', 'drafted', 'approved']);
 /** Statuses the operator can log a manual application from (SPEC F5 manual handoff). */
@@ -198,17 +201,23 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     const { contact, factGroups } = profile.getProfile();
     return { name: fullName, email: gmailAddress, contact, groups: factGroups };
   };
+  /**
+   * Prints with a deadline: a print that never returns would leave the draft on
+   * "Saving PDFs" forever; a timeout becomes the usual "Couldn't save the files" note.
+   * ponytail: the hung print window stays until Electron settles it; destroy it in print-pdf if that shows up.
+   */
+  const print = (html: string) => withDeadline(printPdf(html), PRINT_DEADLINE_MS, `printing took longer than ${PRINT_DEADLINE_MS / 1000} s`);
   /** A proposal stays editable Markdown (SPEC F8); a cover letter is a PDF. */
   const letterName = (draft: Draft) => (draft.kind === 'proposal' ? 'proposal.md' : 'cover-letter.pdf');
   const letterFile = async (job: Job, draft: Draft) =>
-    draft.kind === 'proposal' ? draft.coverLetter : printPdf(pageHtml(letterBody(draft, job, owner()), 'Cover letter'));
+    draft.kind === 'proposal' ? draft.coverLetter : print(pageHtml(letterBody(draft, job, owner()), 'Cover letter'));
 
   /** Prints both documents first, then writes the folder, so a failed print leaves nothing half-written. */
   const saveFiles = async (jobId: string) => {
     const job = getJob(jobId);
     const draft = drafts.get(jobId);
     if (!draft) return;
-    const resume = await printPdf(pageHtml(resumeBody(draft, owner()), 'Resume'));
+    const resume = await print(pageHtml(resumeBody(draft, owner()), 'Resume'));
     // The locked layout is one page; say so when a draft runs over rather than cut it silently.
     const pages = pdfPageCount(resume);
     if (pages > 1) note(jobId, `The résumé prints on ${pages} pages. Trim a bullet or two in the draft, or approve as it is.`);
@@ -232,9 +241,9 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
    * Drafts one job the operator just added or answered, in the background, so
    * their click returns at once; open pages see it in `drafting` until it lands.
    */
-  const draftingNow = new Set<string>();
+  const draftingNow = new Map<string, string>();
   const draftInBackground = (id: string) => {
-    draftingNow.add(id);
+    draftingNow.set(id, new Date().toISOString());
     pushStatus();
     void draftJobs([id], { trigger: 'operator' }, draftPorts)
       .catch((err: unknown) => note(id, `Not drafted: ${err instanceof Error ? err.message : String(err)}`))
@@ -576,7 +585,8 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       dailyTokenBudget,
       lastRun: activity.latestRun(),
       jobsVersion: jobs.version(),
-      drafting: [...draftingNow],
+      drafting: [...draftingNow.keys()],
+      draftingSince: Object.fromEntries(draftingNow),
       ...(ai.budgetStop() ? { budgetStop: ai.budgetStop() } : {}),
       ...(allSourcesAtLimit() ? { sourcesAtLimit: true } : {}),
     };
