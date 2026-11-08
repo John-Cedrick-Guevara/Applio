@@ -11,7 +11,7 @@ const job = (id: string, over: Partial<Job> = {}): Job => ({
 });
 
 const queue = (jobs: Job[], draftThreshold = 75) =>
-  render(<ReviewQueue jobs={jobs} below={[]} waiting={[]} asking={[]} drafting={[]} draftThreshold={draftThreshold} />);
+  render(<ReviewQueue jobs={jobs} below={[]} waiting={[]} asking={[]} drafting={[]} toDraft={[]} draftThreshold={draftThreshold} />);
 
 describe('ReviewQueue', () => {
   it('groups drafts by what to do next, with counts, and filters to one group', async () => {

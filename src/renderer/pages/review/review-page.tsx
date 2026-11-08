@@ -32,8 +32,10 @@ async function loadReview(api: ReturnType<typeof useApi>) {
   const questions = new Map(openQuestions.map((q) => [q.jobId, q.questions]));
   return {
     queue: [...approved, ...drafted].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
-    // Unscored jobs and strong matches whose draft failed: the next scan retries both.
-    waiting: [...scored.filter((j) => (j.score ?? 0) >= settings.draftThreshold && !questions.has(j.id)), ...found],
+    // Strong matches with no draft: scans draft only when asked, and a failed draft lands here too.
+    toDraft: scored.filter((j) => (j.score ?? 0) >= settings.draftThreshold && !questions.has(j.id)),
+    // Not scored yet: the next scan scores them.
+    waiting: found,
     // Claude asked before drafting these; they wait for the operator (SPEC F4).
     asking: scored.filter((j) => questions.has(j.id)),
     questions,
@@ -113,6 +115,7 @@ function ReviewLayout({ data, selectedId, onJobChange, onStatusChange, onRunComp
           waiting={data.waiting.filter((j) => !isDrafting(j.id))}
           asking={data.asking.filter((j) => !isDrafting(j.id))}
           drafting={drafting}
+          toDraft={data.toDraft.filter((j) => !isDrafting(j.id))}
           draftThreshold={data.thresholds.draft}
         />
         {currentId && isDrafting(currentId) && !data.queue.some((j) => j.id === currentId) ? (

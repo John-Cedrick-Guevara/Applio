@@ -27,6 +27,9 @@ export function JobPanel({ job, draftThreshold, budgetStop, onChanged }: JobPane
   const api = useApi();
   const action = useAction();
   const scored = job.status === 'scored';
+  const strong = scored && (job.score ?? 0) >= draftThreshold;
+  // A strong match's own draft failure says more than "not drafted yet".
+  const failedDraft = job.history.findLast((e) => e.note?.startsWith('Not drafted'))?.note;
 
   const draft = async () => {
     const next = await action.run('start the draft', () => api.draftJob(job.id), 'Drafting started. It shows under Drafting now.');
@@ -53,7 +56,9 @@ export function JobPanel({ job, draftThreshold, budgetStop, onChanged }: JobPane
 
       <div className="banner banner-warning draft-warning" role="status">
         <span>
-          {scored
+          {strong
+            ? failedDraft ? `${failedDraft} Draft it again when you're ready.` : `Strong match (${job.score ?? 0}, your draft score is ${draftThreshold}). Not drafted yet: scans only draft when you ask.`
+            : scored
             ? `Not drafted: its match score (${job.score ?? 0}) is below your draft score (${draftThreshold}). Draft it anyway if it looks right.`
             : `${pendingReason(job)}. Your next scan picks it up.`}
         </span>

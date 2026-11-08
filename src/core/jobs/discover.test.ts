@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_PREFERENCES } from '../../shared/defaults';
 import type { Job } from '../../shared/types';
 import { discovered } from '../triage/test-jobs';
-import { discover, type DiscoverPorts, type RunDetails } from './discover';
+import { discover, type DiscoverPorts, type RunDetails, type ScanPhase } from './discover';
 import type { RunSourcesResult } from './run-sources';
 
 const NOW = new Date('2026-11-05T06:00:00.000Z');
@@ -14,6 +14,8 @@ const setup = (polled: RunSourcesResult, existing: string[] = [], targetRoles = 
   const score = vi.fn(async (ids: readonly string[]) => ({ scored: ids.length, toDraft: [...ids], belowThreshold: 0, notScored: 0 }));
   let n = 0;
   const poll = vi.fn(async () => polled);
+  const phases: ScanPhase[] = [];
+  let stopAt: ScanPhase | undefined;
   const ports: DiscoverPorts = {
     poll,
     existingKeys: () => new Set(existing),
@@ -26,8 +28,14 @@ const setup = (polled: RunSourcesResult, existing: string[] = [], targetRoles = 
     leftover: () => leftover,
     now: () => NOW,
     newId: () => `id-${++n}`,
+    onPhase: (phase) => void phases.push(phase),
+    stopped: () => phases.at(-1) === stopAt,
   };
-  return { run: () => discover(ports), saved, poll, score, draft, scoring };
+  return {
+    run: (options: { draft?: boolean } = { draft: true }) => discover(ports, options),
+    stopAfter: (phase: ScanPhase) => (stopAt = phase),
+    saved, poll, score, draft, scoring, phases,
+  };
 };
 
 const ok = (sourceId: string, jobs: number) => ({ sourceId, outcome: 'ok' as const, jobs, dropped: 0 });
@@ -132,5 +140,40 @@ describe('discover', () => {
     await expect(run()).rejects.toThrow('Add at least one target role in Profile, then run discovery again.');
     expect(poll).not.toHaveBeenCalled();
     expect(saved).toEqual([]);
+  });
+
+  it('leaves strong matches undrafted unless the scan asks to draft them', async () => {
+    const { run, draft, scoring } = setup(polled);
+    expect(await run({})).toMatchObject({ passedFilters: 1, drafted: 0 });
+    expect(draft).not.toHaveBeenCalled();
+    expect(scoring[0]).toMatchObject({ drafted: 0 });
+  });
+
+  it('reports each phase as it starts, in order', async () => {
+    const { run, phases } = setup(polled);
+    await run();
+    expect(phases).toEqual(['fetching', 'filtering', 'scoring', 'drafting']);
+  });
+
+  it('skips the drafting phase when the scan does not draft', async () => {
+    const { run, phases } = setup(polled);
+    await run({});
+    expect(phases).toEqual(['fetching', 'filtering', 'scoring']);
+  });
+
+  it('stops before scoring when asked, keeping the jobs it found for the next scan', async () => {
+    const { run, stopAfter, saved, score } = setup(polled);
+    stopAfter('filtering');
+    expect(await run()).toMatchObject({ passedFilters: 1, drafted: 0, stopped: true });
+    expect(saved[0]!.jobs).toHaveLength(1);
+    expect(score).not.toHaveBeenCalled();
+  });
+
+  it('stops before drafting when asked, keeping the scores', async () => {
+    const { run, stopAfter, score, draft } = setup(polled);
+    stopAfter('scoring');
+    expect(await run()).toMatchObject({ stopped: true, drafted: 0 });
+    expect(score).toHaveBeenCalled();
+    expect(draft).not.toHaveBeenCalled();
   });
 });

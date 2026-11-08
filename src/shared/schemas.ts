@@ -113,7 +113,8 @@ export const API_ARGS = {
   getInterviewPrep: z.tuple([id]),
 
   getStatus: none,
-  runDiscovery: none,
+  runDiscovery: z.tuple([z.strictObject({ sourceIds: z.array(id).max(100).optional(), draft: z.boolean().optional() }).optional()]),
+  stopScan: none,
   setAutomationPaused: z.tuple([z.boolean()]),
 
   openExternal: z.tuple([url]),

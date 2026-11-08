@@ -382,9 +382,20 @@ export interface RunSummary {
   atLimit?: number;
   /** Jobs where Claude asked questions instead of drafting; set when the run's details are stored. */
   asked?: number;
+  /** The operator stopped the scan between phases; what it found is kept for the next one. */
+  stopped?: boolean;
 }
 
-/** Engine and scheduler state for the sidebar card and Review header. */
+/** Where a scan is; fetching and filtering are free, scoring and drafting spend tokens. */
+export type ScanPhase = 'fetching' | 'filtering' | 'scoring' | 'drafting';
+
+/** What one scan covers. Omitted sources mean every enabled one; drafting is off unless asked. */
+export interface ScanOptions {
+  sourceIds?: string[];
+  draft?: boolean;
+}
+
+/** Engine and scan state for the sidebar card and Review header. */
 export interface AppStatus {
   engine: AiEngine;
   /** False when the API-key engine is selected but no key is saved. */
@@ -397,6 +408,8 @@ export interface AppStatus {
   jobsVersion?: number;
   /** Jobs Claude is drafting right now, from Add job or answered questions. */
   drafting?: string[];
+  /** The scan running now: its phase and when it started. Absent between scans. */
+  scan?: { phase: ScanPhase; startedAt: string };
   /** When each job in `drafting` started (ISO), so pages show real elapsed time. */
   draftingSince?: Record<string, string>;
   /** Why AI is stopped (a daily or monthly token budget used up); absent while AI can run. */

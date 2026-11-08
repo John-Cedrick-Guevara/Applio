@@ -16,7 +16,7 @@ import type {
   QuestionAnswer,
   FactGroup,
   ResumeImport,
-  RunSummary,
+  RunSummary, ScanOptions,
   SecretKey,
   SendRecord,
   Settings,
@@ -66,9 +66,11 @@ export interface ApplioApi {
 
   // Automation (SPEC F2, F6)
   getStatus(): Promise<AppStatus>;
-  /** Runs discovery now; rejects while automation is paused. */
-  runDiscovery(): Promise<RunSummary>;
-  /** Pauses or resumes scheduled runs and auto-sends. Drafts still work while paused. */
+  /** Runs a scan now (or joins the one running): the chosen sources, drafting only when asked (SPEC F2). */
+  runDiscovery(options?: ScanOptions): Promise<RunSummary>;
+  /** Asks the running scan to stop after its current phase; what it found is kept. */
+  stopScan(): Promise<void>;
+  /** Pauses or resumes auto-sends. Scans and drafts still work while paused. */
   setAutomationPaused(paused: boolean): Promise<AppStatus>;
 
   // OS integration
@@ -137,7 +139,7 @@ export interface ApplioApi {
 export const API_METHODS = [
   'listJobs', 'getJob', 'getDraft', 'getSend', 'updateCoverLetter', 'approveDraft', 'draftJob', 'redraft', 'saveDraftFiles', 'skipJob', 'markApplied', 'setStatus',
   'sendFollowUp', 'getInterviewPrep',
-  'getStatus', 'runDiscovery', 'setAutomationPaused',
+  'getStatus', 'runDiscovery', 'stopScan', 'setAutomationPaused',
   'openExternal', 'openJobFolder', 'openDraftFile', 'assistFill', 'chooseFolder', 'openOutputFolder',
   'analyzeJob', 'addJob',
   'getProfile', 'saveFact', 'deleteFact', 'saveAnswer', 'deleteAnswer', 'savePreferences', 'listQuestions', 'answerQuestions', 'saveContact', 'saveFactGroup', 'importResume',

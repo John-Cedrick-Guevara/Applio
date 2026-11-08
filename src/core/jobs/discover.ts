@@ -1,5 +1,5 @@
 import { AppError } from '../../shared/errors';
-import type { Job, Preferences, RunSummary } from '../../shared/types';
+import type { Job, Preferences, RunSummary, ScanPhase } from '../../shared/types';
 import { detectChannel } from '../apply/channel';
 import type { DraftResult } from '../generation/draft-jobs';
 import type { ScoreResult } from '../scoring/score-jobs';
@@ -29,6 +29,8 @@ export interface RunDetails {
   scoringError?: string;
 }
 
+export type { ScanPhase };
+
 export interface DiscoverPorts {
   poll: () => Promise<RunSourcesResult>;
   /** Dedup keys of every job already stored, sent ones included. */
@@ -55,6 +57,10 @@ export interface DiscoverPorts {
   leftover: () => { unscored: readonly string[]; undrafted: readonly string[] };
   now: () => Date;
   newId: () => string;
+  /** Called as each phase starts. */
+  onPhase: (phase: ScanPhase) => void;
+  /** True once the operator asked to stop; checked between phases, never mid-call. */
+  stopped: () => boolean;
 }
 
 /** A job that passed triage, as the brain stores it: found, not yet scored (SPEC F7). */
@@ -84,15 +90,18 @@ const toJob = (j: KeyedJob, id: string, at: string): Job => ({
 });
 
 /**
- * One discovery run (SPEC F2–F3): poll every source, drop duplicates and
- * misfits for free, store what's left as found jobs, score them, and draft
- * the strong matches.
+ * One scan (SPEC F2–F3): poll the sources, drop duplicates and misfits for free,
+ * store what's left as found jobs and score them. Strong matches are drafted only
+ * when the operator asked (`draft`), since drafting is the expensive step. A stop
+ * between phases keeps what's done; unscored jobs are scored on the next scan.
  * @throws NoTargetRolesError before polling when no target role is set.
  */
-export async function discover(ports: DiscoverPorts): Promise<RunSummary> {
+export async function discover(ports: DiscoverPorts, { draft = false }: { draft?: boolean } = {}): Promise<RunSummary> {
   const filters = ports.filters();
   if (!filters.preferences.targetRoles.some((r) => r.trim())) throw new NoTargetRolesError();
+  ports.onPhase('fetching');
   const polled = await ports.poll();
+  ports.onPhase('filtering');
   // Nothing fetched because every source is at its daily limit, and nothing waiting to retry: no run to record.
   const atLimit = polled.sources.filter((s) => s.outcome === 'limit').length;
   const leftoverNow = ports.leftover();
@@ -109,9 +118,20 @@ export async function discover(ports: DiscoverPorts): Promise<RunSummary> {
   // Read before saving, so this run's new jobs aren't counted as left over too.
   const leftover = ports.leftover();
   const runId = ports.save(jobs, details, summary, fresh);
+  if (ports.stopped()) {
+    ports.finishRun(runId, details, 0);
+    return { ...summary, stopped: true };
+  }
   try {
+    ports.onPhase('scoring');
     // ponytail: a job that always fails scoring is retried every run; the budget guard caps the cost.
     const scoring = await ports.score([...jobs.map((j) => j.job.id), ...leftover.unscored], runId);
+    if (!draft || ports.stopped()) {
+      // Strong matches wait in Review, one click from a draft.
+      ports.finishRun(runId, { ...details, scoring }, 0);
+      return draft ? { ...summary, stopped: true } : summary;
+    }
+    ports.onPhase('drafting');
     const drafting = await ports.draft([...scoring.toDraft, ...leftover.undrafted], runId);
     ports.finishRun(runId, { ...details, scoring, drafting }, drafting.drafted);
     return { ...summary, drafted: drafting.drafted };
