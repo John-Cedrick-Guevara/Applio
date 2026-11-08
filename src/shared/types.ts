@@ -72,6 +72,25 @@ export interface Job {
   history: StatusEvent[];
 }
 
+/** What went out, exactly as sent (SPEC F7). For a form: the URL, a title, and the filled fields as `label: value` lines. */
+export interface SentRecord {
+  to: string;
+  subject: string;
+  body: string;
+  /** File names as the recipient got them. */
+  attachments: string[];
+  at: string;
+  /** The email's Message-ID, for threading follow-ups and matching replies. */
+  messageId?: string;
+}
+
+/**
+ * A job's send log: claimed (`sending`) before anything goes out, then filled with
+ * exactly what went out. A `sending` row that stays means a send started and never
+ * reported back, so Applio can't tell whether it went out.
+ */
+export type SendRecord = { state: 'sending'; channel: ApplyChannel; at: string } | ({ state: 'sent'; channel: ApplyChannel } & SentRecord);
+
 /** How an application went out: on its own, or approved by the operator somewhere. */
 export type SentBy = 'autonomous' | 'you-app' | 'you-telegram' | 'you-manual';
 

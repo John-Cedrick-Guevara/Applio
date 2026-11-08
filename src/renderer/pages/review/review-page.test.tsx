@@ -74,11 +74,56 @@ describe('ReviewPage', () => {
     expect(await within(detail).findByRole('button', { name: 'Open PDF' })).toBeDisabled();
   });
 
-  it('sends an email application on approval', async () => {
-    const { api } = open('j1');
+  /** A mock with Gmail set up, so email drafts can be sent. */
+  const withGmail = async (api = createMockApi({ latencyMs: 0 })) => {
+    await api.saveSettings({ gmailAddress: 'sam@gmail.com', fullName: 'Sam Rivera' });
+    await api.setSecret('gmailAppPassword', 'abcd efgh ijkl mnop');
+    return api;
+  };
+
+  it('sends an email application on approval, saying where and naming the saved folder', async () => {
+    const api = await withGmail();
+    renderWithApp(<ReviewPage params={{ id: 'j1' }} />, api);
     await userEvent.click(await screen.findByRole('button', { name: 'Approve & send email' }));
     expect(await screen.findByText(/Sent to jobs@northwind-labs.example/)).toBeInTheDocument();
     expect((await api.getJob('j1')).status).toBe('applied');
+  });
+
+  it('offers Set up Gmail instead of Approve while Gmail is not set up', async () => {
+    open('j1');
+    expect(await screen.findByRole('link', { name: 'Set up Gmail to send' })).toHaveAttribute('href', '#/settings');
+    expect(screen.queryByRole('button', { name: 'Approve & send email' })).not.toBeInTheDocument();
+    expect(screen.getByText("Gmail isn't set up, so approving can't send this email.")).toBeInTheDocument();
+  });
+
+  it('keeps a refused send in Review as Not sent with the reason and Retry, never as Sent', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    let refuse: string | undefined = 'Gmail rejected the app password.';
+    const api = await withGmail(createMockApi({ latencyMs: 0, sendFailure: () => refuse }));
+    renderWithApp(<ReviewPage params={{ id: 'j1' }} />, api);
+    await userEvent.click(await screen.findByRole('button', { name: 'Approve & send email' }));
+
+    const detail = screen.getByRole('region', { name: 'Draft detail' });
+    expect(await within(detail).findByRole('alert')).toHaveTextContent('Not sent. Gmail rejected the app password.');
+    expect(within(detail).queryByText(/Sent to/)).not.toBeInTheDocument();
+    const unsent = screen.getByRole('list', { name: 'Approved, not sent' });
+    expect(within(unsent).getByText('Senior Backend Engineer')).toBeInTheDocument();
+    expect(within(unsent).getByText('Not sent')).toBeInTheDocument();
+
+    refuse = undefined;
+    await userEvent.click(within(detail).getByRole('button', { name: 'Retry send' }));
+    expect(await within(detail).findByText(/Sent to jobs@northwind-labs.example/)).toBeInTheDocument();
+    expect(await api.getSend('j1')).toMatchObject({ state: 'sent' });
+  });
+
+  it('lists a job left approved but unsent after a reload, so it never drops out of every list', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const api = await withGmail(createMockApi({ latencyMs: 0, sendFailure: () => 'Network down' }));
+    await api.approveDraft('j1').catch(() => {});
+    renderWithApp(<ReviewPage params={{}} />, api);
+    const unsent = await screen.findByRole('list', { name: 'Approved, not sent' });
+    expect(within(unsent).getByText('Senior Backend Engineer')).toBeInTheDocument();
+    expect(screen.getByText('Approved, not sent (1)')).toBeInTheDocument();
   });
 
   it('routes platform jobs to the manual handoff', async () => {

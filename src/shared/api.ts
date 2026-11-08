@@ -18,6 +18,7 @@ import type {
   ResumeImport,
   RunSummary,
   SecretKey,
+  SendRecord,
   Settings,
   Source,
   Usage,
@@ -44,6 +45,8 @@ export interface ApplioApi {
   listJobs(filter?: JobFilter): Promise<Job[]>;
   getJob(id: string): Promise<Job>;
   getDraft(jobId: string): Promise<Draft | null>;
+  /** The job's send log: exactly what went out, or a send that never finished. Null when Applio never sent it. */
+  getSend(jobId: string): Promise<SendRecord | null>;
   updateCoverLetter(jobId: string, coverLetter: string): Promise<Draft>;
   /** Approves a draft; the main process sends it if the channel allows, else hands off. */
   approveDraft(jobId: string): Promise<Job>;
@@ -126,7 +129,7 @@ export interface ApplioApi {
  * names over IPC, so this list is the renderer's entire reach into main.
  */
 export const API_METHODS = [
-  'listJobs', 'getJob', 'getDraft', 'updateCoverLetter', 'approveDraft', 'skipJob', 'markApplied', 'setStatus',
+  'listJobs', 'getJob', 'getDraft', 'getSend', 'updateCoverLetter', 'approveDraft', 'skipJob', 'markApplied', 'setStatus',
   'sendFollowUp', 'getInterviewPrep',
   'getStatus', 'runDiscovery', 'setAutomationPaused',
   'openExternal', 'openJobFolder', 'openDraftFile', 'assistFill', 'chooseFolder', 'openOutputFolder',

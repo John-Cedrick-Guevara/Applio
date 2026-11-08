@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Job, StatusEvent } from '../../../shared/types';
-import { appStats, displayStatus, filterGroup, timeline } from './applications-model';
+import { appStats, displayStatus, filterGroup, followUpDraft, followUpProblem, timeline } from './applications-model';
 
 const now = new Date('2026-11-03T12:00:00Z');
 const daysAgo = (d: number) => new Date(now.getTime() - d * 86_400_000).toISOString();
@@ -56,5 +56,36 @@ describe('timeline', () => {
     ]);
     expect(events[2]!.meta).toBe('18.2k tokens · 12 facts used');
     expect(events[3]!.meta).toMatch(/^Autonomous · /);
+  });
+});
+
+describe('followUpDraft', () => {
+  it("greets the company's team and signs with the operator's name", () => {
+    const text = followUpDraft(job({ company: 'Acme', title: 'Engineer' }), 'Sam Rivera');
+    expect(text).toMatch(/^Hi Acme team,/);
+    expect(text).toMatch(/Best,\nSam Rivera$/);
+    expect(text).not.toMatch(/\[[^\]]+\]/);
+  });
+
+  it.each(['Unknown', 'unknown (not stated)', '', '  '])('greets neutrally when the company is %j', (company) => {
+    expect(followUpDraft(job({ company }), 'Sam Rivera')).toMatch(/^Hi there,/);
+  });
+});
+
+describe('followUpProblem', () => {
+  it('blocks a follow-up that still has a placeholder', () => {
+    expect(followUpProblem('Best,\n[Your Name]', 'Sam')).toBe('Replace [Your Name] before sending.');
+  });
+
+  it('blocks a follow-up while the operator has no name to sign with', () => {
+    expect(followUpProblem('Best,', '')).toBe('Add your name in Settings so the follow-up is signed.');
+  });
+
+  it('blocks an empty follow-up', () => {
+    expect(followUpProblem('  ', 'Sam')).toBe('Write the follow-up first.');
+  });
+
+  it('allows a finished follow-up', () => {
+    expect(followUpProblem('Hi,\n\nBest,\nSam', 'Sam')).toBeUndefined();
   });
 });

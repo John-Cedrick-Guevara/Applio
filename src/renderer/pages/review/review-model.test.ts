@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Job } from '../../../shared/types';
-import { effortLevel, modeLabel, pendingReason, primaryAction, queueState, runLine, runResult } from './review-model';
+import type { SendRecord } from '../../../shared/types';
+import { formatClock } from '../../lib/format';
+import { effortLevel, modeLabel, pendingReason, primaryAction, queueState, runLine, runResult, sendState } from './review-model';
 
 const job = (over: Partial<Job>): Job => ({
   id: 'x', sourceId: 's', sourceName: 'S', company: 'C', title: 'T', url: '', location: '', employmentType: 'full-time',
@@ -26,6 +28,12 @@ describe('queueState', () => {
     expect(queueState(job({ channel: 'platform' }))).toBe('Ready to hand off');
     expect(queueState(job({ status: 'applied' }))).toBe('Sent');
     expect(queueState(job({ status: 'skipped' }))).toBe('Skipped');
+  });
+
+  it('never calls an approved job that did not go out Sent', () => {
+    expect(queueState(job({ status: 'approved', channel: 'email' }))).toBe('Not sent');
+    expect(queueState(job({ status: 'approved', channel: 'ats' }))).toBe('Not sent');
+    expect(queueState(job({ status: 'approved', channel: 'platform' }))).toBe('Ready to hand off');
   });
 });
 
@@ -100,5 +108,58 @@ describe('effortLevel', () => {
     expect(effortLevel(50)).toBe('Medium');
     expect(effortLevel(74)).toBe('Medium');
     expect(effortLevel(75)).toBe('High');
+  });
+});
+
+describe('sendState', () => {
+  const at = '2026-11-07T09:30:00.000Z';
+  const sent: SendRecord = { state: 'sent', channel: 'email', to: 'jobs@acme.com', subject: 'Application: T — Sam', body: 'Hi', attachments: ['Rivera_T.pdf'], at };
+
+  it('is waiting while the draft is waiting on the operator', () => {
+    expect(sendState(job({ status: 'drafted' }), null)).toEqual({ kind: 'waiting' });
+  });
+
+  it('says Sent only when a sent record exists, naming the recipient and folder', () => {
+    expect(sendState(job({ status: 'applied', folderPath: '/Users/sam/Applio/2026-11/Acme — T (88%)' }), sent)).toEqual({
+      kind: 'sent', line: `Sent to jobs@acme.com at ${formatClock(at)}.`, folder: 'Acme — T (88%)',
+    });
+  });
+
+  it('names a submitted form by its URL', () => {
+    expect(sendState(job({ status: 'applied', channel: 'ats' }), { ...sent, channel: 'ats', to: 'https://jobs.lever.co/acme/1/apply' })).toMatchObject({ kind: 'sent', line: `Form submitted at ${formatClock(at)}.` });
+  });
+
+  it('is not sent, with the reason, when the job was approved but nothing went out', () => {
+    const failed = job({ status: 'approved', history: [{ status: 'approved', at }, { status: 'approved', at, note: 'Not sent: Gmail rejected the app password.' }] });
+    expect(sendState(failed, null)).toEqual({ kind: 'not-sent', reason: 'Gmail rejected the app password.' });
+  });
+
+  it('passes on why a form was handed back, so the operator knows to finish it', () => {
+    const handed = job({ status: 'approved', channel: 'ats', history: [{ status: 'drafted', at, note: 'Old note' }, { status: 'approved', at }, { status: 'approved', at, note: 'Handed to you: the form has a CAPTCHA.' }] });
+    expect(sendState(handed, null)).toEqual({ kind: 'not-sent', reason: 'Handed to you: the form has a CAPTCHA.' });
+  });
+
+  it('ignores notes from before the approval', () => {
+    expect(sendState(job({ status: 'approved', history: [{ status: 'drafted', at, note: 'The résumé prints on 2 pages.' }, { status: 'approved', at }] }), null)).toEqual({ kind: 'not-sent', reason: "It hasn't gone out yet." });
+  });
+
+  it('is not sent with a generic reason when no note says why', () => {
+    expect(sendState(job({ status: 'approved' }), null)).toEqual({ kind: 'not-sent', reason: "It hasn't gone out yet." });
+  });
+
+  it("is unconfirmed when a send started and never reported back", () => {
+    expect(sendState(job({ status: 'approved' }), { state: 'sending', channel: 'email', at })).toEqual({ kind: 'unconfirmed', at });
+  });
+
+  it('is waiting for the handoff when a platform job was approved', () => {
+    expect(sendState(job({ status: 'approved', channel: 'platform' }), null)).toEqual({ kind: 'handoff' });
+  });
+
+  it('is applied by the operator when there is no send record', () => {
+    expect(sendState(job({ status: 'applied', sentBy: 'you-manual' }), null)).toEqual({ kind: 'applied-manually' });
+  });
+
+  it('is skipped for a skipped job', () => {
+    expect(sendState(job({ status: 'skipped' }), null)).toEqual({ kind: 'skipped' });
   });
 });

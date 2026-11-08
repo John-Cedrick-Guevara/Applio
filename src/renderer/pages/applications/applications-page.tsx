@@ -9,11 +9,11 @@ import { useJobsVersion } from '../../hooks/use-jobs-version';
 import { formatShortDate, formatTokens } from '../../lib/format';
 import { CHANNEL_LABEL } from '../../lib/labels';
 import { ApplicationDetail } from './application-detail';
+import { APPLICATION_STATUSES } from '../../lib/job-lists';
 import { appStats, displayStatus, filterGroup, SENT_BY_LABEL, sentAt, type FilterGroup } from './applications-model';
 import { StatusBadge } from './status-badge';
 import './applications.css';
 
-const SENT_STATUSES = ['applied', 'replied', 'interview', 'offer', 'rejected', 'ghosted'] as const;
 
 const FILTERS: { id: FilterGroup | 'all'; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -28,21 +28,21 @@ export default function ApplicationsPage() {
   const api = useApi();
   const jobsChanges = useJobsVersion();
   const state = useAsync(async () => {
-    const [jobs, settings] = await Promise.all([api.listJobs({ statuses: [...SENT_STATUSES] }), api.getSettings()]);
+    const [jobs, settings] = await Promise.all([api.listJobs({ statuses: [...APPLICATION_STATUSES] }), api.getSettings()]);
     const sorted = [...jobs].sort((a, b) => (sentAt(b) ?? '').localeCompare(sentAt(a) ?? ''));
-    return { jobs: sorted, followUpDays: settings.followUpDays };
+    return { jobs: sorted, followUpDays: settings.followUpDays, ownerName: settings.fullName };
   }, [api, jobsChanges]);
 
   const replace = (job: Job) => state.setData((d) => ({ ...d, jobs: d.jobs.map((j) => (j.id === job.id ? job : j)) }));
 
   return (
     <AsyncView state={state} what="applications" rows={6}>
-      {({ jobs, followUpDays }) => <Applications jobs={jobs} followUpDays={followUpDays} onJob={replace} />}
+      {({ jobs, followUpDays, ownerName }) => <Applications jobs={jobs} followUpDays={followUpDays} ownerName={ownerName} onJob={replace} />}
     </AsyncView>
   );
 }
 
-function Applications({ jobs, followUpDays, onJob }: { jobs: Job[]; followUpDays: number; onJob: (job: Job) => void }) {
+function Applications({ jobs, followUpDays, ownerName, onJob }: { jobs: Job[]; followUpDays: number; ownerName: string; onJob: (job: Job) => void }) {
   const [filter, setFilter] = useState<FilterGroup | 'all'>('all');
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState(jobs[0]?.id);
@@ -141,7 +141,7 @@ function Applications({ jobs, followUpDays, onJob }: { jobs: Job[]; followUpDays
         </section>
 
         {selected ? (
-          <ApplicationDetail key={selected.job.id} job={selected.job} status={selected.status} followUpDays={followUpDays} now={now} onJob={onJob} />
+          <ApplicationDetail key={selected.job.id} job={selected.job} status={selected.status} followUpDays={followUpDays} now={now} ownerName={ownerName} onJob={onJob} />
         ) : null}
       </div>
     </>

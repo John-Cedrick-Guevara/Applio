@@ -1,3 +1,4 @@
+import { findPlaceholder } from '../../../shared/placeholders';
 import type { Job, SentBy } from '../../../shared/types';
 import { formatShortDate, formatTokens } from '../../lib/format';
 import { CHANNEL_LABEL } from '../../lib/labels';
@@ -100,4 +101,27 @@ export function timeline(job: Job, followUpDays: number, now: Date): TimelineEve
   }
   if (followUpDue(job, followUpDays, now)) events.push({ title: `No reply in ${followUpDays} days`, meta: 'Follow-up suggested' });
   return events;
+}
+
+/** A company name a source couldn't read ("Unknown", "Unknown (not stated)", blank). */
+const unknownCompany = (company: string) => !company.trim() || /^unknown\b/i.test(company.trim());
+
+/**
+ * The follow-up editor's starting text: greets the company's team (or "Hi there"
+ * when the company is unknown) and signs with the operator's name. It never
+ * contains a placeholder, so sending it unedited is safe.
+ */
+export function followUpDraft(job: Job, name: string): string {
+  const sent = sentAt(job);
+  const greeting = unknownCompany(job.company) ? 'Hi there,' : `Hi ${job.company} team,`;
+  return `${greeting}\n\nFollowing up on my application for the ${job.title} role, sent ${sent ? formatShortDate(sent) : 'recently'}. I am still very interested and happy to share more detail on any of my work.\n\nBest,${name ? `\n${name}` : ''}`;
+}
+
+/** Why the follow-up can't be sent yet, for the disabled Send button; undefined when it can. */
+export function followUpProblem(text: string, name: string): string | undefined {
+  if (!text.trim()) return 'Write the follow-up first.';
+  const placeholder = findPlaceholder(text);
+  if (placeholder) return `Replace ${placeholder} before sending.`;
+  if (!name.trim()) return 'Add your name in Settings so the follow-up is signed.';
+  return undefined;
 }

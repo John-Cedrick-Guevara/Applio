@@ -26,4 +26,33 @@ describe('useAction', () => {
     expect(screen.getByText("Couldn't approve the draft. Daily limit reached")).toBeInTheDocument();
     expect(log).toHaveBeenCalledWith('[action] failed to approve the draft', expect.any(Error));
   });
+
+  it('runs one action at a time, so a fast double click calls the API once', async () => {
+    let finish: (v: number) => void = () => {};
+    const fn = vi.fn(() => new Promise<number>((resolve) => (finish = resolve)));
+    const { result } = renderHook(() => useAction(), { wrapper });
+    let second: number | undefined = 1;
+    await act(async () => {
+      const first = result.current.run('send', fn);
+      second = await result.current.run('send', fn);
+      finish(7);
+      await first;
+    });
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(second).toBeUndefined();
+  });
+
+  it('keeps the last error for inline display, without a toast when asked to stay quiet', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { result } = renderHook(() => useAction(), { wrapper });
+    await act(async () => {
+      await result.current.run('send', () => Promise.reject(new Error('Gmail refused')), undefined, { quiet: true });
+    });
+    expect(result.current.error).toBe('Gmail refused');
+    expect(screen.queryByText(/Couldn't send/)).not.toBeInTheDocument();
+    await act(async () => {
+      await result.current.run('send', () => Promise.resolve(1));
+    });
+    expect(result.current.error).toBeUndefined();
+  });
 });

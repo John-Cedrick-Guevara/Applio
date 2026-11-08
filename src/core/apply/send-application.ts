@@ -1,6 +1,6 @@
 import { AppError } from '../../shared/errors';
 import { documentNames, isLockedLayout, signOff, type DocumentOwner } from '../../shared/templates/application-documents';
-import type { ApplyChannel, Draft, Job, JobStatus, SentBy } from '../../shared/types';
+import type { ApplyChannel, Draft, Job, JobStatus, SendRecord, SentBy, SentRecord } from '../../shared/types';
 import type { FillInput, FillStep } from './ats-plan';
 import { atsFormUrl } from './channel';
 
@@ -23,16 +23,6 @@ export interface EmailMessage {
   references?: string;
 }
 
-/** What went out, exactly as sent (SPEC F7). */
-export interface SentRecord {
-  to: string;
-  subject: string;
-  body: string;
-  attachments: string[];
-  at: string;
-  /** The email's Message-ID, for threading follow-ups and matching replies. */
-  messageId?: string;
-}
 
 /** How an attempt at an ATS form ended. Only `submitted` was seen to go through. */
 export type AtsOutcome =
@@ -43,7 +33,8 @@ export type AtsOutcome =
   /** Submit was pressed but no confirmation showed, so it may or may not have gone through. */
   | { kind: 'unconfirmed'; filled: FillStep[] };
 
-export type SendLogRow = { state: 'sending'; channel: ApplyChannel; at: string } | ({ state: 'sent'; channel: ApplyChannel } & SentRecord);
+export type SendLogRow = SendRecord;
+export type { SentRecord };
 
 export interface ApplyPorts {
   job: (id: string) => Job;
@@ -76,6 +67,11 @@ export interface ApplyPorts {
   /** Adds answers the operator just approved to the answer bank. */
   saveAiAnswers: (answers: { question: string; answer: string }[]) => void;
   bankAnswers: () => { question: string; answer: string }[];
+  /**
+   * Checks the channel can send at all (Gmail's address and app password for email).
+   * @throws an operator-readable error naming what to set up.
+   */
+  checkSetup: (channel: ApplyChannel) => void;
   /** Fills and submits an ATS form in Applio's own window (SPEC F5 channel 2); hidden for autonomous sends. */
   submitAts: (request: { url: string; input: FillInput; visible: boolean }) => Promise<AtsOutcome>;
 }
@@ -110,6 +106,7 @@ const CHANNEL_NAME: Record<ApplyChannel, string> = { email: 'email', ats: 'ATS',
  * @throws SendBlockedError naming what's in the way.
  */
 const readyToSend = (jobId: string, channel: ApplyChannel, ports: ApplyPorts) => {
+  ports.checkSetup(channel);
   const job = ports.job(jobId);
   const draft = ports.draft(jobId);
   if (!draft) throw new SendBlockedError(`Job ${jobId} has no draft to send.`);
@@ -125,6 +122,8 @@ const readyToSend = (jobId: string, channel: ApplyChannel, ports: ApplyPorts) =>
   const { gmailDaily, perChannel } = ports.caps();
   if (channel === 'email' && today >= gmailDaily) throw new SendBlockedError(`Gmail's daily cap is reached (${gmailDaily} sends today). Applio sends again tomorrow.`);
   if (today >= perChannel) throw new SendBlockedError(`Today's cap for ${CHANNEL_NAME[channel]} applications is reached (${perChannel}). Raise it in Guardrails, or send tomorrow.`);
+
+  if (channel === 'ats' && !job.applyUrl) throw new SendBlockedError("This job has no form link, so Applio can't open its application. Use the manual handoff.");
 
   const folder = ports.folder(job);
   const resume = folder ? join(folder, 'resume.pdf') : undefined;
@@ -192,9 +191,8 @@ export async function sendByEmail(jobId: string, sentBy: SentBy, ports: ApplyPor
  */
 export async function sendByAts(jobId: string, sentBy: SentBy, ports: ApplyPorts): Promise<Job> {
   const { job, draft, folder, resume } = readyToSend(jobId, 'ats', ports);
-  if (!job.applyUrl) throw new SendBlockedError("This job has no form link, so Applio can't open its application. Use the manual handoff.");
   const coverLetter = join(folder, 'cover-letter.pdf');
-  const url = atsFormUrl(job.applyUrl);
+  const url = atsFormUrl(job.applyUrl!);
   // Forms upload a file by its name on disk, so the documents go up as copies named for the operator.
   const names = documentNames(ports.owner().name, draft.headline);
   const upload = (from: string, as: string) => {
@@ -258,10 +256,14 @@ export async function sendByAts(jobId: string, sentBy: SentBy, ports: ApplyPorts
  * The operator approves a draft (SPEC F5): the job becomes Approved, its new
  * AI-written answers join the answer bank, and an email or ATS job is sent.
  * Platform and career-site jobs go to the manual handoff and are never sent from here.
+ * Anything that would stop the send before it starts (setup, caps, a missing résumé)
+ * is checked first and leaves the job drafted, so it never sits approved but unsent
+ * for a reason the operator could have fixed first.
  */
 export async function approveDraft(jobId: string, ports: ApplyPorts, approvedBy: SentBy = 'you-app'): Promise<Job> {
   let job = ports.job(jobId);
   if (job.status !== 'drafted' && job.status !== 'approved') throw new SendBlockedError(`Job ${jobId} is not awaiting approval`);
+  if (job.channel === 'email' || job.channel === 'ats') readyToSend(jobId, job.channel, ports);
   if (job.status === 'drafted') {
     job = ports.transition(jobId, 'approved');
     const fresh = (ports.draft(jobId)?.answers ?? []).filter((a) => a.origin === 'ai').map(({ question, answer }) => ({ question, answer }));

@@ -1,3 +1,4 @@
+import { findPlaceholder } from '../../shared/placeholders';
 import type { Job } from '../../shared/types';
 import { fromHeader, SendBlockedError, type EmailMessage } from './send-application';
 
@@ -19,12 +20,14 @@ export interface FollowUpPorts {
  * Sends the operator's follow-up (SPEC F7) as a reply in the application's
  * email thread, then logs it word for word. Only this function sends a
  * follow-up, and only the operator's click calls it.
- * @throws SendBlockedError when the application isn't waiting, has no email address, or the text is empty.
+ * @throws SendBlockedError when the application isn't waiting, has no email address, or the text is empty or still has a placeholder.
  */
 export async function sendFollowUp(jobId: string, text: string, ports: FollowUpPorts): Promise<Job> {
   const job = ports.job(jobId);
   if (job.status !== 'applied') throw new SendBlockedError('Follow-ups go only to applications still waiting on a reply');
   if (!text.trim()) throw new SendBlockedError('Write the follow-up first');
+  const placeholder = findPlaceholder(text);
+  if (placeholder) throw new SendBlockedError(`Replace ${placeholder} before sending.`);
   if (job.channel !== 'email') throw new SendBlockedError('This application went through a form, so there is no email address to follow up with.');
 
   const original = ports.sent(jobId);

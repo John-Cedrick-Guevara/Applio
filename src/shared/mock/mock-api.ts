@@ -2,7 +2,7 @@ import type { ApplioApi } from '../api';
 import { matchesFilter } from '../job-filter';
 import { capAutonomy } from '../autonomy';
 import { nextStatuses } from '../status';
-import type { AppStatus, Job, JobStatus, OpenQuestions, SecretKey } from '../types';
+import type { AppStatus, Job, JobStatus, OpenQuestions, SecretKey, SendRecord } from '../types';
 import {
   seedLastRun,
   seedDrafts,
@@ -18,6 +18,11 @@ interface MockOptions {
   /** Simulated round-trip so loading states are visible in dev. */
   latencyMs?: number;
   now?: () => Date;
+  /**
+   * Plays Gmail or the form refusing a send: return a reason and the next send fails
+   * the way the real backend's does (approved, noted "Not sent: …", rejected).
+   */
+  sendFailure?: () => string | undefined;
 }
 
 /**
@@ -26,7 +31,7 @@ interface MockOptions {
  * main process will (status flow, channel caps, write-only secrets) so UI bugs
  * surface here rather than after integration.
  */
-export function createMockApi({ latencyMs = 250, now = () => new Date() }: MockOptions = {}): ApplioApi {
+export function createMockApi({ latencyMs = 250, now = () => new Date(), sendFailure = () => undefined }: MockOptions = {}): ApplioApi {
   const start = now();
   const jobs = seedJobs(start);
   const drafts = seedDrafts(jobs, start);
@@ -38,6 +43,18 @@ export function createMockApi({ latencyMs = 250, now = () => new Date() }: MockO
   let lastRun = seedLastRun(start);
   const secrets = new Map<SecretKey, string>();
   let nextId = 1000;
+
+  /** What "went out" for each job Applio sent, like the real send log; manual applications have none. */
+  const sends = new Map<string, SendRecord>();
+  const recordSend = (job: Job, at: string) => {
+    const draft = drafts.find((d) => d.jobId === job.id);
+    const subject = settings.fullName ? `Application: ${job.title} — ${settings.fullName}` : `Application: ${job.title}`;
+    sends.set(job.id, { state: 'sent', channel: job.channel, to: job.applyTarget, subject: draft?.subject ?? subject, body: draft?.coverLetter ?? '', attachments: ['resume.pdf'], at });
+  };
+  for (const job of jobs) {
+    const at = job.history.find((e) => e.status === 'applied')?.at;
+    if (at && job.sentBy && job.sentBy !== 'you-manual') recordSend(job, at);
+  }
 
   /** Resolves a deep copy after the simulated latency — callers never share store references. */
   const respond = <T>(value: T): Promise<T> =>
@@ -94,6 +111,7 @@ export function createMockApi({ latencyMs = 250, now = () => new Date() }: MockO
     getJob: (id) => run(() => findJob(id)),
 
     getDraft: (jobId) => respond(drafts.find((d) => d.jobId === jobId) ?? null),
+    getSend: (jobId) => respond(sends.get(jobId) ?? null),
 
     updateCoverLetter: (jobId, coverLetter) =>
       run(() => {
@@ -107,13 +125,24 @@ export function createMockApi({ latencyMs = 250, now = () => new Date() }: MockO
     approveDraft: (jobId) =>
       run(() => {
         const job = findJob(jobId);
-        if (job.status !== 'drafted') throw new Error(`Job ${jobId} is not awaiting approval`);
-        transition(job, 'approved');
+        if (job.status !== 'drafted' && job.status !== 'approved') throw new Error(`Job ${jobId} is not awaiting approval`);
         // Approval sends only where the channel can send on its own (SPEC F5).
         const canSend = capAutonomy('autonomous', job.channel) === 'autonomous';
+        // Like the real backend: missing setup refuses before the status changes.
+        if (canSend && job.channel === 'email' && (!settings.gmailAddress || !settings.secretsSet.gmailAppPassword)) {
+          throw new Error('Set up Gmail in Settings first: your address and an app password.');
+        }
+        if (job.status === 'drafted') transition(job, 'approved');
         if (!canSend) return job;
+        const refused = sendFailure();
+        if (refused) {
+          job.history.push({ status: job.status, at: now().toISOString(), note: `Not sent: ${refused}` });
+          throw new Error(refused);
+        }
         job.sentBy = 'you-app';
-        return transition(job, 'applied');
+        const applied = transition(job, 'applied');
+        recordSend(applied, applied.history.at(-1)!.at);
+        return applied;
       }),
 
     skipJob: (jobId) => run(() => transition(findJob(jobId), 'skipped')),

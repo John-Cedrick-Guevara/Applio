@@ -150,6 +150,40 @@
 
 .sent-body {
   margin: 6px 0 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* About six lines, then Show all. */
+.sent-body-clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+  overflow: hidden;
+}
+
+.sent-meta {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+
+.sent-meta > div {
+  display: flex;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.sent-meta dt {
+  flex: none;
+  width: 56px;
+}
+
+.sent-meta dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-body);
 }
 
 .file-chip {

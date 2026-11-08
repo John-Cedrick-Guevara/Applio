@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Autonomy, Draft, Job } from '../../../shared/types';
+import type { Autonomy, Draft, Job, SendRecord } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { AsyncView } from '../../components/async-view';
 import { Button, buttonClass } from '../../components/button';
@@ -7,12 +7,12 @@ import { Icon } from '../../components/icons';
 import { ScoreBlock } from '../../components/score-block';
 import { useAction } from '../../hooks/use-action';
 import { useAsync } from '../../hooks/use-async';
-import { formatRelative, formatTokens } from '../../lib/format';
+import { formatClock, formatRelative, formatTokens } from '../../lib/format';
 import { CHANNEL_LABEL } from '../../lib/labels';
 import { navigate } from '../../lib/router';
 import type { DocumentOwner } from '../../../shared/templates/application-documents';
 import { DraftDocument, type DocTab } from './draft-document';
-import { modeLabel, primaryAction, sentLine, effortLevel } from './review-model';
+import { modeLabel, primaryAction, sendState, effortLevel, type SendState } from './review-model';
 import { SourceCredit } from '../../components/source-credit';
 
 interface DraftPanelProps {
@@ -22,6 +22,8 @@ interface DraftPanelProps {
   /** Whose name and email go on the documents. */
   owner: DocumentOwner;
   autonomyBySource: Record<string, Autonomy>;
+  /** Gmail's address and app password are saved, so an email draft can be sent. */
+  gmailReady: boolean;
   onJobChange: (job: Job) => void;
 }
 
@@ -29,20 +31,21 @@ interface DraftPanelProps {
 export function DraftPanel({ jobId, ...rest }: DraftPanelProps) {
   const api = useApi();
   const state = useAsync(async () => {
-    const [job, draft] = await Promise.all([api.getJob(jobId), api.getDraft(jobId)]);
-    return { job, draft };
+    const [job, draft, send] = await Promise.all([api.getJob(jobId), api.getDraft(jobId), api.getSend(jobId)]);
+    return { job, draft, send };
   }, [api, jobId]);
 
   return (
     <section className="card card-flush draft-panel" aria-label="Draft detail">
       <AsyncView state={state} what="this draft" rows={6}>
-        {({ job, draft }) => (
+        {({ job, draft, send }) => (
           <DraftDetail
             job={job}
             draft={draft}
+            send={send}
             {...rest}
-            onJob={(next) => {
-              state.setData((d) => ({ ...d, job: next }));
+            onJob={(next, nextSend) => {
+              state.setData((d) => ({ ...d, job: next, send: nextSend }));
               rest.onJobChange(next);
             }}
             onDraft={(next) => state.setData((d) => ({ ...d, draft: next }))}
@@ -56,28 +59,45 @@ export function DraftPanel({ jobId, ...rest }: DraftPanelProps) {
 interface DetailProps extends Omit<DraftPanelProps, 'jobId' | 'onJobChange'> {
   job: Job;
   draft: Draft | null;
-  onJob: (job: Job) => void;
+  send: SendRecord | null;
+  onJob: (job: Job, send: SendRecord | null) => void;
   onDraft: (draft: Draft) => void;
 }
 
-function DraftDetail({ job, draft, nextId, thresholds, owner, autonomyBySource, onJob, onDraft }: DetailProps) {
+function DraftDetail({ job, draft, send, nextId, thresholds, owner, autonomyBySource, gmailReady, onJob, onDraft }: DetailProps) {
   const api = useApi();
   const action = useAction();
+  // Its own action, so a failed send's message stays on screen and never reads as a skip or edit error.
+  const sending = useAction();
   const [tab, setTab] = useState<DocTab>('letter');
   const [editing, setEditing] = useState(false);
   const primary = primaryAction(job);
+  const state = sendState(job, send);
   const waiting = job.status === 'drafted';
+  const needsGmail = job.channel === 'email' && !gmailReady;
   const foundAt = job.history[0]?.at ?? job.postedAt;
 
+  /** Approves (or retries) and then re-reads the job and its send log, so what's shown is what happened, success or not. */
   const approve = async () => {
-    const next = await action.run('approve the draft', () => api.approveDraft(job.id));
-    if (next) onJob(next);
+    await sending.run('send the application', () => api.approveDraft(job.id), undefined, { quiet: true });
+    try {
+      const [next, nextSend] = await Promise.all([api.getJob(job.id), api.getSend(job.id)]);
+      onJob(next, nextSend);
+    } catch (err) {
+      // The send's own result is already on screen; a failed re-read only leaves the old view, so it's logged, not shown.
+      console.error('[review] failed to reload the job after sending', err);
+    }
+  };
+
+  const markApplied = async () => {
+    const next = await action.run('mark it applied', () => api.markApplied(job.id), 'Marked as applied');
+    if (next) onJob(next, send);
   };
 
   const skip = async () => {
     const next = await action.run('skip the job', () => api.skipJob(job.id), `Skipped ${job.title} at ${job.company}`);
     if (!next) return;
-    onJob(next);
+    onJob(next, send);
     if (nextId) navigate(`/review/${nextId}`);
   };
 
@@ -146,14 +166,29 @@ function DraftDetail({ job, draft, nextId, thresholds, owner, autonomyBySource, 
         />
       ) : null}
 
-      {!waiting && job.status !== 'skipped' ? (
-        <div className="banner banner-success draft-sent">
-          <span>{sentLine(job)}</span>
-          <a href="#/applications">View in Applications</a>
-        </div>
-      ) : null}
-
       <div className="draft-footer">
+        {/* Where the application stands sits beside Approve, so the result of a click shows where the click was. */}
+        <SendBanner
+          state={state}
+          channel={job.channel}
+          busy={sending.pending || action.pending}
+          onRetry={approve}
+          onMarkApplied={markApplied}
+          onSkip={skip}
+          onOpenFolder={() => action.run('open the folder', () => api.openJobFolder(job.id))}
+          handoffHref={`#/handoff/${job.id}`}
+        />
+        {waiting && sending.error ? (
+          <div className="banner banner-danger" role="alert">
+            <span><strong>Not sent.</strong> {sending.error} Nothing went out, and the draft is still here.</span>
+          </div>
+        ) : null}
+        {waiting && needsGmail ? (
+          <div className="banner banner-warning">
+            <span>Gmail isn't set up, so approving can't send this email.</span>
+            <a href="#/settings">Set up Gmail</a>
+          </div>
+        ) : null}
         <div className="draft-footer-meta">
           <span>Apply via <strong>{CHANNEL_LABEL[job.channel]}</strong> · {job.applyTarget}</span>
           <span>Mode <strong>{modeLabel(job, autonomyBySource[job.sourceId] ?? 'draft')}</strong></span>
@@ -161,16 +196,89 @@ function DraftDetail({ job, draft, nextId, thresholds, owner, autonomyBySource, 
         </div>
         {waiting ? (
           <div className="row">
-            <Button busy={action.pending} onClick={skip}>Skip</Button>
+            <Button busy={action.pending || sending.pending} onClick={skip}>Skip</Button>
             <Button disabled={!draft} onClick={() => { setTab('letter'); setEditing(true); }}>Edit</Button>
             {primary.handoff ? (
               <a className={buttonClass('primary')} href={`#/handoff/${job.id}`}>{primary.label}</a>
+            ) : needsGmail ? (
+              <a className={buttonClass('primary')} href="#/settings">Set up Gmail to send</a>
             ) : (
-              <Button variant="primary" busy={action.pending} onClick={approve}>{action.pending ? (job.channel === 'email' ? 'Sending…' : 'Submitting…') : primary.label}</Button>
+              <Button variant="primary" busy={sending.pending} onClick={approve}>{sending.pending ? (job.channel === 'email' ? 'Sending…' : 'Submitting…') : primary.label}</Button>
             )}
           </div>
         ) : null}
       </div>
     </>
   );
+}
+
+interface SendBannerProps {
+  state: SendState;
+  channel: Job['channel'];
+  busy: boolean;
+  onRetry: () => void;
+  onMarkApplied: () => void;
+  onSkip: () => void;
+  onOpenFolder: () => void;
+  handoffHref: string;
+}
+
+/**
+ * The one line that says where this application stands after the operator's
+ * decision, with the next step for each state. Nothing here is inferred from
+ * the status alone: Sent needs a sent record (`sendState`).
+ */
+function SendBanner({ state, channel, busy, onRetry, onMarkApplied, onSkip, onOpenFolder, handoffHref }: SendBannerProps) {
+  switch (state.kind) {
+    case 'waiting':
+    case 'skipped':
+      return null;
+    case 'sent':
+      return (
+        <div className="banner banner-success draft-sent" role="status">
+          <span>{state.line}{state.folder ? <> Saved to <strong>{state.folder}</strong>.</> : null}</span>
+          <div className="row">
+            {state.folder ? <Button size="sm" variant="link" onClick={onOpenFolder}>Open folder</Button> : null}
+            <a href="#/applications">View in Applications</a>
+          </div>
+        </div>
+      );
+    case 'not-sent':
+      return (
+        <div className="banner banner-danger draft-sent" role="alert">
+          <span><strong>{channel === 'email' ? 'Not sent.' : 'Not submitted.'}</strong> {state.reason}</span>
+          <div className="row">
+            {channel === 'email' ? <a href="#/settings">Check Gmail settings</a> : <Button size="sm" busy={busy} onClick={onMarkApplied}>I finished it myself</Button>}
+            <Button size="sm" variant="primary" busy={busy} onClick={onRetry}>{busy ? (channel === 'email' ? 'Sending…' : 'Submitting…') : channel === 'email' ? 'Retry send' : 'Retry form'}</Button>
+          </div>
+        </div>
+      );
+    case 'unconfirmed':
+      return (
+        <div className="banner banner-warning draft-sent" role="alert">
+          <span>
+            A send started at {formatClock(state.at)} but never confirmed, so Applio can't tell whether it went out.{' '}
+            {channel === 'email' ? "Check Gmail's Sent folder." : 'Check the form window and your email.'}
+          </span>
+          <div className="row">
+            <Button size="sm" busy={busy} onClick={onSkip}>I didn't apply</Button>
+            <Button size="sm" variant="primary" busy={busy} onClick={onMarkApplied}>Mark as applied</Button>
+          </div>
+        </div>
+      );
+    case 'handoff':
+      return (
+        <div className="banner banner-warning draft-sent">
+          <span>Approved. This one is applied to by hand, so it waits for you in the handoff.</span>
+          <a className={buttonClass('primary', 'sm')} href={handoffHref}>Open handoff</a>
+        </div>
+      );
+    case 'applied-manually':
+      return (
+        <div className="banner banner-success draft-sent" role="status">
+          <span>You applied to this one yourself, outside Applio.</span>
+          <a href="#/applications">View in Applications</a>
+        </div>
+      );
+  }
 }

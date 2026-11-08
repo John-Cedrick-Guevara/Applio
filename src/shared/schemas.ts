@@ -100,6 +100,7 @@ export const API_ARGS = {
   listJobs: z.tuple([JobFilterSchema.optional()]),
   getJob: z.tuple([id]),
   getDraft: z.tuple([id]),
+  getSend: z.tuple([id]),
   updateCoverLetter: z.tuple([id, long]),
   approveDraft: z.tuple([id]),
   skipJob: z.tuple([id]),

@@ -22,3 +22,6 @@ const TRANSITIONS: Record<JobStatus, JobStatus[]> = {
 export function nextStatuses(status: JobStatus): JobStatus[] {
   return TRANSITIONS[status];
 }
+
+/** Every job status, from the transition table, so a new status can't be missed by lists that must cover them all. */
+export const JOB_STATUSES = Object.keys(TRANSITIONS) as JobStatus[];
