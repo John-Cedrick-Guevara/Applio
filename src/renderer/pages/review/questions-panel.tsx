@@ -19,6 +19,8 @@ interface Row {
   answer: string;
   save: boolean;
   section: string;
+  /** Edited and left: from then on an empty answer shows its error (blur-first). */
+  touched: boolean;
 }
 
 /**
@@ -30,11 +32,19 @@ export function QuestionsPanel({ job, questions, sections, onAnswered }: Props) 
   const api = useApi();
   const action = useAction();
   const toast = useToast();
-  const [rows, setRows] = useState<Row[]>(() => questions.map(() => ({ answer: '', save: false, section: sections[0] ?? '' })));
+  const [rows, setRows] = useState<Row[]>(() => questions.map(() => ({ answer: '', save: false, section: sections[0] ?? '', touched: false })));
   const set = (i: number, patch: Partial<Row>) => setRows((r) => r.map((row, j) => (j === i ? { ...row, ...patch } : row)));
-  const complete = rows.every((r) => r.answer.trim());
+  // Set by a click on Answer and draft: every empty answer shows its error, not just the ones left.
+  const [tried, setTried] = useState(false);
+  const missing = (i: number) => (tried || rows[i]!.touched) && !rows[i]!.answer.trim();
 
   const submit = async () => {
+    const empty = rows.findIndex((r) => !r.answer.trim());
+    if (empty >= 0) {
+      setTried(true);
+      document.getElementById(`q-${empty}`)?.focus();
+      return;
+    }
     const answers: QuestionAnswer[] = questions.map((question, i) => {
       const row = rows[i]!;
       return { question, answer: row.answer.trim(), ...(row.save && row.section ? { saveTo: row.section } : {}) };
@@ -56,12 +66,23 @@ export function QuestionsPanel({ job, questions, sections, onAnswered }: Props) 
       <div>
         <div className="cell-sub">{job.company} · {job.sourceName}</div>
         <h2 className="draft-title">{job.title}</h2>
-        <p className="body-text">Claude needs these before it can draft without guessing. Your answers are used for this application; tick one to keep it in your fact bank for future drafts too.</p>
+        <p className="body-text">Claude needs these before it can draft without guessing. Every answer is required. They're used for this application; tick one to keep it in your fact bank for future drafts too.</p>
       </div>
       {questions.map((q, i) => (
         <div key={q} className="question-row">
           <label htmlFor={`q-${i}`} className="settings-row-name">{q}</label>
-          <textarea id={`q-${i}`} className="textarea" rows={2} value={rows[i]!.answer} onChange={(e) => set(i, { answer: e.target.value })} />
+          <textarea
+            id={`q-${i}`}
+            className="textarea"
+            rows={2}
+            required
+            aria-invalid={missing(i) || undefined}
+            aria-describedby={missing(i) ? `q-${i}-error` : undefined}
+            value={rows[i]!.answer}
+            onChange={(e) => set(i, { answer: e.target.value })}
+            onBlur={() => rows[i]!.answer && set(i, { touched: true })}
+          />
+          {missing(i) ? <span id={`q-${i}-error`} className="field-error">Add an answer so Claude can draft this part.</span> : null}
           <div className="question-save">
             <label className="row">
               <input type="checkbox" checked={rows[i]!.save} onChange={(e) => set(i, { save: e.target.checked })} />
@@ -82,7 +103,7 @@ export function QuestionsPanel({ job, questions, sections, onAnswered }: Props) 
         <span className="cell-sub">{action.pending ? 'Drafting with your answers… this takes a minute or two.' : 'Drafting uses about 15k tokens.'}</span>
         <div className="row">
           <Button busy={action.pending} onClick={skip}>Skip job</Button>
-          <Button variant="strong" busy={action.pending} disabled={!complete} onClick={submit}>Answer and draft</Button>
+          <Button variant="strong" busy={action.pending} onClick={submit}>Answer and draft</Button>
         </div>
       </div>
     </section>

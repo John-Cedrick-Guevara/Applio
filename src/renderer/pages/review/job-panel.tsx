@@ -46,7 +46,7 @@ export function JobPanel({ job, draftThreshold, budgetStop, onChanged }: JobPane
         <div className="draft-head-text">
           <div className="cell-sub">{job.company} · <SourceCredit job={job} /></div>
           <h2 className="draft-title">{job.title}</h2>
-          <div className="tag-row">{job.tags.map((t) => <span key={t} className="tag">{t}</span>)}</div>
+          {job.tags.length ? <p className="draft-facts">{job.tags.join(' · ')}</p> : null}
         </div>
         {job.score !== undefined ? <ScoreBlock score={job.score} note={`Draft at ${draftThreshold}`} /> : null}
       </div>
@@ -55,7 +55,7 @@ export function JobPanel({ job, draftThreshold, budgetStop, onChanged }: JobPane
         <span>
           {scored
             ? `Not drafted: its match score (${job.score ?? 0}) is below your draft score (${draftThreshold}). Draft it anyway if it looks right.`
-            : `${pendingReason(job)}. The next run picks it up.`}
+            : `${pendingReason(job)}. Your next scan picks it up.`}
         </span>
       </div>
 

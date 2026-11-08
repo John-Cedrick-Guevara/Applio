@@ -158,3 +158,37 @@ export function queueGroups(queue: readonly Job[], asking: readonly Job[], draft
   ];
   return groups.filter((g) => g.jobs.length > 0);
 }
+
+export type StepState = 'done' | 'current' | 'blocked' | 'failed' | 'todo';
+const STEP_LABELS = ['Found', 'Scored', 'Drafted', 'PDFs saved', 'Sent'] as const;
+
+/**
+ * Where a job is between Found and Sent, read from its records: the step it's on is
+ * in progress (`current`), waiting on the operator (`blocked`: a scan, Claude's
+ * questions, a draft click, approval) or `failed`. Sent is
+ * done only past Approved; an approved job with no sent record shows Sent as failed.
+ */
+export function jobSteps(
+  job: Job,
+  { drafting = false, send = null }: { drafting?: boolean; send?: SendRecord | null } = {},
+): { label: string; state: StepState }[] {
+  const at = (index: number, state: StepState) => STEP_LABELS.map((label, i) => ({ label, state: i < index ? 'done' : i === index ? state : 'todo' } as const));
+  switch (job.status) {
+    case 'found':
+      return at(1, 'blocked');
+    case 'scored':
+      return at(2, drafting ? 'current' : 'blocked');
+    case 'drafted': {
+      const files = filesState(job);
+      return files.kind === 'ready' ? at(4, 'blocked') : at(3, files.kind === 'failed' ? 'failed' : 'current');
+    }
+    case 'approved': {
+      const state = sendState(job, send);
+      return state.kind === 'sent' ? at(5, 'done') : at(4, state.kind === 'not-sent' ? 'failed' : 'blocked');
+    }
+    case 'skipped':
+      return at(2, 'todo');
+    default:
+      return at(5, 'done');
+  }
+}

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Job } from '../../../shared/types';
 import type { SendRecord } from '../../../shared/types';
 import { formatClock } from '../../lib/format';
-import { queueGroups, effortLevel, filesState, gmailIssue, traceLine, modeLabel, pendingReason, primaryAction, queueState, runLine, runResult, sendState } from './review-model';
+import { jobSteps, queueGroups, effortLevel, filesState, gmailIssue, traceLine, modeLabel, pendingReason, primaryAction, queueState, runLine, runResult, sendState } from './review-model';
 
 const job = (over: Partial<Job>): Job => ({
   id: 'x', sourceId: 's', sourceName: 'S', company: 'C', title: 'T', url: '', location: '', employmentType: 'full-time',
@@ -234,5 +234,33 @@ describe('queueGroups', () => {
   it('files each group under one filter, so the filter counts add up', () => {
     const groups = queueGroups([email, site, unsent], [asking], []);
     expect(groups.map((g) => g.filter)).toEqual(['attention', 'attention', 'send', 'handoff']);
+  });
+});
+
+describe('jobSteps', () => {
+  const states = (...args: Parameters<typeof jobSteps>) => Object.fromEntries(jobSteps(...args).map((s) => [s.label, s.state]));
+  const sent: SendRecord = { state: 'sent', channel: 'email', to: 'a@b.c', subject: 's', body: 'b', attachments: [], at: '2026-11-08T09:14:00.000Z' };
+
+  it('waits on the operator at Drafted until a draft starts (a click or answers)', () => {
+    expect(states(job({ status: 'scored' }))).toEqual({ Found: 'done', Scored: 'done', Drafted: 'blocked', 'PDFs saved': 'todo', Sent: 'todo' });
+  });
+
+  it('shows Drafted in progress while Claude drafts', () => {
+    expect(states(job({ status: 'scored' }), { drafting: true }).Drafted).toBe('current');
+  });
+
+  it('shows the PDFs saving, then failed with the saved note', () => {
+    expect(states(job({ status: 'drafted' }))['PDFs saved']).toBe('current');
+    const failed = job({ status: 'drafted', history: [{ status: 'drafted', at: '', note: "Couldn't save the files: printing took longer than 60 s" }] });
+    expect(states(failed)['PDFs saved']).toBe('failed');
+  });
+
+  it('waits on the operator to approve once the PDFs are saved', () => {
+    expect(states(job({ status: 'drafted', folderPath: '/x' }))).toMatchObject({ 'PDFs saved': 'done', Sent: 'blocked' });
+  });
+
+  it('calls a job sent only when a sent record exists', () => {
+    expect(states(job({ status: 'approved', folderPath: '/x' }), { send: null }).Sent).toBe('failed');
+    expect(states(job({ status: 'applied', folderPath: '/x' }), { send: sent }).Sent).toBe('done');
   });
 });
