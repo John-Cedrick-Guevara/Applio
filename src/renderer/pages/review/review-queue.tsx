@@ -20,6 +20,9 @@ interface ReviewQueueProps {
 
 /** "Waiting on you": one row per draft, linking to it. Manual-handoff channels get an amber chip. */
 export function ReviewQueue({ jobs, currentId, below, waiting, asking, drafting, draftThreshold }: ReviewQueueProps) {
+  // Approved jobs that haven't gone out lead the list, so none drops out of sight.
+  const unsent = jobs.filter((j) => j.status === 'approved');
+  const rest = jobs.filter((j) => j.status !== 'approved');
   const [showBelow, setShowBelow] = useState(false);
   const [showWaiting, setShowWaiting] = useState(false);
   return (
@@ -70,8 +73,16 @@ export function ReviewQueue({ jobs, currentId, below, waiting, asking, drafting,
           </ul>
         </>
       ) : null}
+      {unsent.length > 0 ? (
+        <>
+          <div className="queue-group-label">Approved, not sent ({unsent.length})</div>
+          <ul className="list-plain" aria-label="Approved, not sent">
+            {unsent.map((job) => <QueueRow key={job.id} job={job} currentId={currentId} />)}
+          </ul>
+        </>
+      ) : null}
       <ul className="list-plain">
-        {jobs.map((job) => (
+        {rest.map((job) => (
           <li key={job.id}>
             <a
               href={`#/review/${job.id}`}
@@ -136,5 +147,26 @@ export function ReviewQueue({ jobs, currentId, below, waiting, asking, drafting,
         </div>
       ) : null}
     </section>
+  );
+}
+
+/** A row for an approved job that hasn't gone out: red when a send failed, amber when it waits for a handoff. */
+function QueueRow({ job, currentId }: { job: Job; currentId?: string }) {
+  const failed = sendsOnApprove(job.channel);
+  return (
+    <li>
+      <a href={`#/review/${job.id}`} className="queue-row" aria-current={job.id === currentId ? 'true' : undefined}>
+        <div className="queue-row-top">
+          <div className="queue-row-text">
+            <div className="queue-role">{job.title}</div>
+            <div className="cell-sub">{job.company} · {job.sourceName}</div>
+          </div>
+          <span className="queue-score mono">{job.score}</span>
+        </div>
+        <div className="queue-row-meta">
+          <span className={failed ? 'badge badge-danger' : 'badge badge-warning'}>{queueState(job)}</span>
+        </div>
+      </a>
+    </li>
   );
 }

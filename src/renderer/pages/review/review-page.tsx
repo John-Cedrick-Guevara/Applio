@@ -13,10 +13,12 @@ import { ReviewHeader } from './review-header';
 import { ReviewQueue } from './review-queue';
 import './review.css';
 
-/** Everything Review needs, loaded together so the split view renders in one pass. */
+/** Everything Review needs, loaded together so the split view renders in one pass. Covers every status in `REVIEW_STATUSES`. */
 async function loadReview(api: ReturnType<typeof useApi>) {
-  const [drafted, scored, found, settings, profile, sources, status, openQuestions] = await Promise.all([
+  const [drafted, approved, scored, found, settings, profile, sources, status, openQuestions] = await Promise.all([
     api.listJobs({ statuses: ['drafted'] }),
+    // Approved but not out yet (a refused send, a form handed back, a handoff to finish): still the operator's to act on.
+    api.listJobs({ statuses: ['approved'] }),
     api.listJobs({ statuses: ['scored'] }),
     api.listJobs({ statuses: ['found'] }),
     api.getSettings(),
@@ -27,7 +29,7 @@ async function loadReview(api: ReturnType<typeof useApi>) {
   ]);
   const questions = new Map(openQuestions.map((q) => [q.jobId, q.questions]));
   return {
-    queue: [...drafted].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
+    queue: [...approved, ...drafted].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
     // Unscored jobs and strong matches whose draft failed: the next run retries both.
     waiting: [...scored.filter((j) => (j.score ?? 0) >= settings.draftThreshold && !questions.has(j.id)), ...found],
     // Claude asked before drafting these; they wait for the operator (SPEC F4).
@@ -38,6 +40,7 @@ async function loadReview(api: ReturnType<typeof useApi>) {
     undrafted: [...scored, ...found],
     below: scored.filter((j) => (j.score ?? 0) < settings.draftThreshold && !questions.has(j.id)).sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
     thresholds: { draft: settings.draftThreshold, auto: settings.autoSendThreshold },
+    gmailReady: !!settings.gmailAddress && settings.secretsSet.gmailAppPassword,
     owner: { name: settings.fullName, email: settings.gmailAddress, contact: profile.contact, groups: profile.factGroups },
     autonomyBySource: Object.fromEntries(sources.map((s) => [s.id, s.autonomy])) as Record<string, Autonomy>,
     status,
@@ -124,6 +127,7 @@ function ReviewLayout({ data, selectedId, onJobChange, onStatusChange, onRunComp
             thresholds={data.thresholds}
             owner={data.owner}
             autonomyBySource={data.autonomyBySource}
+            gmailReady={data.gmailReady}
             onJobChange={onJobChange}
           />
         ) : (

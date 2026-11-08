@@ -29,7 +29,7 @@ const isActive = (path: string, to: string) => path === to || path.startsWith(`$
 export function Sidebar() {
   const api = useApi();
   const path = usePath();
-  const { data: pending } = useAsync(() => api.listJobs({ statuses: ['drafted'] }), [api, path]);
+  const { data: pending } = useAsync(() => api.listJobs({ statuses: ['drafted', 'approved'] }), [api, path]);
 
   return (
     <aside className="sidebar">

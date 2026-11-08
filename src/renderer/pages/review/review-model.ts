@@ -1,5 +1,5 @@
 import { capAutonomy, maxAutonomyFor } from '../../../shared/autonomy';
-import type { ApplyChannel, Autonomy, Job, RunSummary } from '../../../shared/types';
+import type { ApplyChannel, Autonomy, Job, RunSummary, SendRecord } from '../../../shared/types';
 import { formatClock } from '../../lib/format';
 import { AUTONOMY_LABEL } from '../../lib/labels';
 
@@ -15,11 +15,12 @@ export function primaryAction(job: Job): { label: string; handoff: boolean } {
   return { label: 'Open handoff', handoff: true };
 }
 
-/** Short status shown under each queue row. */
+/** Short status shown under each queue row. Only a job past Approved is called Sent. */
 export function queueState(job: Job): string {
   if (job.status === 'skipped') return 'Skipped';
-  if (job.status !== 'drafted') return 'Sent';
-  return sendsOnApprove(job.channel) ? 'Draft ready' : 'Ready to hand off';
+  if (job.status === 'drafted') return sendsOnApprove(job.channel) ? 'Draft ready' : 'Ready to hand off';
+  if (job.status === 'approved') return sendsOnApprove(job.channel) ? 'Not sent' : 'Ready to hand off';
+  return 'Sent';
 }
 
 /** What automation may do with this job: its source's autonomy, capped by channel. */
@@ -58,10 +59,36 @@ export function runLine(run: RunSummary | undefined): string {
   return run.atLimit ? `${line} · ${run.atLimit} source${run.atLimit === 1 ? '' : 's'} at today's limit` : line;
 }
 
-/** Confirmation shown after an approved draft goes out. */
-export function sentLine(job: Job): string {
-  const at = job.history.findLast((e) => e.status === 'applied')?.at;
-  const when = at ? ` at ${formatClock(at)}` : '';
-  const where = job.channel === 'email' ? `Sent to ${job.applyTarget}${when}.` : `Form submitted${when}.`;
-  return job.folderPath ? `${where} Saved to ${job.folderPath.split('/').slice(0, 3).join('/')}.` : where;
+/**
+ * Where a draft stands after the operator's decision, read from the send log
+ * rather than guessed from the status: Sent is shown only when a sent record
+ * exists, and an approved job that didn't go out says so, with why.
+ */
+export type SendState =
+  | { kind: 'waiting' }
+  | { kind: 'sent'; line: string; folder?: string }
+  | { kind: 'not-sent'; reason: string }
+  | { kind: 'unconfirmed'; at: string }
+  | { kind: 'handoff' }
+  | { kind: 'applied-manually' }
+  | { kind: 'skipped' };
+
+export function sendState(job: Job, send: SendRecord | null): SendState {
+  if (job.status === 'skipped') return { kind: 'skipped' };
+  if (send?.state === 'sent') {
+    const when = ` at ${formatClock(send.at)}`;
+    const line = send.channel === 'email' ? `Sent to ${send.to}${when}.` : `Form submitted${when}.`;
+    const folder = job.folderPath?.split('/').filter(Boolean).at(-1);
+    return { kind: 'sent', line, ...(folder ? { folder } : {}) };
+  }
+  if (send?.state === 'sending') return { kind: 'unconfirmed', at: send.at };
+  if (job.status === 'approved') {
+    if (!sendsOnApprove(job.channel)) return { kind: 'handoff' };
+    // The latest note since approval says why: a refused send, or a form handed back to the operator.
+    const since = job.history.findLastIndex((e) => e.status === 'approved' && !e.note);
+    const note = job.history.slice(Math.max(since, 0)).findLast((e) => e.note)?.note;
+    return { kind: 'not-sent', reason: note ? note.replace(/^Not sent: /, '') : "It hasn't gone out yet." };
+  }
+  if (job.status === 'drafted' || job.status === 'found' || job.status === 'scored') return { kind: 'waiting' };
+  return { kind: 'applied-manually' };
 }
