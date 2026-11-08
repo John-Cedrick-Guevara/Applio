@@ -477,6 +477,25 @@ describe('createBackend discovery', () => {
     return { ...b, job: job! };
   };
 
+  it('drafts a job scored below the threshold when the operator asks, in the background', async () => {
+    const b = await searchingBackend();
+    const fact = await b.api.saveFact({ group: 'Acme', text: 'Shipped APIs' });
+    b.deps.engines['claude-code'] = {
+      check: async () => ({ ready: true, message: 'ok' }),
+      complete: async ({ prompt, jobIds }) => {
+        const call = (name: string, input: unknown) => createTools(createToolPorts(b.deps.db, jobIds, () => new Date())).find((t) => t.name === name)!.call(input);
+        if (prompt.startsWith('Score')) return { text: JSON.stringify(jobIds.map((jobId) => ({ jobId, score: 40, roleSummary: 'r', descriptionSummary: 'd', strengths: [], gaps: [] }))), inputTokens: 1, outputTokens: 1 };
+        for (const jobId of jobIds) call('save_draft', { jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ group: 'Acme', items: [{ text: 'Shipped APIs', factId: fact.id }] }], coverLetter: 'Hi', answers: [] });
+        return { text: 'done', inputTokens: 1, outputTokens: 1 };
+      },
+    };
+    expect(await b.api.runDiscovery()).toMatchObject({ drafted: 0 });
+    const [below] = await b.api.listJobs({ statuses: ['scored'] });
+    await b.api.draftJob(below!.id);
+    await vi.waitFor(async () => expect((await b.api.getJob(below!.id)).status).toBe('drafted'));
+    await expect(b.api.draftJob(below!.id)).rejects.toThrow('Only scored jobs can be drafted');
+  });
+
   it('writes the résumé and letter PDFs and job.md into the month folder, with the name on them', async () => {
     const { job, deps } = await draftedBackend();
     expect(job.folderPath).toMatch(/Applio\/\d{4}-\d{2}\/Acme — Senior Backend Engineer \(90%\)$/);

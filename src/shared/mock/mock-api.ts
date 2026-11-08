@@ -158,6 +158,16 @@ export function createMockApi({ latencyMs = 250, now = () => new Date(), sendFai
 
     skipJob: (jobId) => run(() => transition(findJob(jobId), 'skipped')),
 
+    // The mock drafts at once; main drafts in the background and reports it in `drafting`.
+    draftJob: (jobId) =>
+      run(() => {
+        const job = findJob(jobId);
+        if (job.status !== 'scored') throw new Error('Only scored jobs can be drafted. This one is already drafted, sent or dismissed.');
+        const drafted = transition(job, 'drafted', 'Drafted at your request');
+        if (!drafts.some((d) => d.jobId === jobId)) drafts.push({ ...seedDrafts([drafted], now())[0]! });
+        return drafted;
+      }),
+
     markApplied: (jobId) =>
       run(() => {
         const job = findJob(jobId);

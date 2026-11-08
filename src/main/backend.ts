@@ -629,6 +629,12 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
 
     approveDraft: (jobId) => approveDraft(jobId, applyPorts),
 
+    draftJob: later((jobId) => {
+      if (getJob(jobId).status !== 'scored') throw new Error('Only scored jobs can be drafted. This one is already drafted, sent or dismissed.');
+      draftInBackground(jobId);
+      return getJob(jobId);
+    }),
+
     getUsage: later(usageFor),
 
     analyzeJob: async (input) => {

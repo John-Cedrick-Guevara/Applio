@@ -8,6 +8,7 @@ import { useJobsVersion } from '../../hooks/use-jobs-version';
 import type { RouteParams } from '../../lib/router';
 import { DraftPanel } from './draft-panel';
 import { DraftingPanel } from './drafting-panel';
+import { JobPanel } from './job-panel';
 import { QuestionsPanel } from './questions-panel';
 import { ReviewHeader } from './review-header';
 import { ReviewQueue } from './review-queue';
@@ -119,6 +120,13 @@ function ReviewLayout({ data, selectedId, onJobChange, onStatusChange, onRunComp
             questions={data.questions.get(currentId)!}
             sections={data.sections}
             onAnswered={onRunComplete}
+          />
+        ) : currentId && data.undrafted.some((j) => j.id === currentId) ? (
+          <JobPanel
+            key={currentId}
+            job={data.undrafted.find((j) => j.id === currentId)!}
+            draftThreshold={data.thresholds.draft}
+            onChanged={onRunComplete}
           />
         ) : currentId ? (
           <DraftPanel
