@@ -43,6 +43,9 @@ function Handoff({ job, draft, assisted, onJob }: { job: Job; draft: Draft | nul
   const connects = job.platform === 'Upwork' ? connectsCost(job.description) : undefined;
   const platform = job.platform ?? 'the site';
   const letterWord = draft?.kind === 'proposal' ? 'Proposal' : 'Cover letter';
+  // Steps are numbered as rendered, so a skipped one (no screening questions) leaves no gap.
+  let step = 0;
+  const next = () => ++step;
 
   return (
     <>
@@ -71,7 +74,7 @@ function Handoff({ job, draft, assisted, onJob }: { job: Job; draft: Draft | nul
       <div className="split">
         <ol className="list-plain handoff-steps">
           {assisted ? (
-            <Step n={1} title="Fill the form in Applio" sub={`The first time, sign in to ${platform} in the window that opens.`}>
+            <Step n={next()} title="Fill the form in Applio" sub={`The first time, sign in to ${platform} in the window that opens.`}>
               <Button
                 variant="primary"
                 busy={fill.pending}
@@ -95,7 +98,7 @@ function Handoff({ job, draft, assisted, onJob }: { job: Job; draft: Draft | nul
               ) : null}
             </Step>
           ) : (
-            <Step n={1} title="Open the job" sub="Opens in your browser, where you are already signed in.">
+            <Step n={next()} title="Open the job" sub="Opens in your browser, where you are already signed in.">
               <Button onClick={() => os.run('open the job', () => api.openExternal(job.url))}>
                 Open on {platform}
                 <Icon name="external" size={14} strokeWidth={1.8} />
@@ -103,7 +106,7 @@ function Handoff({ job, draft, assisted, onJob }: { job: Job; draft: Draft | nul
             </Step>
           )}
 
-          <Step n={2} title="Upload your tailored resume">
+          <Step n={next()} title="Upload your tailored resume">
             <div className="handoff-box handoff-file">
               <FileIcon />
               <div className="handoff-file-text">
@@ -115,7 +118,7 @@ function Handoff({ job, draft, assisted, onJob }: { job: Job; draft: Draft | nul
           </Step>
 
           {draft && draft.answers.length > 0 ? (
-            <Step n={3} title="Answer the screening questions">
+            <Step n={next()} title="Answer the screening questions">
               <div className="stack-sm">
                 {draft.answers.map((a, i) => (
                   <div key={a.question} className="handoff-box handoff-answer">
@@ -134,13 +137,13 @@ function Handoff({ job, draft, assisted, onJob }: { job: Job; draft: Draft | nul
           ) : null}
 
           {draft ? (
-            <Step n={4} title={<>{letterWord} <span className="step-aside">· if the form asks</span></>} action={<CopyButton text={draft.coverLetter} what={letterWord.toLowerCase()} />}>
+            <Step n={next()} title={<>{letterWord} <span className="step-aside">· if the form asks</span></>} action={<CopyButton text={draft.coverLetter} what={letterWord.toLowerCase()} />}>
               <p className="pre handoff-letter">{draft.coverLetter}</p>
             </Step>
           ) : null}
 
           <li className="card handoff-step">
-            <DoneStep job={job} platform={platform} onJob={onJob} />
+            <DoneStep n={next()} job={job} platform={platform} onJob={onJob} />
           </li>
         </ol>
 
@@ -160,7 +163,7 @@ function Handoff({ job, draft, assisted, onJob }: { job: Job; draft: Draft | nul
           {assisted ? null : (
             <section className="handoff-tip">
               <div className="handoff-tip-title">Want this filled for you?</div>
-              <p>Turn on assisted fill for platform apply. Applio opens the form in its own window and fills it in. You still click Submit.</p>
+              <p>Turn on assisted fill for {job.channel === 'custom' ? 'company career sites' : `${platform} and other platforms`}. Applio opens the form in its own window and fills it in. You still click Submit.</p>
               <a href="#/settings">Channel settings</a>
             </section>
           )}
@@ -189,7 +192,7 @@ function Step({ n, title, sub, action, children }: { n: number; title: React.Rea
 }
 
 /** Final step: log the outcome so it lands in Applications (SPEC F5 "Mark as applied"). */
-function DoneStep({ job, platform, onJob }: { job: Job; platform: string; onJob: (job: Job) => void }) {
+function DoneStep({ n, job, platform, onJob }: { n: number; job: Job; platform: string; onJob: (job: Job) => void }) {
   const api = useApi();
   const action = useAction();
   const [outcome, setOutcome] = useState<'applied' | 'skipped' | null>(null);
@@ -222,7 +225,7 @@ function DoneStep({ job, platform, onJob }: { job: Job; platform: string; onJob:
 
   return (
     <div className="step-head">
-      <span className="step-num" aria-hidden="true">5</span>
+      <span className="step-num" aria-hidden="true">{n}</span>
       <div className="step-title-wrap">
         <div className="step-title">Done on {platform}?</div>
         <div className="cell-sub">Logs what you sent to Applications and starts reply tracking.</div>

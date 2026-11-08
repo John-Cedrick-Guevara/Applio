@@ -89,3 +89,10 @@ describe('followUpProblem', () => {
     expect(followUpProblem('Hi,\n\nBest,\nSam', 'Sam')).toBeUndefined();
   });
 });
+
+describe('timeline repeats', () => {
+  it('shows identical consecutive events once', () => {
+    const j = job({ history: history(['drafted', 3], ['drafted', 3], ['applied', 2]) });
+    expect(timeline(j, 7, now).map((e) => e.title)).toEqual(['Resume and cover letter drafted', 'Sent via Email']);
+  });
+});

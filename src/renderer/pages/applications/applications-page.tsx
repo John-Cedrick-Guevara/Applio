@@ -67,7 +67,7 @@ function Applications({ jobs, followUpDays, ownerName, onJob }: { jobs: Job[]; f
         </div>
         <dl className="app-stats">
           <Stat label="Sent this month" value={stats.sentThisMonth} />
-          <Stat label="Replies" value={stats.replies} />
+          <Stat label="Replies, incl. interviews" value={stats.replies} />
           <Stat label="Interviews" value={stats.interviews} />
           <Stat label="Follow-ups due" value={stats.followUpsDue} />
         </dl>

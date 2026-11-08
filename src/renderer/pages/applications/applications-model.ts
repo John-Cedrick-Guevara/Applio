@@ -100,7 +100,8 @@ export function timeline(job: Job, followUpDays: number, now: Date): TimelineEve
     }
   }
   if (followUpDue(job, followUpDays, now)) events.push({ title: `No reply in ${followUpDays} days`, meta: 'Follow-up suggested' });
-  return events;
+  // A redraft or a repeated note adds the same line twice; once says it.
+  return events.filter((e, i) => i === 0 || e.title !== events[i - 1]!.title || e.meta !== events[i - 1]!.meta);
 }
 
 /** A company name a source couldn't read ("Unknown", "Unknown (not stated)", blank). */
