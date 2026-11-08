@@ -14,7 +14,20 @@ export default tseslint.config(
     rules: {
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', ignoreRestSiblings: true }],
+    },
+  },
+  {
+    // Text the operator sees or sends must never ship a template placeholder like "[Your Name]" (QA 2026-11-07 #2, #3).
+    files: ['src/renderer/**/*.{ts,tsx}', 'src/shared/templates/**/*.ts', 'src/core/**/*.ts'],
+    ignores: ['**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        { selector: 'Literal[value=/\\[[A-Z][A-Za-z ]{1,30}\\]/]', message: 'Template placeholder in shipped text. Use the real value (e.g. settings.fullName).' },
+        { selector: 'TemplateElement[value.raw=/\\[[A-Z][A-Za-z ]{1,30}\\]/]', message: 'Template placeholder in shipped text. Use the real value (e.g. settings.fullName).' },
+        { selector: 'JSXText[value=/\\[[A-Z][A-Za-z ]{1,30}\\]/]', message: 'Template placeholder in shipped text. Use the real value.' },
+      ],
     },
   },
   {
