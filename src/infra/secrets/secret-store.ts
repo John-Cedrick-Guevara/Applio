@@ -17,11 +17,23 @@ export class SecretStorageUnavailableError extends AppError {
   }
 }
 
+const SECRET_LABEL: Record<SecretKey, string> = { gmailAppPassword: 'Gmail app password', telegramBotToken: 'Telegram bot token', anthropicApiKey: 'Anthropic API key' };
+
+/**
+ * A saved secret the keychain won't decrypt: access was denied, or the app's signature
+ * changed since it was saved (each local build of the installed app is a new signature).
+ */
+export class SecretUnreadableError extends AppError {
+  constructor(key: SecretKey, options?: ErrorOptions) {
+    super('SECRET_UNREADABLE', `Applio can't read your saved ${SECRET_LABEL[key]} from the macOS keychain. Choose Always Allow when macOS asks, or save it again in Settings.`, options);
+  }
+}
+
 export interface SecretStore {
   /** Saves a secret, or removes it when `value` is empty. @throws SecretStorageUnavailableError */
   set(key: SecretKey, value: string): void;
   has(key: SecretKey): boolean;
-  /** For main-process adapters only (Gmail, Telegram, AI); never returned over IPC. */
+  /** For main-process adapters only (Gmail, Telegram, AI); never returned over IPC. @throws SecretUnreadableError */
   get(key: SecretKey): string | undefined;
 }
 
@@ -50,7 +62,12 @@ export function createSecretStore(encryptor: Encryptor, file: string): SecretSto
     has: (key) => key in load(),
     get: (key) => {
       const stored = load()[key];
-      return stored === undefined ? undefined : encryptor.decryptString(Buffer.from(stored, 'base64'));
+      if (stored === undefined) return undefined;
+      try {
+        return encryptor.decryptString(Buffer.from(stored, 'base64'));
+      } catch (err) {
+        throw new SecretUnreadableError(key, { cause: err });
+      }
     },
   };
 }
