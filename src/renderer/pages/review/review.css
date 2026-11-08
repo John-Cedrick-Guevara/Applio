@@ -323,3 +323,15 @@
 .drafting-status {
   gap: var(--space-2);
 }
+
+.doc-trace-warn {
+  color: var(--warning-text);
+}
+
+.doc-unverified {
+  margin: 0 var(--space-6) var(--space-3);
+}
+
+.doc-unverified ul {
+  margin-top: var(--space-2);
+}

@@ -1,11 +1,13 @@
 import type { DatabaseSync } from 'node:sqlite';
 import type { Draft } from '../../shared/types';
-import { json, type Row } from './rows';
+import { json, optText, type Row } from './rows';
 
 export interface DraftsRepo {
   /** One draft per job; saving again replaces it. Throws if the job doesn't exist. */
   save(draft: Draft): void;
   get(jobId: string): Draft | undefined;
+  /** Deletes a job's draft, so it can be drafted again. */
+  remove(jobId: string): void;
   /** Drafts made at or after `since` (ISO time), for the usage page. */
   createdSince(since: string): Draft[];
 }
@@ -20,20 +22,25 @@ const toDraft = (r: Row): Draft => ({
   edited: r.edited === 1,
   answers: json<Draft['answers']>(r.answers),
   createdAt: String(r.created_at),
+  ...(r.subject == null ? {} : { subject: String(r.subject) }),
+  ...(r.keywords == null ? {} : { keywords: json<NonNullable<Draft['keywords']>>(r.keywords) }),
+  ...(optText(r.profile_version) ? { profileVersion: String(r.profile_version) } : {}),
 });
 
 /** SQLite-backed application drafts (SPEC F4). */
 export function createDraftsRepo(db: DatabaseSync): DraftsRepo {
   const upsert = db.prepare(`
-    INSERT OR REPLACE INTO drafts (job_id, kind, headline, summary, resume, cover_letter, edited, answers, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    INSERT OR REPLACE INTO drafts (job_id, kind, headline, summary, resume, cover_letter, edited, answers, created_at, subject, keywords, profile_version)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  const removeDraft = db.prepare('DELETE FROM drafts WHERE job_id = ?');
   const select = db.prepare('SELECT * FROM drafts WHERE job_id = ?');
   const since = db.prepare('SELECT * FROM drafts WHERE created_at >= ? ORDER BY created_at');
 
   return {
     save: (d) =>
       void upsert.run(d.jobId, d.kind, d.headline, d.summary, JSON.stringify(d.resume), d.coverLetter,
-        d.edited ? 1 : 0, JSON.stringify(d.answers), d.createdAt),
+        d.edited ? 1 : 0, JSON.stringify(d.answers), d.createdAt, d.subject ?? null, d.keywords ? JSON.stringify(d.keywords) : null, d.profileVersion ?? null),
+    remove: (jobId) => void removeDraft.run(jobId),
     createdSince: (from) => since.all(from).map(toDraft),
     get: (jobId) => {
       const row = select.get(jobId);

@@ -13,6 +13,7 @@ import {
   seedUsage,
 } from './fixtures';
 import { analyze } from './analyze';
+import { checkDraft, profileVersion } from '../draft-check';
 
 interface MockOptions {
   /** Simulated round-trip so loading states are visible in dev. */
@@ -45,6 +46,16 @@ export function createMockApi({ latencyMs = 250, now = () => new Date(), sendFai
   let lastRun = seedLastRun(start);
   const secrets = new Map<SecretKey, string>();
   let nextId = 1000;
+
+  // Seed drafts were made from today's profile; later edits in a session make them stale, as in main.
+  const versionNow = () => profileVersion({ facts: profile.facts, groups: profile.factGroups, contact: profile.contact });
+  for (const d of drafts) d.profileVersion = versionNow();
+  /** Like main: each read adds the draft's check against the current profile. */
+  const withCheck = (draft: (typeof drafts)[number]) => {
+    const job = findJob(draft.jobId);
+    const found = checkDraft(draft, { facts: profile.facts, groups: profile.factGroups, contact: profile.contact, owner: `${settings.fullName} ${settings.gmailAddress}`, job });
+    return { ...draft, check: { stale: draft.profileVersion !== versionNow(), ...found } };
+  };
 
   /** What "went out" for each job Applio sent, like the real send log; manual applications have none. */
   const sends = new Map<string, SendRecord>();
@@ -121,7 +132,10 @@ export function createMockApi({ latencyMs = 250, now = () => new Date(), sendFai
 
     getJob: (id) => run(() => findJob(id)),
 
-    getDraft: (jobId) => respond(drafts.find((d) => d.jobId === jobId) ?? null),
+    getDraft: (jobId) => run(() => {
+      const draft = drafts.find((d) => d.jobId === jobId);
+      return draft ? withCheck(draft) : null;
+    }),
     getSend: (jobId) => respond(sends.get(jobId) ?? null),
 
     updateCoverLetter: (jobId, coverLetter) =>
@@ -158,13 +172,22 @@ export function createMockApi({ latencyMs = 250, now = () => new Date(), sendFai
 
     skipJob: (jobId) => run(() => transition(findJob(jobId), 'skipped')),
 
+    redraft: (jobId) =>
+      run(() => {
+        const job = findJob(jobId);
+        if (job.status !== 'drafted') throw new Error('Only a draft waiting in Review can be redrafted.');
+        const draft = drafts.find((d) => d.jobId === jobId);
+        if (draft) draft.profileVersion = versionNow();
+        return transition(job, 'drafted', 'Redrafted from your current profile');
+      }),
+
     // The mock drafts at once; main drafts in the background and reports it in `drafting`.
     draftJob: (jobId) =>
       run(() => {
         const job = findJob(jobId);
         if (job.status !== 'scored') throw new Error('Only scored jobs can be drafted. This one is already drafted, sent or dismissed.');
         const drafted = transition(job, 'drafted', 'Drafted at your request');
-        if (!drafts.some((d) => d.jobId === jobId)) drafts.push({ ...seedDrafts([drafted], now())[0]! });
+        if (!drafts.some((d) => d.jobId === jobId)) drafts.push({ ...seedDrafts([drafted], now())[0]!, profileVersion: versionNow() });
         return drafted;
       }),
 
@@ -257,7 +280,7 @@ export function createMockApi({ latencyMs = 250, now = () => new Date(), sendFai
           history: ['found', 'scored', 'drafted'].map((status) => ({ status: status as JobStatus, at: now().toISOString() })),
         };
         jobs.push(job);
-        drafts.push({ ...seedDrafts([job], now())[0]! });
+        drafts.push({ ...seedDrafts([job], now())[0]!, profileVersion: versionNow() });
         return job;
       }),
 

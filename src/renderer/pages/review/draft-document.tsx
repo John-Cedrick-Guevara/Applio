@@ -5,6 +5,7 @@ import { useApi } from '../../api/api-context';
 import { Button } from '../../components/button';
 import { Icon } from '../../components/icons';
 import { useAction } from '../../hooks/use-action';
+import { traceLine } from './review-model';
 
 export type DocTab = 'letter' | 'resume' | 'post';
 
@@ -28,6 +29,8 @@ export function DraftDocument({ job, draft, owner, tab, onTab, editing, onEditDo
   const api = useApi();
   const action = useAction();
   const letterWord = draft.kind === 'proposal' ? 'Proposal' : 'Cover letter';
+  const trace = traceLine(draft, job.factsUsed);
+  const unverified = draft.edited ? [] : (draft.check?.unverified ?? []);
   const file = tab === 'resume' ? 'resume' : tab === 'letter' ? 'letter' : null;
   const tabs: { id: DocTab; label: string }[] = [
     { id: 'letter', label: letterWord },
@@ -45,9 +48,9 @@ export function DraftDocument({ job, draft, owner, tab, onTab, editing, onEditDo
             </button>
           ))}
         </div>
-        <div className="doc-trace">
-          <Icon name="shield" strokeWidth={1.8} className="trace-icon" />
-          Every claim traced to your fact bank · {job.factsUsed} facts used
+        <div className={trace.ok ? 'doc-trace' : 'doc-trace doc-trace-warn'}>
+          <Icon name={trace.ok ? 'shield' : 'minus'} strokeWidth={1.8} className="trace-icon" />
+          {trace.text}
         </div>
         {file ? (
           <Button
@@ -61,6 +64,16 @@ export function DraftDocument({ job, draft, owner, tab, onTab, editing, onEditDo
           </Button>
         ) : null}
       </div>
+      {unverified.length ? (
+        <div className="banner banner-warning doc-unverified">
+          <div>
+            <strong>Check these lines before sending.</strong> They name something none of your facts, your profile or the posting states.
+            <ul className="list-plain">
+              {unverified.map((u) => <li key={u.line}>“{u.line}” <span className="cell-sub">({u.terms.join(', ')})</span></li>)}
+            </ul>
+          </div>
+        </div>
+      ) : null}
       <div className="doc-well">
         <div className="doc-paper" role="tabpanel">
           {tab === 'letter' && editing ? (

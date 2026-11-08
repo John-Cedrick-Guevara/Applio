@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { profileVersion } from '../shared/draft-check';
 import { AppError } from '../shared/errors';
 import { draftKind } from '../core/generation/draft-jobs';
 import { essentialText } from '../core/scoring/job-card';
@@ -195,7 +196,10 @@ export function createTools(ports: ToolPorts): McpTool[] {
       });
       // The kind is Applio's rule (SPEC F4), whatever Claude sent.
       const resume = d.resume.map((sec) => ({ heading: sec.group, group: sec.group, items: sec.items }));
-      ports.saveDraft({ ...d, resume, kind: draftKind(job), edited: false, answers, createdAt: ports.now().toISOString() }, reused);
+      const { contact } = ports.profile();
+      // The profile it was made from, so a later fact or notes change marks it stale.
+      const madeFrom = profileVersion({ facts: factBank, groups: factGroups, contact });
+      ports.saveDraft({ ...d, resume, kind: draftKind(job), edited: false, answers, createdAt: ports.now().toISOString(), profileVersion: madeFrom }, reused);
       return 'Saved.';
     }, SaveDraftPublished),
 

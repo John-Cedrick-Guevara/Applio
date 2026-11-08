@@ -220,4 +220,15 @@ export const MIGRATIONS: readonly Migration[] = [
       ) WITHOUT ROWID;
     `,
   },
+  {
+    version: 11,
+    name: 'draft provenance',
+    sql: `
+      -- The profile a draft was made from, so a later fact or notes change marks it stale (QA 2026-11-07 #10),
+      -- and Claude's subject and keywords, which were dropped on save.
+      ALTER TABLE drafts ADD COLUMN profile_version TEXT;
+      ALTER TABLE drafts ADD COLUMN subject TEXT;
+      ALTER TABLE drafts ADD COLUMN keywords TEXT;
+    `,
+  },
 ];

@@ -34,6 +34,7 @@ import { quotaLevel } from '../shared/quota';
 import { createBotApi } from '../infra/telegram/bot-api';
 import { fetchPublicPage, isPlatformUrl } from '../infra/web/fetch-page';
 import { CHECKS_KEY, createSettingsService } from '../core/settings/settings-service';
+import { checkDraft, profileVersion } from '../shared/draft-check';
 import {
   createActivityRepo, createDraftsRepo, createJobsRepo, createSendsRepo, createPollsRepo, createProfileRepo, createSettingsRepo, createSourcesRepo, createQuestionsRepo, transaction,
 } from '../infra/db';
@@ -400,6 +401,22 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     }
   };
 
+  /**
+   * Adds the draft's provenance check, worked out now against today's profile:
+   * stale when the profile changed since it was made, plus the letter lines no
+   * fact backs and any term the operator's notes forbid (QA 2026-11-07 #10).
+   */
+  const withCheck = (draft: Draft): Draft => {
+    const p = profile.getProfile();
+    const job = getJob(draft.jobId);
+    const now = profileVersion({ facts: p.facts, groups: p.factGroups, contact: p.contact });
+    const found = checkDraft(draft, {
+      facts: p.facts, groups: p.factGroups, contact: p.contact, owner: `${settings.getSettings().fullName} ${settings.getSettings().gmailAddress}`,
+      job: { company: job.company, title: job.title, description: job.description },
+    });
+    return { ...draft, check: { stale: draft.profileVersion !== now, ...found } };
+  };
+
   const localMidnight = () => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
@@ -575,7 +592,10 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     // Jobs and drafts come from SQLite; the send flow stays mock until PR-18.
     listJobs: later((filter = {}) => jobs.list(filter.statuses ? { statuses: filter.statuses } : undefined).filter((j) => matchesFilter(j, filter))),
     getJob: later(getJob),
-    getDraft: later((jobId) => drafts.get(jobId) ?? null),
+    getDraft: later((jobId) => {
+      const draft = drafts.get(jobId);
+      return draft ? withCheck(draft) : null;
+    }),
     getSend: later((id) => {
       const row = sends.get(id);
       if (!row) return null;
@@ -593,8 +613,20 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       const job = getJob(jobId);
       const folder = jobFolder(job);
       if (folder) writeFileSync(join(folder, letterName(next)), await letterFile(job, next));
-      return next;
+      return withCheck(next);
     },
+
+    redraft: later((jobId) => {
+      const job = getJob(jobId);
+      if (job.status !== 'drafted') throw new Error('Only a draft waiting in Review can be redrafted.');
+      // Back to scored, so the drafting run treats it like any other match; the old draft goes, so it can't be sent by mistake.
+      transaction(db, () => {
+        drafts.remove(jobId);
+        jobs.transition(jobId, { status: 'scored', at: new Date().toISOString(), note: 'Redrafting from your current profile' });
+      });
+      draftInBackground(jobId);
+      return getJob(jobId);
+    }),
 
     getProfile: later(profile.getProfile),
     saveFact: later(profile.saveFact),

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Job } from '../../../shared/types';
 import type { SendRecord } from '../../../shared/types';
 import { formatClock } from '../../lib/format';
-import { effortLevel, gmailIssue, modeLabel, pendingReason, primaryAction, queueState, runLine, runResult, sendState } from './review-model';
+import { effortLevel, gmailIssue, traceLine, modeLabel, pendingReason, primaryAction, queueState, runLine, runResult, sendState } from './review-model';
 
 const job = (over: Partial<Job>): Job => ({
   id: 'x', sourceId: 's', sourceName: 'S', company: 'C', title: 'T', url: '', location: '', employmentType: 'full-time',
@@ -177,5 +177,24 @@ describe('gmailIssue', () => {
     expect(gmailIssue({ gmailAddress: 'a@b.co', secretsSet: set, checks: { gmail: { ok: true, at, message: '' } } })).toBeUndefined();
     expect(gmailIssue({ gmailAddress: 'a@b.co', secretsSet: set, checks: {} })).toBeUndefined();
     expect(gmailIssue({ gmailAddress: 'a@b.co', secretsSet: set, checks: { gmail: { ok: false, offline: true, at, message: '' } } })).toBeUndefined();
+  });
+});
+
+describe('traceLine', () => {
+  const clean = { stale: false, unverified: [], forbidden: [] };
+  it('claims every claim traced only when the check found nothing', () => {
+    expect(traceLine({ edited: false, check: clean }, 12)).toEqual({ text: 'Every claim traced to your fact bank · 12 facts used', ok: true });
+  });
+  it('counts the cover-letter lines nothing backs', () => {
+    expect(traceLine({ edited: false, check: { ...clean, unverified: [{ line: 'a', terms: ['X'] }, { line: 'b', terms: ['Y'] }] } }, 12)).toEqual({ text: 'Résumé traced to facts · cover letter: 2 unverified lines', ok: false });
+  });
+  it('names a term the notes forbid', () => {
+    expect(traceLine({ edited: false, check: { ...clean, forbidden: ['intern'] } }, 12)).toEqual({ text: 'Uses "intern", which your notes for Claude forbid', ok: false });
+  });
+  it('says an edited letter is the operator\'s own, not checked against facts', () => {
+    expect(traceLine({ edited: true, check: clean }, 12)).toEqual({ text: 'Résumé traced to facts · letter edited by you, not checked', ok: false });
+  });
+  it('never claims a trace it has no check for', () => {
+    expect(traceLine({ edited: false }, 12)).toEqual({ text: 'Résumé traced to facts · cover letter not checked', ok: false });
   });
 });
