@@ -140,7 +140,6 @@
   flex-wrap: nowrap;
 }
 
-.schedule-select { width: auto; }
 
 .sign-in-command {
   margin-top: var(--space-2);

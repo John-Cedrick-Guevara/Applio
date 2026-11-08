@@ -25,9 +25,19 @@ describe('EngineCard', () => {
     const events = fakeEvents();
     const { api } = renderWithApp(<EngineCard />);
     expect(await screen.findByText('Ready')).toBeInTheDocument();
-    const paused = { ...(await api.getStatus()), paused: true, nextRunAt: undefined };
+    const paused = { ...(await api.getStatus()), paused: true };
     act(() => events.push(paused));
     expect(screen.getByText('Paused', { selector: '.engine-state' })).toBeInTheDocument();
+  });
+
+  it('shows when the last scan ran, and never a next run', async () => {
+    const events = fakeEvents();
+    const { api } = renderWithApp(<EngineCard />);
+    await screen.findByText('Ready');
+    const neverScanned = { ...(await api.getStatus()), lastRun: undefined };
+    act(() => events.push(neverScanned));
+    expect(screen.getByText('Last scan').nextSibling).toHaveTextContent('None yet');
+    expect(screen.queryByText('Next run')).not.toBeInTheDocument();
   });
 
   it('stops listening when it unmounts', async () => {

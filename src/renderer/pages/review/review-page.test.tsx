@@ -225,11 +225,11 @@ describe('ReviewPage', () => {
     expect(await screen.findByText(/^Skipped /)).toBeInTheDocument();
   });
 
-  it('pauses automation and blocks manual runs', async () => {
+  it('pauses auto-send and still lets the operator start a scan', async () => {
     open();
-    await userEvent.click(await screen.findByRole('button', { name: 'Pause automation' }));
-    expect(await screen.findByText(/Automation is paused/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Run now' })).toBeDisabled();
+    await userEvent.click(await screen.findByRole('button', { name: 'Pause auto-send' }));
+    expect(await screen.findByText(/Auto-send is paused/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Run now' })).toBeEnabled();
   });
 
   it('lists the jobs scored below the draft threshold when asked, each opening its detail', async () => {

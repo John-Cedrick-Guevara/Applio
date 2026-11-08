@@ -1,7 +1,6 @@
 import type { Autonomy, Draft, Job, QuestionAnswer } from '../../shared/types';
 import { QuotaExceededError, type AiRequest } from '../ai/ai-service';
 import { budgetTokens, type AiReply } from '../ai/engine';
-import { AutomationPausedError } from '../jobs/scheduler';
 
 /**
  * The drafting instructions: the operator's own résumé-strategist prompt (2026-11-07),
@@ -86,12 +85,12 @@ const kindOf = (job: Pick<Job, 'employmentType' | 'platform'>) => (draftKind(job
 /**
  * Drafts each strong match in its own AI call (SPEC F4). Claude saves the draft
  * through `save_draft`, which enforces the fact citations; a job with no saved
- * draft after the call gets one more try, then a note. A budget stop or pause
- * ends drafting for this run.
+ * draft after the call gets one more try, then a note. A budget stop ends
+ * drafting for this run.
  */
 export async function draftJobs(
   jobIds: readonly string[],
-  { runId, trigger = 'scheduled' }: { runId?: number; trigger?: AiRequest['trigger'] },
+  { runId }: { runId?: number },
   ports: DraftPorts,
 ): Promise<DraftResult> {
   const result: DraftResult = { drafted: 0, notDrafted: 0, notifyOnly: 0, asked: 0 };
@@ -121,11 +120,11 @@ export async function draftJobs(
       try {
         const reply = await ports.ai({
           step: 'tailor', system: DRAFT_SYSTEM, prompt, jobIds: [id],
-          ...(runId !== undefined ? { runId } : {}), trigger,
+          ...(runId !== undefined ? { runId } : {}),
         });
         ports.addTokens(id, budgetTokens(reply));
       } catch (err) {
-        if (err instanceof QuotaExceededError || err instanceof AutomationPausedError) result.stopped = err.message;
+        if (err instanceof QuotaExceededError) result.stopped = err.message;
         else failure = err instanceof Error ? err.message : String(err);
       }
     }

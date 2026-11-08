@@ -23,11 +23,10 @@ describe('SettingsPage', () => {
     expect(within(group).getByRole('button', { name: 'Autonomous' })).toBeDisabled();
   });
 
-  it('changes how often discovery runs and turns on launch at login', async () => {
+  it('turns on launch at login, with no scan schedule to set', async () => {
     const { api } = renderWithApp(<SettingsPage />);
-    await userEvent.selectOptions(await screen.findByLabelText('Run discovery every'), '4 hours');
-    expect((await api.getSettings()).discoveryIntervalHours).toBe(4);
-    await userEvent.click(screen.getByRole('switch', { name: 'Open Applio at login' }));
+    await userEvent.click(await screen.findByRole('switch', { name: 'Open Applio at login' }));
+    expect(screen.queryByLabelText('Run discovery every')).not.toBeInTheDocument();
     expect((await api.getSettings()).launchAtLogin).toBe(true);
   });
 

@@ -1,6 +1,5 @@
 import { AppError } from '../../shared/errors';
 import type { UsageStep } from '../../shared/types';
-import { AutomationPausedError } from '../jobs/scheduler';
 import { budgetTokens, type AiEngine, type AiReply } from './engine';
 
 const WARN_AT = 0.8;
@@ -21,8 +20,6 @@ export interface AiRequest {
   jobIds: readonly string[];
   /** False for a one-turn call that answers in text (scoring); Applio's tools are offered otherwise. */
   tools?: boolean;
-  /** Scheduled work stops while automation is paused; what the operator asks for still runs (MNB-1). */
-  trigger: 'scheduled' | 'operator';
 }
 
 /** One AI call's spend, as the usage table stores it (SPEC F10). */
@@ -47,7 +44,6 @@ export interface AiPorts {
   /** The mean budget tokens of the step's last few calls, or undefined with no history: the pre-flight estimate. */
   recentCost: (step: UsageStep) => number | undefined;
   record: (entry: UsageEntry) => void;
-  isPaused: () => boolean;
   now: () => Date;
   /** The 80% warning, for the dashboard and (later) Telegram. */
   warn: (message: string) => void;
@@ -56,7 +52,7 @@ export interface AiPorts {
 const fmt = (n: number) => n.toLocaleString('en-US');
 
 /**
- * Every AI call goes through here: pause and budget checks before, usage
+ * Every AI call goes through here: budget checks before, usage
  * recording and the 80% warning after. A call can overshoot the budget by its
  * own size (its cost isn't known until it returns), and the next one is refused.
  */
@@ -81,11 +77,9 @@ export function createAi(ports: AiPorts) {
     },
 
     /**
-     * @throws AutomationPausedError for scheduled work while paused.
      * @throws QuotaExceededError once a budget is used up.
      */
     async run(request: AiRequest): Promise<AiReply> {
-      if (request.trigger === 'scheduled' && ports.isPaused()) throw new AutomationPausedError();
       const before = usage();
       const full = before.find((p) => p.used >= p.limit);
       if (full) throw new QuotaExceededError(stopMessage(full));

@@ -79,7 +79,7 @@ export async function analyzePost(
   { text, sourceName, platform }: { text: string; sourceName: string; platform?: { name: string; url: string } },
   ports: AnalyzePorts,
 ): Promise<{ preview: Omit<JobPreview, 'previewId'>; job: AnalyzedJob }> {
-  const reply = await ports.ai({ step: 'score', system: ANALYZE_SYSTEM, prompt: `Analyze this job post.\n<post>\n${text}\n</post>`, jobIds: [], trigger: 'operator' });
+  const reply = await ports.ai({ step: 'score', system: ANALYZE_SYSTEM, prompt: `Analyze this job post.\n<post>\n${text}\n</post>`, jobIds: [] });
   const parsed = AnalysisSchema.safeParse(firstObject(reply.text));
   if (!parsed.success) {
     // The cause names the failing fields (not values, which come from an untrusted post) for the IPC log.

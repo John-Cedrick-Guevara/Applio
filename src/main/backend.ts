@@ -20,7 +20,7 @@ import { draftJobs, type DraftPorts } from '../core/generation/draft-jobs';
 import { dedupKey } from '../core/triage';
 import { discover } from '../core/jobs/discover';
 import { localDay, runSources } from '../core/jobs/run-sources';
-import { createScheduler } from '../core/jobs/scheduler';
+import { createScanRunner } from '../core/jobs/scan-runner';
 import type { HttpGet, JobSource } from '../core/jobs/source';
 import { createProfileService } from '../core/profile/profile-service';
 import { draftReady, followUpDue, newMatch, quotaWarning, replyArrived, sentOnItsOwn, type BotMessage } from '../core/notify/messages';
@@ -85,9 +85,9 @@ export interface BackendDeps {
   engines: Record<EngineKind, AiEngine>;
 }
 
-/** The API, plus the scheduler tick main runs every minute and on wake. */
 /**
- * The API, plus what main drives: the scheduler tick (every minute and on wake), and
+ * The API, plus what main drives: the minute tick (replies, no-reply marks, limits;
+ * never a scan), and
  * one Telegram long-poll (false, without waiting, when Telegram isn't set up).
  */
 export type Backend = ApplioApi & { tick(): Promise<void>; telegramPoll(): Promise<boolean> };
@@ -140,7 +140,6 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       pushStatus();
     },
     recentCost: (step) => activity.recentCost(step),
-    isPaused,
     now: () => new Date(),
     warn: (message) => {
       console.warn('[budget]', message);
@@ -245,7 +244,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
   const draftInBackground = (id: string) => {
     draftingNow.set(id, new Date().toISOString());
     pushStatus();
-    void draftJobs([id], { trigger: 'operator' }, draftPorts)
+    void draftJobs([id], {}, draftPorts)
       .catch((err: unknown) => note(id, `Not drafted: ${err instanceof Error ? err.message : String(err)}`))
       .finally(() => {
         draftingNow.delete(id);
@@ -336,11 +335,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       newId: randomUUID,
     });
 
-  const scheduler = createScheduler({
-    now: () => new Date(),
-    intervalHours: () => settings.getSettings().discoveryIntervalHours,
-    lastRunAt: () => activity.latestRun()?.at,
-    isPaused,
+  const scans = createScanRunner({
     run: runDiscovery,
     onChange: () => pushStatus(),
     log: console.error,
@@ -580,7 +575,6 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       engine: aiEngine,
       engineReady: engineChecks[aiEngine]?.ready ?? (aiEngine === 'claude-code' || secretsSet.anthropicApiKey),
       paused: isPaused(),
-      nextRunAt: scheduler.nextRunAt(),
       tokensToday: activity.tokensSince(midnight),
       dailyTokenBudget,
       lastRun: activity.latestRun(),
@@ -758,14 +752,13 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     },
 
     getStatus: later(getStatus),
-    runDiscovery: () => scheduler.runNow(),
+    runDiscovery: () => scans.runNow(),
     setAutomationPaused: later((paused) => {
       kv.set(PAUSED_KEY, paused);
       pushStatus();
       return getStatus();
     }),
     tick: async () => {
-      await scheduler.tick();
       markNoReply();
       warnLimits();
       await checkReplies().catch((err: unknown) => console.error('[replies] inbox check failed', err));

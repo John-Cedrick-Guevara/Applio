@@ -351,8 +351,6 @@ export interface Settings {
   dailyTokenBudget: number;
   /** AI stops at this many tokens in a calendar month (SPEC F10). */
   monthlyTokenBudget: number;
-  /** Hours between discovery runs, 4–6 (SPEC F2). */
-  discoveryIntervalHours: number;
   /** Start Applio in the tray when the operator logs in. */
   launchAtLogin: boolean;
   /** Companies never applied to (SPEC F6). */
@@ -392,7 +390,6 @@ export interface AppStatus {
   /** False when the API-key engine is selected but no key is saved. */
   engineReady: boolean;
   paused: boolean;
-  nextRunAt?: string;
   tokensToday: number;
   dailyTokenBudget: number;
   lastRun?: RunSummary;

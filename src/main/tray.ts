@@ -32,8 +32,8 @@ export function createTray(actions: TrayActions): () => void {
     tray.setContextMenu(
       Menu.buildFromTemplate([
         { label: 'Open Applio', click: actions.open },
-        { label: 'Run discovery now', enabled: !paused, click: actions.runNow },
-        { label: paused ? 'Resume automation' : 'Pause automation', click: () => actions.setPaused(!paused) },
+        { label: 'Run discovery now', click: actions.runNow },
+        { label: paused ? 'Resume auto-send' : 'Pause auto-send', click: () => actions.setPaused(!paused) },
         { type: 'separator' },
         { label: 'Quit Applio', click: actions.quit },
       ]),

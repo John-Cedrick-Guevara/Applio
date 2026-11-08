@@ -48,7 +48,7 @@ export async function interviewPrep(jobId: string, ports: PrepPorts): Promise<In
   if (saved) return saved;
   const { letter, resume } = ports.sent(jobId);
   const reply = await ports.ai({
-    step: 'prep', system: PREP_SYSTEM, jobIds: [jobId], trigger: 'operator',
+    step: 'prep', system: PREP_SYSTEM, jobIds: [jobId],
     prompt: `Prepare me for job ${jobId}.\n\nWhat I sent:\n${letter}\n\nRésumé lines:\n${resume.map((l) => `- ${l}`).join('\n')}`,
   });
   const parsed = PrepSchema.safeParse(firstObject(reply.text));

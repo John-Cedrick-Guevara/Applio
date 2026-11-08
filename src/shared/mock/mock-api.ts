@@ -90,15 +90,12 @@ export function createMockApi({ latencyMs = 250, now = () => new Date(), sendFai
     return job;
   };
 
-  /** Engine/scheduler snapshot; the next run is the next 6-hour slot (SPEC F2). */
+  /** Engine and scan snapshot; scans run only when the operator starts one (SPEC F2). */
   const status = (): AppStatus => {
-    const next = new Date(now());
-    next.setHours(Math.ceil((next.getHours() + 1) / 6) * 6, 0, 0, 0);
     return {
       engine: settings.aiEngine,
       engineReady: settings.aiEngine === 'claude-code' || settings.secretsSet.anthropicApiKey,
       paused,
-      nextRunAt: paused ? undefined : next.toISOString(),
       tokensToday: seedUsage(start, 'today').summary.tokens,
       dailyTokenBudget: settings.dailyTokenBudget,
       lastRun,
@@ -242,7 +239,6 @@ export function createMockApi({ latencyMs = 250, now = () => new Date(), sendFai
 
     runDiscovery: () =>
       run(() => {
-        if (paused) throw new Error('Automation is paused. Resume it to run discovery');
         lastRun = { at: now().toISOString(), found: 14, newAfterDedup: 11, passedFilters: 2, drafted: 0 };
         return lastRun;
       }),
