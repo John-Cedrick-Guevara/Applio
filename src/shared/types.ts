@@ -402,6 +402,8 @@ export interface JobPreview {
   applyTarget: string;
   maxAutonomy: Autonomy;
   tokensUsed: number;
+  /** The job Applio already has under the same company and title; adding it again is refused. */
+  duplicate?: { jobId: string; status: JobStatus };
 }
 
 export type JobInput = { kind: 'text' | 'link'; value: string };

@@ -31,6 +31,22 @@ describe('jobs repository', () => {
     expect(jobs.get(first.id)?.suspicious).toBe('The post tells automated tools to ignore their instructions.');
   });
 
+  it('re-keys stored jobs when the dedup rules change, leaving a key alone when it would collide', () => {
+    const jobs = setup();
+    jobs.insert({ ...first, company: 'Northbeam Labs' }, { dedupKey: 'northbeam labs|ai engineer', createdAt: NOW.toISOString() });
+    jobs.insert({ ...second, company: 'Northbeam' }, { dedupKey: 'northbeam|ai engineer', createdAt: NOW.toISOString() });
+    expect(jobs.rekey(() => 'northbeam|ai engineer')).toEqual({ changed: 0, collided: 1 });
+    expect(jobs.dedupKeys()).toEqual(new Set(['northbeam labs|ai engineer', 'northbeam|ai engineer']));
+    expect(jobs.rekey((j) => `${j.company.toLowerCase()}|new`)).toEqual({ changed: 2, collided: 0 });
+  });
+
+  it('remembers every key it has seen, dropped jobs included, without storing the jobs', () => {
+    const jobs = setup();
+    jobs.markSeen(['a|x', 'b|y'], NOW.toISOString());
+    jobs.markSeen(['a|x'], NOW.toISOString());
+    expect(jobs.seenKeys()).toEqual(new Set(['a|x', 'b|y']));
+  });
+
   it('returns undefined for an unknown job', () => {
     expect(setup().get('missing')).toBeUndefined();
   });

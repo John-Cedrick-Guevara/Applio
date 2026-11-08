@@ -22,6 +22,16 @@ export interface JobsRepo {
   saveMatch(id: string, match: Pick<Job, 'roleSummary' | 'descriptionSummary' | 'strengths' | 'gaps'> & { score: number }): void;
   /** Every stored job's dedup key, sent ones included, for triage. */
   dedupKeys(): Set<string>;
+  /**
+   * Recomputes every stored job's dedup key with the current rules, so a rule change
+   * (like "Labs" no longer counting) applies to old jobs too. A key that another job
+   * already holds is left as it was, since the database keeps keys unique.
+   */
+  rekey(key: (job: Pick<Job, 'company' | 'title'>) => string): { changed: number; collided: number };
+  /** Records keys seen by a run, whether or not their jobs were kept. */
+  markSeen(keys: readonly string[], at: string): void;
+  /** Every key any run has seen. */
+  seenKeys(): Set<string>;
   /** Newest first; all jobs when no statuses are given. */
   list(filter?: { statuses?: readonly JobStatus[] }): Job[];
   /**
@@ -91,6 +101,10 @@ export function createJobsRepo(db: DatabaseSync): JobsRepo {
   const updateMatch = db.prepare('UPDATE jobs SET score = ?, role_summary = ?, description_summary = ?, strengths = ?, gaps = ? WHERE id = ?');
   const selectKeys = db.prepare('SELECT dedup_key FROM jobs');
   const updateStatus = db.prepare('UPDATE jobs SET status = ? WHERE id = ?');
+  const selectIdentities = db.prepare('SELECT id, company, title, dedup_key FROM jobs');
+  const updateKey = db.prepare('UPDATE jobs SET dedup_key = ? WHERE id = ?');
+  const insertSeen = db.prepare('INSERT OR IGNORE INTO seen_keys (dedup_key, first_seen) VALUES (?, ?)');
+  const selectSeen = db.prepare('SELECT dedup_key FROM seen_keys');
 
   // perf: one history query per job (N+1); fine for the review list's few dozen jobs — join and group if lists grow.
   const hydrate = (r: Row | undefined) => (r ? toJob(r, selectEvents.all(String(r.id)).map(toEvent)) : undefined);
@@ -116,6 +130,34 @@ export function createJobsRepo(db: DatabaseSync): JobsRepo {
     update: (id, p) => void updateCounts.run(nullable(p.factsUsed), nullable(p.tokensUsed), nullable(p.folderPath), nullable(p.sentBy), id),
     saveMatch: (id, m) => void updateMatch.run(m.score, nullable(m.roleSummary), nullable(m.descriptionSummary), JSON.stringify(m.strengths), JSON.stringify(m.gaps), id),
     dedupKeys: () => new Set(selectKeys.all().map((r) => String(r.dedup_key))),
+
+    rekey: (key) =>
+      transaction(db, () => {
+        const rows = selectIdentities.all();
+        const taken = new Set(rows.map((r) => String(r.dedup_key)));
+        let changed = 0;
+        let collided = 0;
+        for (const r of rows) {
+          const next = key({ company: String(r.company), title: String(r.title) });
+          if (next === r.dedup_key) continue;
+          if (taken.has(next)) {
+            collided++;
+            continue;
+          }
+          taken.delete(String(r.dedup_key));
+          taken.add(next);
+          updateKey.run(next, String(r.id));
+          changed++;
+        }
+        return { changed, collided };
+      }),
+
+    markSeen: (keys, at) =>
+      transaction(db, () => {
+        for (const k of keys) insertSeen.run(k, at);
+      }),
+
+    seenKeys: () => new Set(selectSeen.all().map((r) => String(r.dedup_key))),
 
     findByDedupKey: (key) => hydrate(selectByKey.get(key)),
 

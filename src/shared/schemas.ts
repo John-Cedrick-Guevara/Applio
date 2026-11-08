@@ -61,6 +61,7 @@ const JobPreviewSchema = z.strictObject({
   applyTarget: url,
   maxAutonomy: AutonomySchema,
   tokensUsed: count(10_000_000),
+  duplicate: z.strictObject({ jobId: id, status: JobStatusSchema }).optional(),
 });
 
 const PreferencesSchema = z.strictObject({

@@ -52,7 +52,7 @@ describe('runLine', () => {
   it('summarizes the last run', () => {
     const at = new Date(2026, 10, 3, 8, 0).toISOString();
     expect(runLine({ at, found: 62, newAfterDedup: 47, passedFilters: 9, drafted: 4 }))
-      .toBe('Last run 08:00 · 62 found · 47 not yet in Applio · 9 passed filters · 4 drafted');
+      .toBe('Last run 08:00 · 62 found · 47 new · 9 passed filters · 4 drafted');
   });
 
   it('says when every source was at its daily poll limit, instead of 0 found', () => {
@@ -64,7 +64,7 @@ describe('runLine', () => {
   it('notes sources at their limit alongside what the others found', () => {
     const at = new Date(2026, 10, 3, 8, 0).toISOString();
     expect(runLine({ at, found: 5, newAfterDedup: 5, passedFilters: 1, drafted: 0, atLimit: 1 }))
-      .toBe("Last run 08:00 · 5 found · 5 not yet in Applio · 1 passed filters · 0 drafted · 1 source at today's limit");
+      .toBe("Last run 08:00 · 5 found · 5 new · 1 passed filters · 0 drafted · 1 source at today's limit");
   });
 
   it('handles a fresh install', () => {

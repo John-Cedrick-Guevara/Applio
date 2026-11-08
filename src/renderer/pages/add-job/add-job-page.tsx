@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import type { Job, JobPreview } from '../../../shared/types';
+import type { Job, JobPreview, JobStatus } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
-import { Button } from '../../components/button';
+import { Button, buttonClass } from '../../components/button';
 import { ScoreBlock } from '../../components/score-block';
 import { useAction } from '../../hooks/use-action';
 import { useAsync } from '../../hooks/use-async';
 import { formatTokens } from '../../lib/format';
-import { AUTONOMY_LABEL } from '../../lib/labels';
+import { REVIEW_STATUSES } from '../../lib/job-lists';
+import { AUTONOMY_LABEL, STATUS_LABEL } from '../../lib/labels';
 import { EXAMPLES, inputError } from './add-job-model';
 import './add-job.css';
 
@@ -114,6 +115,10 @@ interface PreviewProps {
   onDiscard: () => void;
 }
 
+/** Where the job Applio already has lives: Review until it's out, Applications after. */
+const existingHref = ({ jobId, status }: { jobId: string; status: JobStatus }) =>
+  (REVIEW_STATUSES as readonly JobStatus[]).includes(status) ? `#/review/${jobId}` : '#/applications';
+
 /** What was parsed and how Applio will apply; nothing is saved until "Add to review queue". */
 function PreviewCard({ preview, draftThreshold, added, onAdded, onDiscard }: PreviewProps) {
   const api = useApi();
@@ -151,6 +156,14 @@ function PreviewCard({ preview, draftThreshold, added, onAdded, onDiscard }: Pre
           <span className="row">
             <Button size="sm" onClick={onDiscard}>Add another</Button>
             <a href={`#/review/${added.id}`}>Go to Review</a>
+          </span>
+        </div>
+      ) : preview.duplicate ? (
+        <div className="banner banner-warning preview-done" role="status">
+          <span>You already have this job in Applio ({STATUS_LABEL[preview.duplicate.status]}). Adding it again would make a second application.</span>
+          <span className="row">
+            <Button size="sm" onClick={onDiscard}>Discard</Button>
+            <a className={buttonClass('primary', 'sm')} href={existingHref(preview.duplicate)}>Open existing</a>
           </span>
         </div>
       ) : (

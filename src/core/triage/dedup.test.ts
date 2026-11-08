@@ -10,7 +10,7 @@ describe('dedupKey', () => {
 
   it('keeps different roles and different companies apart', () => {
     expect(dedupKey({ company: 'Acme', title: 'Backend Engineer' })).not.toBe(dedupKey({ company: 'Acme', title: 'Frontend Engineer' }));
-    expect(dedupKey({ company: 'Acme', title: 'Backend Engineer' })).not.toBe(dedupKey({ company: 'Acme Labs', title: 'Backend Engineer' }));
+    expect(dedupKey({ company: 'Acme', title: 'Backend Engineer' })).not.toBe(dedupKey({ company: 'Apex Labs', title: 'Backend Engineer' }));
   });
 });
 
@@ -28,5 +28,13 @@ describe('dedupe', () => {
     const { fresh, duplicates } = dedupe([discovered({ sourceId: 'jobicy', externalId: 'other' })], new Set([dedupKey(applied)]));
     expect(fresh).toEqual([]);
     expect(duplicates).toBe(1);
+  });
+
+  it('treats a company with or without a descriptor like "Labs" as the same company', () => {
+    expect(dedupKey({ company: 'Northbeam Labs', title: 'AI Engineer (LLM Agents)' })).toBe(dedupKey({ company: 'Northbeam, Inc.', title: 'AI Engineer (LLM Agents)' }));
+  });
+
+  it('keeps a company that is nothing but a descriptor, rather than an empty key', () => {
+    expect(dedupKey({ company: 'Labs', title: 'Engineer' })).toBe('labs|engineer');
   });
 });

@@ -209,4 +209,15 @@ export const MIGRATIONS: readonly Migration[] = [
       ALTER TABLE fact_groups ADD COLUMN link TEXT;
     `,
   },
+  {
+    version: 10,
+    name: 'seen keys',
+    sql: `
+      -- Every job key a run has seen, dropped ones included, so "new" means new (QA 2026-11-07 #14).
+      CREATE TABLE seen_keys (
+        dedup_key TEXT PRIMARY KEY,
+        first_seen TEXT NOT NULL
+      ) WITHOUT ROWID;
+    `,
+  },
 ];

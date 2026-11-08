@@ -7,8 +7,8 @@ import type { RunSourcesResult } from './run-sources';
 
 const NOW = new Date('2026-11-05T06:00:00.000Z');
 
-const setup = (polled: RunSourcesResult, existing: string[] = [], targetRoles = ['Backend Engineer'], leftover = { unscored: [] as string[], undrafted: [] as string[] }) => {
-  const saved: { jobs: { job: Job; dedupKey: string }[]; details: RunDetails }[] = [];
+const setup = (polled: RunSourcesResult, existing: string[] = [], targetRoles = ['Backend Engineer'], leftover = { unscored: [] as string[], undrafted: [] as string[] }, seen: string[] = []) => {
+  const saved: { jobs: { job: Job; dedupKey: string }[]; details: RunDetails; seen: readonly string[] }[] = [];
   const scoring: { runId: number; details: RunDetails; drafted: number }[] = [];
   const draft = vi.fn(async (ids: readonly string[]) => ({ drafted: ids.length, notDrafted: 0, notifyOnly: 0, asked: 0 }));
   const score = vi.fn(async (ids: readonly string[]) => ({ scored: ids.length, toDraft: [...ids], belowThreshold: 0, notScored: 0 }));
@@ -17,8 +17,9 @@ const setup = (polled: RunSourcesResult, existing: string[] = [], targetRoles = 
   const ports: DiscoverPorts = {
     poll,
     existingKeys: () => new Set(existing),
-    filters: () => ({ preferences: { ...DEFAULT_PREFERENCES, targetRoles }, blocklist: ['Evil Corp'] }),
-    save: (jobs, details) => (saved.push({ jobs, details }), 42),
+    seenKeys: () => new Set(seen),
+    filters: () => ({ preferences: { ...DEFAULT_PREFERENCES, targetRoles }, blocklist: ['Evil Corp'], homeLocation: '' }),
+    save: (jobs, details, _summary, seenNow) => (saved.push({ jobs, details, seen: seenNow }), 42),
     score,
     draft,
     finishRun: (runId, details, drafted) => void scoring.push({ runId, details, drafted }),
@@ -62,9 +63,20 @@ describe('discover', () => {
     await run();
     expect(saved[0]!.details).toEqual({
       duplicates: 1,
-      dropped: { blocklist: 1, type: 0, remote: 0, role: 1, pay: 0, hours: 0 },
+      dropped: { blocklist: 1, type: 0, remote: 0, role: 1, seniority: 0, location: 0, pay: 0, hours: 0 },
       sources: polled.sources,
     });
+  });
+
+  it('counts as new only jobs no earlier run has seen, so filtered-out jobs are not new again every run', async () => {
+    const { run } = setup(polled, [], ['Backend Engineer'], undefined, ['globex|sales manager']);
+    expect((await run()).newAfterDedup).toBe(2);
+  });
+
+  it('remembers the key of every job it saw this run, dropped ones too', async () => {
+    const { run, saved } = setup(polled);
+    await run();
+    expect([...saved[0]!.seen].sort()).toEqual(['acme|senior backend engineer', 'evil|backend engineer', 'globex|sales manager']);
   });
 
   it('also retries jobs an earlier run left unscored or undrafted', async () => {

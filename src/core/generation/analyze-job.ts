@@ -52,7 +52,8 @@ export interface AnalyzePorts {
   /** Ids in the fact bank, so a strength can't cite a fact that isn't there. */
   factIds: () => ReadonlySet<string>;
   /** The job Applio already has with this company and title, if any. */
-  existing: (company: string, title: string) => { title: string; status: JobStatus } | undefined;
+  /** The stored job with the same dedup key, if any. */
+  existing: (company: string, title: string) => { id: string; title: string; status: JobStatus } | undefined;
 }
 
 /** The job as it will be saved, minus what saving adds (id, source, status, history). */
@@ -103,8 +104,9 @@ export async function analyzePost(
   const preview: Omit<JobPreview, 'previewId'> = {
     company: a.company, title: a.title, sourceName, tags: a.tags, score: a.score, summary: a.roleSummary,
     channel: route.channel, channelLabel: described.channelLabel,
-    route: dupe ? `Already in Applio (${dupe.status}). Adding it again is refused.` : described.route,
+    route: described.route,
     applyTarget: route.applyTarget, maxAutonomy: described.maxAutonomy, tokensUsed: budgetTokens(reply),
+    ...(dupe ? { duplicate: { jobId: dupe.id, status: dupe.status } } : {}),
   };
   const job: AnalyzedJob = {
     sourceName, company: a.company, title: a.title, url: route.applyUrl ?? '', location: a.location, ...(a.salary ? { salary: a.salary } : {}),
