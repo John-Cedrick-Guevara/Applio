@@ -58,6 +58,27 @@ describe('ApplicationsPage', () => {
     expect(await within(detail).findByText('resume.pdf')).toBeInTheDocument();
   });
 
+  it('shows the subject and recipient exactly as the send log stored them, even after the draft is edited', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const send = await api.getSend('j10');
+    await api.updateCoverLetter('j10', 'Edited after sending');
+    renderWithApp(<ApplicationsPage />, api);
+    await userEvent.click(await screen.findByRole('button', { name: /Tessellate/ }));
+    const detail = screen.getByRole('complementary', { name: 'Application detail' });
+    expect(await within(detail).findByText(send!.state === 'sent' ? send!.subject : '')).toBeInTheDocument();
+    expect(within(detail).getByText('jobs@tessellate.example')).toBeInTheDocument();
+    expect(within(detail).queryByText(/Edited after sending/)).not.toBeInTheDocument();
+  });
+
+  it('says an application made outside Applio has no send record, rather than inventing one', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    await api.markApplied('j3');
+    renderWithApp(<ApplicationsPage />, api);
+    await userEvent.click(await screen.findByRole('button', { name: /Ledgerly/ }));
+    const detail = screen.getByRole('complementary', { name: 'Application detail' });
+    expect(await within(detail).findByText(/You applied to this one yourself, outside Applio/)).toBeInTheDocument();
+  });
+
   it("credits the job's board with its own name and a link back", async () => {
     renderWithApp(<ApplicationsPage />);
     await userEvent.click(await screen.findByRole('button', { name: /Paperplane/ }));
@@ -72,16 +93,39 @@ describe('ApplicationsPage', () => {
     expect(await screen.findByText('Likely questions')).toBeInTheDocument();
   });
 
-  it('drafts and sends a follow-up when one is due', async () => {
-    const { api } = renderWithApp(<ApplicationsPage />);
+  it('drafts and sends a follow-up when one is due, signed with the real name', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    await api.saveSettings({ fullName: 'Sam Rivera' });
+    renderWithApp(<ApplicationsPage />, api);
     await userEvent.click(await screen.findByRole('button', { name: /Tessellate/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Draft follow-up' }));
-    expect((screen.getByLabelText('Follow-up to Tessellate') as HTMLTextAreaElement).value).toContain('Following up on my application');
+    const box = screen.getByLabelText('Follow-up to Tessellate') as HTMLTextAreaElement;
+    expect(box.value).toContain('Following up on my application');
+    expect(box.value).toMatch(/Best,\nSam Rivera$/);
     await userEvent.type(screen.getByLabelText('Follow-up to Tessellate'), ' Thanks!');
     expect((await api.getJob('j10')).history.at(-1)?.note).toBeUndefined();
     await userEvent.click(screen.getByRole('button', { name: 'Send follow-up' }));
     expect((await screen.findAllByText(/Follow-up sent/)).length).toBeGreaterThan(0);
     expect((await api.getJob('j10')).history.at(-1)?.note).toBe('Follow-up sent');
+  });
+
+  it('keeps Send follow-up disabled while a placeholder remains, and says why', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    await api.saveSettings({ fullName: 'Sam Rivera' });
+    renderWithApp(<ApplicationsPage />, api);
+    await userEvent.click(await screen.findByRole('button', { name: /Tessellate/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Draft follow-up' }));
+    await userEvent.type(screen.getByLabelText('Follow-up to Tessellate'), ' [[Company]');
+    expect(screen.getByRole('button', { name: 'Send follow-up' })).toBeDisabled();
+    expect(screen.getByText('Replace [Company] before sending.')).toBeInTheDocument();
+  });
+
+  it('asks for a name in Settings before a follow-up can be signed and sent', async () => {
+    renderWithApp(<ApplicationsPage />);
+    await userEvent.click(await screen.findByRole('button', { name: /Tessellate/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Draft follow-up' }));
+    expect(screen.getByRole('button', { name: 'Send follow-up' })).toBeDisabled();
+    expect(screen.getByRole('link', { name: 'Open Settings' })).toHaveAttribute('href', '#/settings');
   });
 
   it('lets the operator correct a status, offering only the moves the rules allow', async () => {

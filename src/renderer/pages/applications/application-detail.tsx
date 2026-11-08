@@ -7,7 +7,7 @@ import { useAction } from '../../hooks/use-action';
 import { useAsync } from '../../hooks/use-async';
 import { formatShortDate, formatTokens } from '../../lib/format';
 import { CHANNEL_LABEL } from '../../lib/labels';
-import { sentAt, timeline, type DisplayStatus } from './applications-model';
+import { followUpDraft, followUpProblem, timeline, type DisplayStatus } from './applications-model';
 import { StatusBadge } from './status-badge';
 import { SourceCredit } from '../../components/source-credit';
 
@@ -16,11 +16,13 @@ interface DetailProps {
   status: DisplayStatus;
   followUpDays: number;
   now: Date;
+  /** The operator's name from Settings, which signs follow-ups. */
+  ownerName: string;
   onJob: (job: Job) => void;
 }
 
 /** Side panel: timeline, what was sent, and the next useful action (prep or follow-up). */
-export function ApplicationDetail({ job, status, followUpDays, now, onJob }: DetailProps) {
+export function ApplicationDetail({ job, status, followUpDays, now, ownerName, onJob }: DetailProps) {
   const api = useApi();
   const os = useAction();
   const [panel, setPanel] = useState<'prep' | 'follow' | null>(null);
@@ -53,7 +55,7 @@ export function ApplicationDetail({ job, status, followUpDays, now, onJob }: Det
       <WhatWasSent job={job} />
 
       {panel === 'prep' ? <PrepPanel jobId={job.id} /> : null}
-      {panel === 'follow' ? <FollowUpPanel job={job} onCancel={() => setPanel(null)} onSent={(next) => { setPanel(null); onJob(next); }} /> : null}
+      {panel === 'follow' ? <FollowUpPanel job={job} ownerName={ownerName} onCancel={() => setPanel(null)} onSent={(next) => { setPanel(null); onJob(next); }} /> : null}
 
       <div className="row">
         {canPrep ? (
@@ -94,30 +96,42 @@ function StatusCorrection({ job, onJob }: { job: Job; onJob: (job: Job) => void 
   );
 }
 
-/** Exactly what went out (SPEC F7): email subject and opening, or the form summary, plus saved files. */
+/**
+ * Exactly what went out (SPEC F7), read only from the send log: recipient, subject,
+ * body and attachments as stored. Editing the draft later never changes it. An
+ * application the operator made outside Applio says so instead.
+ */
 function WhatWasSent({ job }: { job: Job }) {
   const api = useApi();
-  const { data: draft } = useAsync(() => api.getDraft(job.id), [api, job.id]);
-  const sent = sentAt(job);
-  const isEmail = job.channel === 'email';
-  const aiAnswers = draft?.answers.filter((a) => a.origin === 'ai').length ?? 0;
+  const { data: send, loading } = useAsync(() => api.getSend(job.id), [api, job.id]);
+  const [full, setFull] = useState(false);
+  if (loading) return null;
 
+  if (send?.state !== 'sent') {
+    return (
+      <div>
+        <h3 className="section-label">What was sent</h3>
+        <div className="sent-box">
+          <p className="sent-body">You applied to this one yourself, outside Applio, so it has no record of what was sent. The documents you were given are in the job folder.</p>
+        </div>
+      </div>
+    );
+  }
+  const isEmail = send.channel === 'email';
+  const long = send.body.split('\n').length > 6;
   return (
     <div>
       <h3 className="section-label">What was sent</h3>
       <div className="sent-box">
-        <div className="cell-sub">
-          {isEmail ? `Subject: Application — ${job.title} — [Your Name]` : `${CHANNEL_LABEL[job.channel]} · ${sent ? formatShortDate(sent) : ''}`}
-        </div>
-        <p className="sent-body">
-          {isEmail
-            ? `${draft?.coverLetter.replace(/\s+/g, ' ').slice(0, 180) ?? ''}…`
-            : `Form answers, resume and cover letter as submitted. ${draft?.answers.length ?? 0} answers, ${aiAnswers} written new by AI.`}
-        </p>
-        <div className="row">
-          {['resume.pdf', draft?.kind === 'proposal' ? 'proposal.md' : 'cover-letter.pdf', 'sent.md'].map((f) => (
-            <span key={f} className="file-chip mono">{f}</span>
-          ))}
+        <dl className="sent-meta cell-sub">
+          <div><dt>{isEmail ? 'To' : 'Form'}</dt><dd className="mono">{send.to}</dd></div>
+          {isEmail ? <div><dt>Subject</dt><dd>{send.subject}</dd></div> : null}
+          <div><dt>Sent</dt><dd>{formatShortDate(send.at)} · {CHANNEL_LABEL[send.channel]}</dd></div>
+        </dl>
+        <p className={full || !long ? 'sent-body sent-body-full' : 'sent-body sent-body-clamped'}>{send.body}</p>
+        {long ? <Button size="sm" variant="link" onClick={() => setFull((f) => !f)}>{full ? 'Show less' : 'Show all'}</Button> : null}
+        <div className="row" aria-label="Attachments">
+          {send.attachments.map((f) => <span key={f} className="file-chip mono">{f}</span>)}
         </div>
       </div>
     </div>
@@ -154,13 +168,11 @@ function PrepList({ title, items }: { title: string; items: string[] }) {
 }
 
 /** Follow-up editor; sending is always the operator's explicit action (SPEC F7). */
-function FollowUpPanel({ job, onCancel, onSent }: { job: Job; onCancel: () => void; onSent: (job: Job) => void }) {
+function FollowUpPanel({ job, ownerName, onCancel, onSent }: { job: Job; ownerName: string; onCancel: () => void; onSent: (job: Job) => void }) {
   const api = useApi();
   const action = useAction();
-  const sent = sentAt(job);
-  const [text, setText] = useState(
-    `Hi ${job.company} team,\n\nFollowing up on my application for the ${job.title} role, sent ${sent ? formatShortDate(sent) : 'recently'}. I am still very interested and happy to share more detail on any of my work.\n\nBest,\n[Your Name]`,
-  );
+  const [text, setText] = useState(() => followUpDraft(job, ownerName));
+  const problem = followUpProblem(text, ownerName);
 
   const send = async () => {
     const next = await action.run('send the follow-up', () => api.sendFollowUp(job.id, text), 'Follow-up sent from your Gmail · logged to the timeline');
@@ -173,8 +185,13 @@ function FollowUpPanel({ job, onCancel, onSent }: { job: Job; onCancel: () => vo
       <textarea id="follow-text" className="textarea" value={text} onChange={(e) => setText(e.target.value)} />
       <div className="form-actions">
         <Button variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
-        <Button variant="primary" size="sm" busy={action.pending} disabled={!text.trim()} onClick={send}>Send follow-up</Button>
+        <Button variant="primary" size="sm" busy={action.pending} disabled={!!problem} aria-describedby={problem ? 'follow-problem' : undefined} onClick={send}>Send follow-up</Button>
       </div>
+      {problem ? (
+        <p id="follow-problem" className="field-hint">
+          {problem} {problem.startsWith('Add your name') ? <a href="#/settings">Open Settings</a> : null}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -53,6 +53,12 @@ describe('sendFollowUp', () => {
     await expect(sendFollowUp('j1', '   ', setup().ports)).rejects.toThrow('Write the follow-up first');
   });
 
+  it('refuses text that still has a template placeholder, so a half-filled template never goes out', async () => {
+    const { ports } = setup();
+    await expect(sendFollowUp('j1', 'Hi team,\n\nBest,\n[Your Name]', ports)).rejects.toThrow('Replace [Your Name] before sending.');
+    expect(ports.sendEmail).not.toHaveBeenCalled();
+  });
+
   it('logs nothing when Gmail refuses', async () => {
     const { ports, appended, job } = setup();
     vi.mocked(ports.sendEmail).mockRejectedValueOnce(new Error("Couldn't reach Gmail."));
