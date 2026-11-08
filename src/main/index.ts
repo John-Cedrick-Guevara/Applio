@@ -14,7 +14,7 @@ import { createAllSources, createPoliteHttp, SOURCE_HOSTS } from '../infra/sourc
 import { STATUS_CHANNEL } from '../shared/ipc';
 import { createBackend } from './backend';
 import { registerApiHandlers } from './ipc';
-import { mcpConfigFor } from './mcp-config';
+import { mcpConfigFor, outsideAsar } from './mcp-config';
 import { denyAndOpenExternally, guardNavigation } from './security';
 import { createTray } from './tray';
 
@@ -137,7 +137,7 @@ app.whenReady().then(() => {
         configDir: join(app.getPath('userData'), 'claude'),
         env: { ...process.env, PATH: enginePath() },
         // Only Applio's server; --strict-mcp-config keeps the operator's own MCP servers out.
-        mcpConfig: (jobIds) => mcpConfigFor({ execPath: process.execPath, script: join(__dirname, 'mcp.cjs'), dbPath: dbPath() }, jobIds),
+        mcpConfig: (jobIds) => mcpConfigFor({ execPath: process.execPath, script: outsideAsar(join(__dirname, 'mcp.cjs')), dbPath: dbPath() }, jobIds),
       }),
       'api-key': createApiEngine({
         apiKey: () => secrets.get('anthropicApiKey'),

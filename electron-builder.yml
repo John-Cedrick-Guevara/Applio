@@ -1,0 +1,25 @@
+# Packages Applio as a macOS app (npm run package → release/mac-arm64/Applio.app).
+appId: com.applio.desktop
+productName: Applio
+directories:
+  output: release
+# Everything the app runs is bundled into dist/ by Vite, so no node_modules ship.
+files:
+  - dist/**/*
+  - package.json
+  - "!dist/electron/e2e.cjs"
+  - "!**/*.map"
+  - "!node_modules/**/*"
+# Claude Code starts the MCP server as a separate process, which can't read inside app.asar (see outsideAsar).
+asarUnpack:
+  - dist/electron/mcp.cjs
+npmRebuild: false
+mac:
+  target:
+    - target: dir
+      arch: arm64
+  category: public.app-category.productivity
+  # Ad-hoc signature: runs on this Mac (first launch: right-click → Open). A Developer ID is needed to distribute.
+  identity: "-"
+  # Hardened runtime needs a real Developer ID; with an ad-hoc signature it can block the app's own libraries.
+  hardenedRuntime: false

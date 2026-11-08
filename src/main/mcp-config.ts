@@ -17,3 +17,11 @@ export function mcpConfigFor({ execPath, script, dbPath }: McpServerPaths, jobId
     },
   });
 }
+
+/**
+ * In the installed app, bundled files sit inside `app.asar`, which only Applio's own
+ * process can read. Claude Code starts the MCP server as a separate process, so that
+ * script ships unpacked (`asarUnpack`) and is run from `app.asar.unpacked`.
+ * Paths outside an archive (running from the repo) are returned as they are.
+ */
+export const outsideAsar = (path: string): string => path.replace(/([\\/])app\.asar([\\/])/, '$1app.asar.unpacked$2');
