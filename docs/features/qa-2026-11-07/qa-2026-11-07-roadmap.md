@@ -17,7 +17,7 @@ Source: [QA report](../../qa/2026-11-07-qa-report.md). 18 issues (1 blocker, 9 m
 
 - [x] **PR 1** `fix/send-integrity` — `fix(apply): show sends as they happened, never as hoped` — #1, #2, #3, #11, #12 (+ #16 folder path). Why: a failed send read as "Sent" and dropped out of every list.
 - [x] **PR 2** `fix/send-guardrails` — `fix(apply): gate suspicious posts and verify Gmail before trusting it` — #7, #8. Why: a planted post could auto-send; unverified credentials showed Connected.
-- [ ] **PR 3** `fix/triage-precision` — `fix(triage): drop out-of-reach roles and near-duplicates before AI` — #4, #6, #14. Why: most tokens went on Senior/US-only jobs; "Labs" duplicates got through.
+- [x] **PR 3** `fix/triage-precision` — `fix(triage): drop out-of-reach roles and near-duplicates before AI` — #4, #6, #14. Why: most tokens went on Senior/US-only jobs; "Labs" duplicates got through.
 - [ ] **PR 4** `fix/structured-preferences` — `fix(profile): make every filter editable and pay unambiguous` — #9. Depends on PR 3 (seniority rule).
 - [ ] **PR 5** `fix/review-below-threshold` — `feat(ui): open, draft or dismiss below-threshold jobs` — #5.
 - [ ] **PR 6** `fix/draft-provenance` — `fix(generation): flag stale drafts and trace the cover letter` — #10.

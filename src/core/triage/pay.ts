@@ -9,8 +9,12 @@ const HOURS_PER_YEAR = 2080;
 /** Bare numbers at least this big read as yearly; smaller ones are ambiguous without a period. */
 const YEARLY_FLOOR = 10_000;
 
+/** ISO codes Applio reads, written out ("PHP 30,000") or by symbol. A code wins over a symbol ("A$" is still AUD by code only). */
+const CODES = /\b(USD|EUR|GBP|PHP|AUD|CAD|SGD|INR|JPY|NZD|CHF)\b/i;
+const SYMBOLS: [RegExp, string][] = [[/₱/, 'PHP'], [/€/, 'EUR'], [/£/, 'GBP'], [/₹/, 'INR'], [/\$/, 'USD']];
+
 const currencyOf = (text: string): string | undefined =>
-  /\$|\bUSD\b/i.test(text) ? 'USD' : /€|\bEUR\b/i.test(text) ? 'EUR' : /£|\bGBP\b/i.test(text) ? 'GBP' : undefined;
+  CODES.exec(text)?.[1]?.toUpperCase() ?? SYMBOLS.find(([re]) => re.test(text))?.[1];
 
 const perYear = (text: string, max: number): number | undefined => {
   if (/\b(hour|hourly|hr)\b|\/\s*h\b/i.test(text)) return HOURS_PER_YEAR;
@@ -37,8 +41,9 @@ export function parsePay(text: string): PayRange | undefined {
 /**
  * True unless the job's pay is clearly below the operator's minimum: its top of
  * range is compared, yearly, against the lowest of the operator's alternatives
- * ("$120k / year or $45 / hour"). Unreadable pay or mismatched currencies keep
- * the job (SPEC F3: only drop what we're sure about).
+ * ("$120k / year or $45 / hour"). Unreadable pay, mismatched currencies, or a
+ * minimum with no currency (which could mean any of them) keep the job (SPEC F3:
+ * only drop what we're sure about).
  */
 export function meetsMinimumPay(jobSalary: string | undefined, minimumPay: string): boolean {
   const job = parsePay(jobSalary ?? '');
@@ -46,7 +51,7 @@ export function meetsMinimumPay(jobSalary: string | undefined, minimumPay: strin
   const minimums = minimumPay
     .split(/\bor\b/i)
     .map(parsePay)
-    .filter((p): p is PayRange => !!p && (!p.currency || !job.currency || p.currency === job.currency));
+    .filter((p): p is PayRange => !!p?.currency && (!job.currency || p.currency === job.currency));
   if (minimums.length === 0) return true;
   return job.max >= Math.min(...minimums.map((m) => m.min));
 }
