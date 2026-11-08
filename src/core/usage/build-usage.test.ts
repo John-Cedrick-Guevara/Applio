@@ -22,6 +22,11 @@ const input = (over: Partial<UsageInput> = {}): UsageInput => ({
   polls: [{ id: 'remotive', name: 'Remotive', used: 4, limit: 4 }, { id: 'hn', name: 'HN Who is hiring', used: 0, limit: 1 }],
   settings: { dailyTokenBudget: 10_000, monthlyTokenBudget: 100_000, maxPerChannelPerDay: 10 },
   gmailDailyCap: 100,
+  runs: [
+    { at: at(20), found: 80, duplicates: 10, passed: 6, dropped: { seniority: 40, location: 20, role: 4 } },
+    { at: at(20, 14), found: 20, duplicates: 15, passed: 1, dropped: { seniority: 3, location: 1 } },
+    { at: at(3), found: 50, duplicates: 0, passed: 50, dropped: {} },
+  ],
   ...over,
 });
 
@@ -65,5 +70,12 @@ describe('buildUsage', () => {
     expect(quotas.find((q) => q.id === 'remotive')).toMatchObject({ used: 4, limit: 4, doneLabel: 'Done for today' });
     expect(quotas.find((q) => q.id === 'upwork')).toMatchObject({ off: true });
     expect(quotas.find((q) => q.id === 'jsearch')).toMatchObject({ off: true });
+  });
+
+  it("sums the period's prefilter, per drop reason, biggest first, so the operator sees what each filter removes", () => {
+    expect(buildUsage('today', input()).prefilter).toEqual({
+      found: 100, duplicates: 25, passed: 7,
+      dropped: [{ reason: 'seniority', count: 43 }, { reason: 'location', count: 21 }, { reason: 'role', count: 4 }],
+    });
   });
 });

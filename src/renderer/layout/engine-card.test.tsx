@@ -46,4 +46,24 @@ describe('EngineCard', () => {
     act(() => events.push(busy));
     expect(screen.getByRole('meter', { name: 'Tokens used today' })).toHaveClass('engine-meter-warn');
   });
+
+  it('says AI is paused for the day, with a way to raise the budget, once the budget is used', async () => {
+    const events = fakeEvents();
+    const { api } = renderWithApp(<EngineCard />);
+    await screen.findByText('Ready');
+    const base = await api.getStatus();
+    act(() => events.push({ ...base, tokensToday: 261_300, dailyTokenBudget: 100_000, budgetStop: "Today's Claude token budget is used up." }));
+    expect(screen.getByText('Paused · daily budget used')).toBeInTheDocument();
+    expect(screen.queryByText('Ready')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Raise budget' })).toHaveAttribute('href', '#/settings');
+  });
+
+  it('rounds big token counts so the line fits the card', async () => {
+    const events = fakeEvents();
+    const { api } = renderWithApp(<EngineCard />);
+    await screen.findByText('Ready');
+    const base = await api.getStatus();
+    act(() => events.push({ ...base, tokensToday: 226_900, dailyTokenBudget: 500_000 }));
+    expect(screen.getByText('227k / 500k')).toBeInTheDocument();
+  });
 });

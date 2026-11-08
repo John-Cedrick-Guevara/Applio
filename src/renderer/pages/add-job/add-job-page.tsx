@@ -21,6 +21,9 @@ export default function AddJobPage() {
   const api = useApi();
   const analyze = useAction();
   const { data: settings } = useAsync(() => api.getSettings(), [api]);
+  // Analysis spends tokens, so a used-up budget disables it up front, with the reason, instead of failing on click.
+  const { data: status } = useAsync(() => api.getStatus(), [api]);
+  const budgetStop = status?.budgetStop;
   const [mode, setMode] = useState<Mode>('text');
   const [values, setValues] = useState<Record<Mode, string>>({ text: '', link: '' });
   const [error, setError] = useState<string | null>(null);
@@ -82,8 +85,14 @@ export default function AddJobPage() {
         )}
 
         <div className="spread">
-          {error ? <span className="field-error" role="alert">{error}</span> : <span className="cell-sub">Reading and scoring uses about 8k tokens.</span>}
-          <Button variant="strong" busy={analyze.pending} onClick={run}>{analyze.pending ? 'Analyzing…' : 'Analyze job'}</Button>
+          {error ? (
+            <span className="field-error" role="alert">{error}</span>
+          ) : budgetStop ? (
+            <span className="field-error">{budgetStop} <a href="#/settings">Raise budget</a></span>
+          ) : (
+            <span className="cell-sub">Reading and scoring uses about 8k tokens.</span>
+          )}
+          <Button variant="strong" busy={analyze.pending} disabled={!!budgetStop} onClick={run}>{analyze.pending ? 'Analyzing…' : 'Analyze job'}</Button>
         </div>
       </section>
 

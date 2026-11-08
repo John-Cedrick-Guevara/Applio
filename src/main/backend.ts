@@ -131,7 +131,11 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       return { daily: dailyTokenBudget, monthly: monthlyTokenBudget };
     },
     tokensSince: (since) => activity.tokensSince(since),
-    record: (u) => activity.recordUsage(u),
+    // Every call moves the sidebar's token meter, so it's pushed at once rather than on the next unrelated change.
+    record: (u) => {
+      activity.recordUsage(u);
+      pushStatus();
+    },
     recentCost: (step) => activity.recentCost(step),
     isPaused,
     now: () => new Date(),
@@ -531,6 +535,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       polls: sources.filter((s) => sourcesRepo.get(s.id)?.enabled).map((s) => ({ id: s.id, name: sourcesRepo.get(s.id)?.name ?? s.name, used: polls.count(s.id, today), limit: s.dailyPollLimit })),
       settings: settings.getSettings(),
       gmailDailyCap: GMAIL_DAILY_CAP,
+      runs: activity.runsSince(from),
     });
   };
 
@@ -548,6 +553,13 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     return applyPorts.transition(jobId, 'skipped');
   };
 
+  /** True when every enabled source has used today's polls, so Run now would fetch nothing. */
+  const allSourcesAtLimit = () => {
+    const day = localDay(new Date());
+    const enabled = sources.filter((src) => sourcesRepo.get(src.id)?.enabled);
+    return enabled.length > 0 && enabled.every((src) => polls.count(src.id, day) >= src.dailyPollLimit);
+  };
+
   const getStatus = (): AppStatus => {
     const { aiEngine, secretsSet, dailyTokenBudget } = settings.getSettings();
     // Until the first check returns, a saved key (or Claude Code, the default) counts as ready.
@@ -563,6 +575,8 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       lastRun: activity.latestRun(),
       jobsVersion: jobs.version(),
       drafting: [...draftingNow],
+      ...(ai.budgetStop() ? { budgetStop: ai.budgetStop() } : {}),
+      ...(allSourcesAtLimit() ? { sourcesAtLimit: true } : {}),
     };
   };
   let pushedJobsVersion: number | undefined;

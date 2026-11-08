@@ -11,6 +11,8 @@ interface ReviewHeaderProps {
   onRunComplete: () => void;
 }
 
+const AT_LIMIT = "Every source has used today's polls. They poll again after midnight.";
+
 /** Title, last-run summary, pause/resume and Run now (SPEC F2, F6). */
 export function ReviewHeader({ status, onStatusChange, onRunComplete }: ReviewHeaderProps) {
   const api = useApi();
@@ -45,11 +47,16 @@ export function ReviewHeader({ status, onStatusChange, onRunComplete }: ReviewHe
           <Button busy={pause.pending} onClick={togglePause}>
             {status.paused ? 'Resume automation' : 'Pause automation'}
           </Button>
-          <Button variant="strong" busy={runner.pending} disabled={status.paused} onClick={runNow}>
+          <Button variant="strong" busy={runner.pending} disabled={status.paused || status.sourcesAtLimit} title={status.sourcesAtLimit ? AT_LIMIT : undefined} onClick={runNow}>
             {runner.pending ? 'Running…' : 'Run now'}
           </Button>
         </div>
       </header>
+      {status.sourcesAtLimit && !status.paused ? (
+        <div className="banner banner-warning">
+          <span>{AT_LIMIT}</span>
+        </div>
+      ) : null}
       {status.paused ? (
         <div className="banner banner-warning">
           <span>Automation is paused. Scheduled runs and auto-sends are off; drafts below still work.</span>

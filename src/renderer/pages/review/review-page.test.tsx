@@ -174,6 +174,14 @@ describe('ReviewPage', () => {
     expect((await api.getDraft('j1'))?.coverLetter).toBe('Short and sweet');
   });
 
+  it('disables Run now and says why once every source has used today\'s polls', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const capped = { ...api, getStatus: async () => ({ ...(await api.getStatus()), sourcesAtLimit: true }) };
+    renderWithApp(<ReviewPage params={{}} />, capped);
+    expect(await screen.findByRole('button', { name: 'Run now' })).toBeDisabled();
+    expect(screen.getByText("Every source has used today's polls. They poll again after midnight.")).toBeInTheDocument();
+  });
+
   it('tells the operator what Run now did', async () => {
     open();
     await userEvent.click(await screen.findByRole('button', { name: 'Run now' }));
@@ -212,6 +220,15 @@ describe('ReviewPage', () => {
     await userEvent.click(within(detail).getByRole('button', { name: /Draft this one/ }));
     await waitFor(async () => expect((await api.getJob('j5')).status).toBe('drafted'));
     expect(await screen.findByRole('region', { name: 'Draft detail' })).toBeInTheDocument();
+  });
+
+  it("disables Draft this one with the reason while today's token budget is used", async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const spent = { ...api, getStatus: async () => ({ ...(await api.getStatus()), budgetStop: "Today's Claude token budget is used up." }) };
+    renderWithApp(<ReviewPage params={{ id: 'j5' }} />, spent);
+    const detail = await screen.findByRole('region', { name: 'Job detail' });
+    expect(within(detail).getByRole('button', { name: 'Draft this one' })).toBeDisabled();
+    expect(within(detail).getByText("Today's Claude token budget is used up.")).toBeInTheDocument();
   });
 
   it('dismisses a below-threshold job, which leaves the list for good', async () => {

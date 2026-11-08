@@ -63,6 +63,8 @@ function UsageBody({ usage }: { usage: Usage }) {
 
       <QuotaTable quotas={usage.quotas} />
 
+      {usage.prefilter ? <PrefilterCard prefilter={usage.prefilter} today={today} /> : null}
+
       <div className="usage-row">
         <section className="card usage-half">
           <div className="card-header">
@@ -84,6 +86,35 @@ function UsageBody({ usage }: { usage: Usage }) {
         </section>
       </div>
     </>
+  );
+}
+
+/** Why jobs were dropped, in the operator's words. */
+const DROP_LABEL: Record<string, string> = {
+  seniority: 'Above your level', location: 'Outside your country', role: 'Not a target role', remote: 'Not remote',
+  type: 'Unwanted work type', pay: 'Below your minimum pay', hours: "Hours that can't overlap", blocklist: 'On your blocklist',
+};
+
+/** The free prefilter (SPEC F3.2): how many jobs it kept from AI, and which filter dropped them, so a filter set too tight shows. */
+function PrefilterCard({ prefilter, today }: { prefilter: NonNullable<Usage['prefilter']>; today: boolean }) {
+  const fresh = prefilter.found - prefilter.duplicates;
+  const pct = fresh ? Math.round(((fresh - prefilter.passed) / fresh) * 100) : 0;
+  return (
+    <section className="card">
+      <div className="card-header">
+        <div>
+          <h2>Filtered before AI</h2>
+          <p>{today ? 'Today' : 'This month'}: {prefilter.found} found · {prefilter.duplicates} already seen · {prefilter.passed} scored · {pct}% dropped for free</p>
+        </div>
+      </div>
+      {prefilter.dropped.length ? (
+        <ul className="list-plain drop-list" aria-label="Dropped by filter">
+          {prefilter.dropped.map((d) => (
+            <li key={d.reason} className="spread"><span>{DROP_LABEL[d.reason] ?? d.reason}</span><span className="mono">{d.count}</span></li>
+          ))}
+        </ul>
+      ) : <p className="cell-sub">Nothing dropped yet.</p>}
+    </section>
   );
 }
 
