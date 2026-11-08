@@ -20,6 +20,8 @@ const companyName = (raw: string) => {
  * then to 80 characters on a word boundary.
  */
 const placeOf = (raw: string) => {
+  // Posts listing two roles put the second where the place goes ("… | AI Product Manager | Remote").
+  if (/\b(?:engineer|developer|manager|designer|scientist|lead|architect|analyst)s?\b/i.test(raw) && !/\b(?:remote|onsite|on-site|hybrid)\b/i.test(raw)) return '';
   const glued = raw.search(/(?<=[a-zA-Z)])(?=[A-Z][a-z]+ [a-z])/);
   let place = glued > 0 ? raw.slice(0, glued) : raw;
   place = place.split(/(?<=[a-z)])\. /)[0]!;

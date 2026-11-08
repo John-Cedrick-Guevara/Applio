@@ -258,6 +258,8 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     onDrafted: async (id) => {
       try {
         await saveFiles(id);
+        // The folder is set now; tell open pages so Approve and Open PDF come on without a reload.
+        pushStatus();
       } catch (err) {
         note(id, `Couldn't save the files: ${err instanceof Error ? err.message : String(err)}`);
         return;

@@ -93,7 +93,9 @@ export function createJobsRepo(db: DatabaseSync): JobsRepo {
   const insertEvent = db.prepare('INSERT INTO status_events (job_id, status, at, note) VALUES (?, ?, ?, ?)');
   const selectEvents = db.prepare('SELECT status, at, note FROM status_events WHERE job_id = ? ORDER BY id');
   const selectById = db.prepare('SELECT * FROM jobs WHERE id = ?');
-  const selectVersion = db.prepare('SELECT COALESCE(MAX(id), 0) AS v FROM status_events');
+  // Moves on every status event and whenever a job's files are first saved (folder set), so open pages
+  // refresh in both cases. Both parts only ever grow, so the sum does too.
+  const selectVersion = db.prepare('SELECT (SELECT COALESCE(MAX(id), 0) FROM status_events) + (SELECT COUNT(*) FROM jobs WHERE folder_path IS NOT NULL) AS v');
   const selectByKey = db.prepare('SELECT * FROM jobs WHERE dedup_key = ?');
   const updateCounts = db.prepare(
     'UPDATE jobs SET facts_used = COALESCE(?, facts_used), tokens_used = COALESCE(?, tokens_used), folder_path = COALESCE(?, folder_path), sent_by = COALESCE(?, sent_by) WHERE id = ?',

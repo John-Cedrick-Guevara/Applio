@@ -13,6 +13,7 @@ import {
   seedUsage,
 } from './fixtures';
 import { analyze } from './analyze';
+import { findPlaceholder } from '../placeholders';
 import { checkDraft, profileVersion } from '../draft-check';
 
 interface MockOptions {
@@ -157,6 +158,9 @@ export function createMockApi({ latencyMs = 250, now = () => new Date(), sendFai
         if (canSend && job.channel === 'email' && (!settings.gmailAddress || !settings.secretsSet.gmailAppPassword)) {
           throw new Error('Set up Gmail in Settings first: your address and an app password.');
         }
+        // Like main: a letter still holding a placeholder is never sent.
+        const placeholder = canSend ? findPlaceholder(drafts.find((d) => d.jobId === jobId)?.coverLetter ?? '') : undefined;
+        if (placeholder) throw new Error(`Replace ${placeholder} in the letter before sending.`);
         if (job.status === 'drafted') transition(job, 'approved');
         if (!canSend) return job;
         const refused = sendFailure();
