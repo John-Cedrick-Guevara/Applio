@@ -80,8 +80,13 @@ function DraftDetail({ job, draft, send, nextId, thresholds, owner, autonomyBySo
   /** Approves (or retries) and then re-reads the job and its send log, so what's shown is what happened, success or not. */
   const approve = async () => {
     await sending.run('send the application', () => api.approveDraft(job.id), undefined, { quiet: true });
-    const [next, nextSend] = await Promise.all([api.getJob(job.id), api.getSend(job.id)]);
-    onJob(next, nextSend);
+    try {
+      const [next, nextSend] = await Promise.all([api.getJob(job.id), api.getSend(job.id)]);
+      onJob(next, nextSend);
+    } catch (err) {
+      // The send's own result is already on screen; a failed re-read only leaves the old view, so it's logged, not shown.
+      console.error('[review] failed to reload the job after sending', err);
+    }
   };
 
   const markApplied = async () => {
