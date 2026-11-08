@@ -86,6 +86,11 @@ describe('HN Who is hiring (Algolia)', () => {
     expect(jobs[1]!.location).not.toMatch(/\s$/);
   });
 
+  it('does not take a second role for the location (QA 2026-11-08)', async () => {
+    const { jobs } = await hackerNews.fetchJobs(comments('Distru | AI Product Engineer | AI Product Manager | Remote (US)'));
+    expect(jobs[0]!.location).toBe('');
+  });
+
   it("leaves company and role to the AI when the post doesn't follow the Company | Role line", async () => {
     const { jobs } = await hackerNews.fetchJobs(comments('Claims processing startup looking for engineers who love Rust. Email us.'));
     expect(jobs[0]).toMatchObject({ company: 'Unknown company', title: 'See post', location: '' });

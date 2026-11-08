@@ -7,6 +7,7 @@ Fix what the pre-production QA pass found on `main` after the QA 2026-11-07 PRs 
 3. **Editing preferences rewrote a minimum with alternatives.** "$120k / year or $45 / hour" was read as 120,000 per *hour* and saved that way when any other field was edited.
 4. **The pay fields stacked vertically** on Profile (their row style lived in the Settings stylesheet).
 5. **A "sent.md" file chip opened the folder**, duplicating Open folder under a misleading name.
+6. **An HN post listing two roles stored the second as the location** ("AI Product Manager"), seen in the live discovery run.
 
 ## Acceptance criteria
 - AC-1: While a fresh draft's files are being written, Review says "Saving the résumé and letter PDFs…" and Approve waits. A failed save shows its reason. The send refuses with "still saving" rather than pointing at a missing folder. Open pages refresh when the files land.
@@ -14,6 +15,7 @@ Fix what the pre-production QA pass found on `main` after the QA 2026-11-07 PRs 
 - AC-3: An untouched saved minimum is kept exactly as stored. The editor reads only its first alternative, with that alternative's own period.
 - AC-4: Amount, currency and period sit on one row.
 - AC-5: No file chip claims to be a file it doesn't open.
+- AC-6: An HN place field that names a role, with no remote/onsite wording, is left empty.
 
 ## Must not break
 - MNB-1: Sending, retry, double-send guard; drafting through the MCP server.
@@ -23,4 +25,5 @@ Fix what the pre-production QA pass found on `main` after the QA 2026-11-07 PRs 
 - AC-2: `send-application.test.ts` › "refuses to send a letter that still has a placeholder…", "never types a placeholder answer into a form…"; `draft-check.test.ts` › `placeholders`; `review-model.test.ts` › "puts a leftover placeholder first…"
 - AC-3: `preferences-model.test.ts` › "keeps a saved minimum exactly as it was…", "reads only the first of several alternatives…"
 - AC-4/5: visual check in Chrome
+- AC-6: `feeds.test.ts` › "does not take a second role for the location"
 - MNB-1: full suite; QA harness send path.
