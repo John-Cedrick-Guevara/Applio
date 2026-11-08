@@ -69,6 +69,8 @@ export interface Job {
   folderPath?: string;
   /** Who sent it, once sent. */
   sentBy?: SentBy;
+  /** Why the post looks like it's trying to steer automated tools, when it does; such a job is never sent on its own. */
+  suspicious?: string;
   history: StatusEvent[];
 }
 

@@ -101,6 +101,7 @@ export function ReviewQueue({ jobs, currentId, below, waiting, asking, drafting,
                   {job.platform ? job.applyTarget.split(' · ')[0] : CHANNEL_LABEL[job.channel]}
                 </span>
                 <span className="cell-sub">{queueState(job)}</span>
+                {job.suspicious ? <span className="badge badge-danger" title={job.suspicious}>Check post</span> : null}
               </div>
             </a>
           </li>

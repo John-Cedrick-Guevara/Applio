@@ -71,6 +71,8 @@ function DraftDetail({ job, draft, send, nextId, thresholds, owner, autonomyBySo
   const sending = useAction();
   const [tab, setTab] = useState<DocTab>('letter');
   const [editing, setEditing] = useState(false);
+  // A suspicious post needs a second, explicit click to send (QA 2026-11-07 #7).
+  const [confirming, setConfirming] = useState(false);
   const primary = primaryAction(job);
   const state = sendState(job, send);
   const waiting = job.status === 'drafted';
@@ -103,6 +105,13 @@ function DraftDetail({ job, draft, send, nextId, thresholds, owner, autonomyBySo
 
   return (
     <>
+      {job.suspicious ? (
+        <div className="banner banner-danger draft-warning" role="alert">
+          <span>
+            <strong>This post looks like it's trying to manipulate automated tools.</strong> {job.suspicious} Verify the company is real before sending. Applio only ever sends to {job.applyTarget}.
+          </span>
+        </div>
+      ) : null}
       <div className="draft-head">
         <div className="draft-head-text">
           <div className="cell-sub">{job.company} · <SourceCredit job={job} /> · found {formatRelative(foundAt)}</div>
@@ -183,6 +192,15 @@ function DraftDetail({ job, draft, send, nextId, thresholds, owner, autonomyBySo
             <span><strong>Not sent.</strong> {sending.error} Nothing went out, and the draft is still here.</span>
           </div>
         ) : null}
+        {waiting && confirming && !sending.pending ? (
+          <div className="banner banner-danger" role="alert">
+            <span>Send to {job.applyTarget} even though this post looks suspicious?</span>
+            <div className="row">
+              <Button size="sm" onClick={() => setConfirming(false)}>Cancel</Button>
+              <Button size="sm" variant="danger" onClick={() => { setConfirming(false); void approve(); }}>Send anyway</Button>
+            </div>
+          </div>
+        ) : null}
         {waiting && needsGmail ? (
           <div className="banner banner-warning">
             <span>{needsGmail.message}</span>
@@ -202,7 +220,7 @@ function DraftDetail({ job, draft, send, nextId, thresholds, owner, autonomyBySo
             ) : needsGmail ? (
               <a className={buttonClass('primary')} href="#/settings">{needsGmail.action}</a>
             ) : (
-              <Button variant="primary" busy={sending.pending} onClick={approve}>{sending.pending ? (job.channel === 'email' ? 'Sending…' : 'Submitting…') : primary.label}</Button>
+              <Button variant="primary" busy={sending.pending} onClick={job.suspicious && !confirming ? () => setConfirming(true) : approve}>{sending.pending ? (job.channel === 'email' ? 'Sending…' : 'Submitting…') : primary.label}</Button>
             )}
           </div>
         ) : null}

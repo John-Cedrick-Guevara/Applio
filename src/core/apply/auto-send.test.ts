@@ -21,6 +21,7 @@ describe('autoSendBlock', () => {
     ['its score is below the auto-send score', job({ score: 84 }), ctx(), 'Its match score (84) is below the auto-send score (85).'],
     ['its company is blocklisted', job({ company: 'Acme, Inc.' }), ctx({ blocklist: ['acme'] }), 'Acme, Inc. is on your blocklist.'],
     ['automation is paused', job(), ctx({ paused: true }), 'Automation is paused.'],
+    ['its post looks like it steers AI tools', job({ suspicious: 'The post addresses AI tools directly.' }), ctx(), 'The post addresses AI tools directly. Suspicious posts are never sent automatically.'],
     ['the AI budget is used up', job(), ctx({ budgetStop: "Today's Claude token budget is used up." }), "Today's Claude token budget is used up."],
   ])('holds a job when %s', (_label, j, c, reason) => {
     expect(autoSendBlock(j, c)).toBe(reason);

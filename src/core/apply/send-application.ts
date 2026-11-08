@@ -263,6 +263,8 @@ export async function sendByAts(jobId: string, sentBy: SentBy, ports: ApplyPorts
 export async function approveDraft(jobId: string, ports: ApplyPorts, approvedBy: SentBy = 'you-app'): Promise<Job> {
   let job = ports.job(jobId);
   if (job.status !== 'drafted' && job.status !== 'approved') throw new SendBlockedError(`Job ${jobId} is not awaiting approval`);
+  // A one-tap remote approval can't show the warning, so a suspicious post is approved in the app only.
+  if (job.suspicious && approvedBy === 'you-telegram') throw new SendBlockedError('This post looks like it tries to steer automated tools. Open it in Applio to check and approve it there.');
   if (job.channel === 'email' || job.channel === 'ats') readyToSend(jobId, job.channel, ports);
   if (job.status === 'drafted') {
     job = ports.transition(jobId, 'approved');
