@@ -52,6 +52,8 @@ export interface ApplioApi {
   approveDraft(jobId: string): Promise<Job>;
   /** Drafts a scored job the operator chose, below the threshold or not, in the background. @returns The job as it is now (still scored). */
   draftJob(jobId: string): Promise<Job>;
+  /** Drops a waiting draft and drafts the job again from the current profile, in the background. */
+  redraft(jobId: string): Promise<Job>;
   skipJob(jobId: string): Promise<Job>;
   /** Logs an application the operator submitted themselves (manual handoff). */
   markApplied(jobId: string): Promise<Job>;
@@ -131,7 +133,7 @@ export interface ApplioApi {
  * names over IPC, so this list is the renderer's entire reach into main.
  */
 export const API_METHODS = [
-  'listJobs', 'getJob', 'getDraft', 'getSend', 'updateCoverLetter', 'approveDraft', 'draftJob', 'skipJob', 'markApplied', 'setStatus',
+  'listJobs', 'getJob', 'getDraft', 'getSend', 'updateCoverLetter', 'approveDraft', 'draftJob', 'redraft', 'skipJob', 'markApplied', 'setStatus',
   'sendFollowUp', 'getInterviewPrep',
   'getStatus', 'runDiscovery', 'setAutomationPaused',
   'openExternal', 'openJobFolder', 'openDraftFile', 'assistFill', 'chooseFolder', 'openOutputFolder',

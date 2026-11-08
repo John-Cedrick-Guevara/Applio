@@ -496,6 +496,29 @@ describe('createBackend discovery', () => {
     await expect(b.api.draftJob(below!.id)).rejects.toThrow('Only scored jobs can be drafted');
   });
 
+  it("keeps Claude's email subject and keywords with the draft", async () => {
+    const { api, job, deps } = await draftedBackend();
+    const draft = (await api.getDraft(job.id))!;
+    deps.db.prepare('UPDATE drafts SET subject = ?, keywords = ? WHERE job_id = ?').run('Backend Engineer — Sam Rivera', JSON.stringify({ claimed: [], gaps: ['Go'] }), job.id);
+    expect(await api.getDraft(job.id)).toMatchObject({ ...draft, subject: 'Backend Engineer — Sam Rivera', keywords: { claimed: [], gaps: ['Go'] }, check: expect.any(Object) });
+  });
+
+  it('marks a draft stale once the fact bank changes, and redrafts it from the current profile', async () => {
+    const { api, job } = await draftedBackend();
+    expect((await api.getDraft(job.id))?.check).toMatchObject({ stale: false, unverified: [], forbidden: [] });
+    await api.saveFact({ group: 'Acme — Engineer', text: 'Led the billing migration' });
+    expect((await api.getDraft(job.id))?.check?.stale).toBe(true);
+    await api.redraft(job.id);
+    await vi.waitFor(async () => expect((await api.getJob(job.id)).status).toBe('drafted'));
+    expect((await api.getDraft(job.id))?.check?.stale).toBe(false);
+  });
+
+  it('flags cover-letter lines that state something no fact does', async () => {
+    const { api, job } = await draftedBackend();
+    await api.updateCoverLetter(job.id, 'Dear team,\nI am based in Marikina City.');
+    expect((await api.getDraft(job.id))?.check?.unverified).toEqual([{ line: 'I am based in Marikina City.', terms: ['Marikina', 'City'] }]);
+  });
+
   it('writes the résumé and letter PDFs and job.md into the month folder, with the name on them', async () => {
     const { job, deps } = await draftedBackend();
     expect(job.folderPath).toMatch(/Applio\/\d{4}-\d{2}\/Acme — Senior Backend Engineer \(90%\)$/);

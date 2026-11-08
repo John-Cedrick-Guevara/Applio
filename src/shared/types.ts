@@ -141,6 +141,20 @@ export interface Draft {
   subject?: string;
   /** The posting's keywords the operator can claim (each with its proof) and the gaps. */
   keywords?: { claimed: { keyword: string; factId: string }[]; gaps: string[] };
+  /** Fingerprint of the profile it was made from (`profileVersion`); absent on drafts made before it was kept. */
+  profileVersion?: string;
+  /** How the draft stands against the current profile, worked out by main on every read. */
+  check?: DraftCheck;
+}
+
+/** A draft's provenance: made from today's profile or not, and what in it no fact backs. */
+export interface DraftCheck {
+  /** Made from an older profile (or before Applio tracked it): facts, sections, contact or notes changed since. */
+  stale: boolean;
+  /** Cover-letter sentences that name something no fact, profile line or posting states. */
+  unverified: { line: string; terms: string[] }[];
+  /** Terms the operator's notes forbid that the draft uses anyway. */
+  forbidden: string[];
 }
 
 /** Questions Claude asked instead of drafting, waiting on the operator (SPEC F4). */

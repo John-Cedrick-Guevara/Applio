@@ -101,6 +101,26 @@ describe('ReviewPage', () => {
     await waitFor(async () => expect(await api.getSend('j1')).toMatchObject({ state: 'sent' }));
   });
 
+  it('marks a draft made from an older profile and redrafts it on request', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    await api.saveFact({ group: 'Northwind Labs — Senior Engineer', text: 'Led the billing rewrite' });
+    renderWithApp(<ReviewPage params={{ id: 'j1' }} />, api);
+    const detail = await screen.findByRole('region', { name: 'Draft detail' });
+    expect(await within(detail).findByText('Made from an older profile.')).toBeInTheDocument();
+    await userEvent.click(within(detail).getByRole('button', { name: /Redraft/ }));
+    await waitFor(async () => expect((await api.getDraft('j1'))?.check?.stale).toBe(false));
+  });
+
+  it('claims every line traced only when the check says so', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const plain = { ...api, getDraft: async (id: string) => ({ ...(await api.getDraft(id))!, check: { stale: false, unverified: [{ line: 'I am based in Marikina City.', terms: ['Marikina'] }], forbidden: [] } }) };
+    renderWithApp(<ReviewPage params={{ id: 'j1' }} />, plain);
+    const detail = await screen.findByRole('region', { name: 'Draft detail' });
+    expect(await within(detail).findByText('Résumé traced to facts · cover letter: 1 unverified line')).toBeInTheDocument();
+    expect(within(detail).queryByText(/Every claim traced/)).not.toBeInTheDocument();
+    expect(within(detail).getByText(/I am based in Marikina City/)).toBeInTheDocument();
+  });
+
   it('offers Set up Gmail instead of Approve while Gmail is not set up', async () => {
     open('j1');
     expect(await screen.findByRole('link', { name: 'Set up Gmail to send' })).toHaveAttribute('href', '#/settings');
@@ -199,7 +219,8 @@ describe('ReviewPage', () => {
     const detail = await screen.findByRole('region', { name: 'Job detail' });
     await userEvent.click(within(detail).getByRole('button', { name: 'Dismiss' }));
     await waitFor(async () => expect((await api.getJob('j5')).status).toBe('skipped'));
-    expect(screen.queryByText(/more scored below your draft threshold/)).not.toBeInTheDocument();
+    // The queue reloads after the dismiss; wait for it rather than racing it.
+    await waitFor(() => expect(screen.queryByText(/more scored below your draft threshold/)).not.toBeInTheDocument());
   });
 
   it('lists jobs still waiting to be scored or drafted, with the reason, so none go missing', async () => {

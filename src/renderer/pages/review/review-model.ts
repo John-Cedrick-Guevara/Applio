@@ -1,5 +1,5 @@
 import { capAutonomy, maxAutonomyFor } from '../../../shared/autonomy';
-import type { ApplyChannel, Autonomy, Job, RunSummary, SendRecord, Settings } from '../../../shared/types';
+import type { ApplyChannel, Autonomy, Draft, Job, RunSummary, SendRecord, Settings } from '../../../shared/types';
 import { formatClock } from '../../lib/format';
 import { AUTONOMY_LABEL } from '../../lib/labels';
 
@@ -102,4 +102,19 @@ export function gmailIssue(settings: Pick<Settings, 'gmailAddress' | 'secretsSet
   const check = settings.checks.gmail;
   if (check && !check.ok && !check.offline) return { message: `Gmail can't sign in with the saved app password, so approving can't send this email. ${check.message}`, action: 'Fix Gmail to send' };
   return undefined;
+}
+
+/**
+ * The trace line over the documents. It claims only what the draft check proved:
+ * "Every claim traced" needs a clean check of an unedited letter; anything else
+ * says what's unchecked or wrong, never a constant (QA 2026-11-07 #10).
+ */
+export function traceLine(draft: Pick<Draft, 'edited' | 'check'>, factsUsed: number): { text: string; ok: boolean } {
+  const check = draft.check;
+  if (check?.forbidden.length) return { text: `Uses ${check.forbidden.map((t) => `"${t}"`).join(', ')}, which your notes for Claude forbid`, ok: false };
+  if (draft.edited) return { text: 'Résumé traced to facts · letter edited by you, not checked', ok: false };
+  if (!check) return { text: 'Résumé traced to facts · cover letter not checked', ok: false };
+  const n = check.unverified.length;
+  if (n) return { text: `Résumé traced to facts · cover letter: ${n} unverified line${n === 1 ? '' : 's'}`, ok: false };
+  return { text: `Every claim traced to your fact bank · ${factsUsed} facts used`, ok: true };
 }

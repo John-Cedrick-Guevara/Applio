@@ -103,8 +103,21 @@ function DraftDetail({ job, draft, send, nextId, thresholds, owner, autonomyBySo
     if (nextId) navigate(`/review/${nextId}`);
   };
 
+  const redraft = async () => {
+    const next = await action.run('redraft', () => api.redraft(job.id), 'Redrafting from your current profile. It shows under Drafting now.');
+    if (next) onJob(next, send);
+  };
+
   return (
     <>
+      {waiting && draft?.check?.stale ? (
+        <div className="banner banner-warning draft-warning" role="status">
+          <span>
+            <strong>Made from an older profile.</strong> Your facts, contact details or notes for Claude changed since this was drafted, so it may say something no longer true.
+          </span>
+          <Button size="sm" busy={action.pending} onClick={redraft}>Redraft (≈ 25–40k tokens)</Button>
+        </div>
+      ) : null}
       {job.suspicious ? (
         <div className="banner banner-danger draft-warning" role="alert">
           <span>

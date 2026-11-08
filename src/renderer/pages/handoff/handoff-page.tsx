@@ -54,6 +54,13 @@ function Handoff({ job, draft, assisted, onJob }: { job: Job; draft: Draft | nul
             ? `Applio can fill the form in its own window, signed in as you. You check it and click Submit. Applio never submits on ${platform}.`
             : `Assisted fill is off for ${platform}, so you apply yourself. Everything is ready to copy. Applio never submits on ${platform}.`}
         </p>
+        {draft?.check?.stale ? (
+          <div className="banner banner-warning" role="status">
+            <span>
+              <strong>Made from an older profile.</strong> Your facts, contact details or notes changed since this was drafted. Redraft it in <a href={`#/review/${job.id}`}>Review</a> before you copy it.
+            </span>
+          </div>
+        ) : null}
         {job.platform === 'Upwork' ? (
           <p className="handoff-lede strong">
             {connects !== undefined ? `This proposal costs ${connects} Connects on Upwork.` : 'Upwork charges Connects for every proposal. Check the cost on the job page before you submit.'}
