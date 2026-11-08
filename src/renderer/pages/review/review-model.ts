@@ -1,6 +1,7 @@
 import { capAutonomy, maxAutonomyFor } from '../../../shared/autonomy';
-import type { ApplyChannel, Autonomy, Draft, Job, RunSummary, SendRecord, Settings } from '../../../shared/types';
+import type { ApplyChannel, Autonomy, Draft, Job, SendRecord, Settings } from '../../../shared/types';
 import { formatClock } from '../../lib/format';
+import { filesState } from '../../lib/job-progress';
 import { AUTONOMY_LABEL } from '../../lib/labels';
 
 /** True when approving sends straight away (email, standard ATS); otherwise the operator applies (SPEC F5). */
@@ -34,29 +35,6 @@ export function modeLabel(job: Job, sourceAutonomy: Autonomy): string {
  */
 export function effortLevel(score: number): 'High' | 'Medium' | 'Quick' {
   return score >= 75 ? 'High' : score >= 50 ? 'Medium' : 'Quick';
-}
-
-/** Why a job is still waiting: its last failure note, or what's left to do. */
-export function pendingReason(job: Pick<Job, 'status' | 'history'>): string {
-  return job.history.findLast((e) => e.note)?.note ?? (job.status === 'found' ? 'Not scored yet' : 'Not drafted yet');
-}
-
-/** The toast after Run now: what the run produced, or why it fetched nothing. */
-export function runResult(run: RunSummary): string {
-  if (run.found === 0 && run.atLimit) return "Nothing was fetched: every source has used today's polls. They poll again tomorrow.";
-  if (run.passedFilters === 0) return 'Run finished: nothing new passed your filters.';
-  const asked = run.asked ? ` ${run.asked} need${run.asked === 1 ? 's' : ''} your answers in Review.` : '';
-  return `Run finished: ${run.passedFilters} job${run.passedFilters === 1 ? '' : 's'} passed your filters, ${run.drafted} drafted.${asked}`;
-}
-
-/** One-line summary of the last discovery run for the Review header. */
-export function runLine(run: RunSummary | undefined): string {
-  if (!run) return 'No runs yet. Run discovery to fill the queue.';
-  const when = `Last run ${formatClock(run.at)}`;
-  if (run.found === 0 && run.atLimit) return `${when} · every source has used today's polls; they poll again tomorrow`;
-  // "New" is jobs no earlier run saw, dropped ones included, so the same filtered-out jobs aren't new every run.
-  const line = `${when} · ${run.found} found · ${run.newAfterDedup} new · ${run.passedFilters} passed filters · ${run.drafted} drafted`;
-  return run.atLimit ? `${line} · ${run.atLimit} source${run.atLimit === 1 ? '' : 's'} at today's limit` : line;
 }
 
 /**
@@ -118,17 +96,6 @@ export function traceLine(draft: Pick<Draft, 'edited' | 'check'>, factsUsed: num
   const n = check.unverified.length;
   if (n) return { text: `Résumé traced to facts · cover letter: ${n} unverified line${n === 1 ? '' : 's'}`, ok: false };
   return { text: `Every claim traced to your fact bank · ${factsUsed} facts used`, ok: true };
-}
-
-/**
- * Whether a draft's PDFs are on disk. Claude marks a job drafted mid-turn and the files
- * are printed after, so a fresh draft shows "saving" (Approve waits) rather than letting
- * a click fail; a failed save shows its reason.
- */
-export function filesState(job: Pick<Job, 'folderPath' | 'history'>): { kind: 'ready' } | { kind: 'saving' } | { kind: 'failed'; reason: string } {
-  if (job.folderPath) return { kind: 'ready' };
-  const failed = job.history.findLast((e) => e.note?.startsWith("Couldn't save the files"))?.note;
-  return failed ? { kind: 'failed', reason: failed } : { kind: 'saving' };
 }
 
 /** Which of the queue's filters a group sits under. */

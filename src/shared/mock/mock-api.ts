@@ -286,6 +286,8 @@ export function createMockApi({ latencyMs = 250, now = () => new Date(), sendFai
           description: preview.summary, score: preview.score, roleSummary: preview.summary, tags: preview.tags, strengths: [], gaps: [],
           applyTarget: preview.applyTarget, factsUsed: 8, tokensUsed: preview.tokensUsed,
           history: ['found', 'scored', 'drafted'].map((status) => ({ status: status as JobStatus, at: now().toISOString() })),
+          // The mock prints at once; main saves the PDFs a moment after the draft.
+          folderPath: `~/Applio/2026-11/${preview.company} - ${preview.title}`,
         };
         jobs.push(job);
         drafts.push({ ...seedDrafts([job], now())[0]!, profileVersion: versionNow() });

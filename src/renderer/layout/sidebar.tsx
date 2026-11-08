@@ -13,6 +13,7 @@ interface NavItem {
 /** Pages in the primary nav. Each page PR adds its entry here. */
 const NAV: NavItem[] = [
   { to: '/review', label: 'Review', icon: 'review' },
+  { to: '/find-jobs', label: 'Find jobs', icon: 'search' },
   { to: '/applications', label: 'Applications', icon: 'applications' },
   { to: '/profile', label: 'Profile', icon: 'profile' },
   { to: '/usage', label: 'Usage & limits', icon: 'usage' },

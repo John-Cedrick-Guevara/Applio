@@ -104,7 +104,7 @@ function ReviewLayout({ data, selectedId, onJobChange, onStatusChange, onRunComp
 
   return (
     <>
-      <ReviewHeader status={data.status} onStatusChange={onStatusChange} onRunComplete={onRunComplete} />
+      <ReviewHeader status={data.status} onStatusChange={onStatusChange} />
       <div className="split">
         <ReviewQueue
           jobs={data.queue}

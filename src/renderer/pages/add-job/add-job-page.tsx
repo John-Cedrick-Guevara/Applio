@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Job, JobPreview, JobStatus } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { Button, buttonClass } from '../../components/button';
+import { Callout, StepList, Stepper, type StepState } from '../../components/job-state';
 import { ScoreBlock } from '../../components/score-block';
 import { useAction } from '../../hooks/use-action';
 import { useAsync } from '../../hooks/use-async';
+import { useJobsVersion } from '../../hooks/use-jobs-version';
 import { formatTokens } from '../../lib/format';
+import { filesState, pendingReason } from '../../lib/job-progress';
 import { REVIEW_STATUSES } from '../../lib/job-lists';
 import { AUTONOMY_LABEL, STATUS_LABEL } from '../../lib/labels';
 import { EXAMPLES, inputError } from './add-job-model';
@@ -50,6 +53,14 @@ export default function AddJobPage() {
     setValues({ text: '', link: '' });
   };
 
+  // Paste → Check the match → Draft → Ready in Review; the draft's own state comes from DraftProgress.
+  const [draftDone, setDraftDone] = useState(false);
+  const stage = added ? (draftDone ? 4 : 2) : preview ? 1 : analyze.pending ? 1 : 0;
+  const steps = ['Paste', 'Check the match', 'Draft', 'Ready in Review'].map((label, i): { label: string; state: StepState } => ({
+    label,
+    state: i < stage ? 'done' : i > stage ? 'todo' : preview && !added ? 'blocked' : 'current',
+  }));
+
   return (
     <div className="add-job">
       <header className="page-header">
@@ -59,7 +70,9 @@ export default function AddJobPage() {
         </div>
       </header>
 
-      <section className="card">
+      <Stepper label="Steps" steps={steps} />
+
+      {preview ? null : <section className="card">
         <div className="spread">
           <div className="tabs" role="tablist" aria-label="Input type">
             {(['text', 'link'] as const).map((m) => (
@@ -92,9 +105,9 @@ export default function AddJobPage() {
           ) : (
             <span className="cell-sub">Reading and scoring uses about 8k tokens.</span>
           )}
-          <Button variant="strong" busy={analyze.pending} disabled={!!budgetStop} onClick={run}>{analyze.pending ? 'Analyzing…' : 'Analyze job'}</Button>
+          <Button variant="strong" busy={analyze.pending} disabled={!!budgetStop} onClick={run}>{analyze.pending ? 'Checking the match…' : 'Check the match'}</Button>
         </div>
-      </section>
+      </section>}
 
       {analyze.pending ? (
         <section className="card" role="status" aria-busy="true">
@@ -110,7 +123,15 @@ export default function AddJobPage() {
       ) : null}
 
       {preview ? (
-        <PreviewCard preview={preview} draftThreshold={settings?.draftThreshold ?? 75} added={added} onAdded={setAdded} onDiscard={reset} />
+        <PreviewCard
+          preview={preview}
+          draftThreshold={settings?.draftThreshold ?? 75}
+          added={added}
+          onAdded={(job) => { setDraftDone(false); setAdded(job); }}
+          onEdit={() => setPreview(null)}
+          onDiscard={reset}
+          onDraftDone={setDraftDone}
+        />
       ) : null}
     </div>
   );
@@ -121,7 +142,11 @@ interface PreviewProps {
   draftThreshold: number;
   added: Job | null;
   onAdded: (job: Job) => void;
+  /** Back to the post, keeping what was pasted. */
+  onEdit: () => void;
+  /** Clears everything for the next job. */
   onDiscard: () => void;
+  onDraftDone: (done: boolean) => void;
 }
 
 /** Where the job Applio already has lives: Review until it's out, Applications after. */
@@ -129,7 +154,7 @@ const existingHref = ({ jobId, status }: { jobId: string; status: JobStatus }) =
   (REVIEW_STATUSES as readonly JobStatus[]).includes(status) ? `#/review/${jobId}` : '#/applications';
 
 /** What was parsed and how Applio will apply; nothing is saved until "Add to review queue". */
-function PreviewCard({ preview, draftThreshold, added, onAdded, onDiscard }: PreviewProps) {
+function PreviewCard({ preview, draftThreshold, added, onAdded, onEdit, onDiscard, onDraftDone }: PreviewProps) {
   const api = useApi();
   const action = useAction();
   const above = preview.score >= draftThreshold;
@@ -145,7 +170,7 @@ function PreviewCard({ preview, draftThreshold, added, onAdded, onDiscard }: Pre
         <div className="preview-text">
           <div className="cell-sub">{preview.company} · {preview.sourceName}</div>
           <h2 className="preview-title">{preview.title}</h2>
-          <div className="tag-row">{preview.tags.map((t) => <span key={t} className="tag">{t}</span>)}</div>
+          {preview.tags.length ? <p className="preview-facts">{preview.tags.join(' · ')}</p> : null}
         </div>
         <ScoreBlock score={preview.score} note={above ? `Above draft threshold (${draftThreshold})` : `Below draft threshold (${draftThreshold})`} />
       </div>
@@ -160,13 +185,7 @@ function PreviewCard({ preview, draftThreshold, added, onAdded, onDiscard }: Pre
         <div><dt>Tokens used</dt><dd className="mono">{formatTokens(preview.tokensUsed)}</dd></div>
       </dl>
       {added ? (
-        <div className="banner banner-success preview-done" role="status">
-          <span>Added. Claude is drafting the résumé and cover letter in the background (one to two minutes). Follow it in Review under Drafting now.</span>
-          <span className="row">
-            <Button size="sm" onClick={onDiscard}>Add another</Button>
-            <a href={`#/review/${added.id}`}>Go to Review</a>
-          </span>
-        </div>
+        <DraftProgress job={added} onDone={onDraftDone} onAnother={onDiscard} />
       ) : preview.duplicate ? (
         <div className="banner banner-warning preview-done" role="status">
           <span>You already have this job in Applio ({STATUS_LABEL[preview.duplicate.status]}). Adding it again would make a second application.</span>
@@ -177,10 +196,66 @@ function PreviewCard({ preview, draftThreshold, added, onAdded, onDiscard }: Pre
         </div>
       ) : (
         <div className="preview-actions">
-          <Button onClick={onDiscard}>Discard</Button>
-          <Button variant="primary" busy={action.pending} onClick={add}>Add to review queue</Button>
+          <Button onClick={onEdit}>Edit the post</Button>
+          <Button variant="primary" busy={action.pending} onClick={add}>Add and draft</Button>
         </div>
       )}
+    </section>
+  );
+}
+
+/** "0:42" from milliseconds. */
+const clock = (ms: number) => `${Math.floor(ms / 60_000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
+
+/**
+ * The added job's draft, followed live on this page: main's status pushes say
+ * while Claude drafts (and since when), and the job record says when the PDFs land
+ * or why they didn't. Never inferred: each state reads a record.
+ */
+function DraftProgress({ job, onDone, onAnother }: { job: Job; onDone: (done: boolean) => void; onAnother: () => void }) {
+  const api = useApi();
+  const version = useJobsVersion();
+  const { data: current } = useAsync(() => api.getJob(job.id), [api, job.id, version]);
+  const [drafting, setDrafting] = useState<{ ids: string[]; since: Record<string, string> }>({ ids: [], since: {} });
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => window.applioEvents?.onStatus((s) => setDrafting({ ids: s.drafting ?? [], since: s.draftingSince ?? {} })), []);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const shown = current ?? job;
+  const busy = drafting.ids.includes(job.id);
+  const files = shown.status === 'drafted' ? filesState(shown) : undefined;
+  const ready = !busy && files?.kind === 'ready';
+  useEffect(() => onDone(ready), [ready, onDone]);
+  const since = drafting.since[job.id];
+
+  return (
+    <section className="preview-progress" aria-label="Draft progress">
+      {busy ? (
+        <>
+          <div className="spread">
+            <strong>Drafting</strong>
+            <span className="mono cell-sub">{since ? `${clock(Math.max(0, now - Date.parse(since)))} elapsed · ` : ''}usually 1–2 minutes</span>
+          </div>
+          <StepList label="Drafting steps" steps={[{ label: 'Claude is writing the résumé and letter from your fact bank', state: 'active', note: 'In progress' }, { label: 'Save the PDFs', state: 'pending' }]} />
+        </>
+      ) : ready ? (
+        <Callout tone="done" title="Ready to review.">The résumé and letter are saved and wait for your approval.</Callout>
+      ) : files?.kind === 'failed' ? (
+        <Callout tone="failed" title="PDFs didn't save.">Retry from Review; it costs no tokens.</Callout>
+      ) : files?.kind === 'saving' ? (
+        <Callout tone="busy" title="Saving the résumé and letter PDFs." />
+      ) : shown.status === 'scored' ? (
+        <Callout tone="needs" title="Not drafted yet.">{pendingReason(shown)}</Callout>
+      ) : (
+        <Callout tone="busy" title="Added." >Claude starts drafting in a moment.</Callout>
+      )}
+      <div className="row preview-progress-actions">
+        <Button onClick={onAnother}>Add another job</Button>
+        <a className={buttonClass(ready ? 'primary' : 'secondary')} href={`#/review/${job.id}`}>{ready ? 'Review and approve' : 'Open in Review'}</a>
+      </div>
     </section>
   );
 }
