@@ -1,13 +1,14 @@
-import type { ButtonHTMLAttributes } from 'react';
+import type { ButtonHTMLAttributes, Ref } from 'react';
 
-export type ButtonVariant = 'primary' | 'strong' | 'secondary' | 'ghost' | 'danger' | 'link' | 'icon';
+export type ButtonVariant = 'primary' | 'strong' | 'secondary' | 'ghost' | 'danger' | 'destructive' | 'link' | 'icon';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  /** primary = blue (send/approve), strong = ink (save/run), secondary = outlined. */
+  /** primary/strong = blue (one accent per view), secondary = outlined, destructive = filled red (confirm dialogs only). */
   variant?: ButtonVariant;
   size?: 'sm' | 'md';
   /** Disables the button and marks it busy while an action runs. */
   busy?: boolean;
+  ref?: Ref<HTMLButtonElement>;
 }
 
 /** The one button style used across the app. Defaults to `type="button"` so it never submits forms by accident. */

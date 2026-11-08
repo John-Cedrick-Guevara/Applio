@@ -254,7 +254,7 @@
 
 .doc-letter {
   color: #20242b;
-  font-size: 13.5px;
+  font-size: var(--text-base);
   line-height: 1.65;
 }
 
@@ -272,7 +272,7 @@
 .doc-editor {
   min-height: 320px;
   border-color: var(--border-focus);
-  font-size: 13.5px;
+  font-size: var(--text-base);
   line-height: 1.6;
 }
 

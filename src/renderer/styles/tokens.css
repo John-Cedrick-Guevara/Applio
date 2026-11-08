@@ -1,6 +1,7 @@
 /*
- * Design tokens from the Applio UI prototype. Every color, size and duration
- * in the UI comes from here. Light theme only, matching the prototype.
+ * Design tokens from the Applio UI prototype (v3). Every color, size and duration
+ * in the UI comes from here. Light theme only. Type sits on a 12/14/16/20/24 scale,
+ * controls are at least 44px tall, and light shadows stay under 8% opacity.
  */
 :root {
   color-scheme: light;
@@ -51,6 +52,7 @@
   --warning-text: #8a4b0c;
   --warning-soft: #fdf1e4;
   --warning-border: #e8c9a5;
+  --danger: #b42318;
   --danger-text: #a33a1e;
   --danger-soft: #fbece7;
   --neutral-soft: #eef1f5;
@@ -76,22 +78,22 @@
   /* Type */
   --font: 'IBM Plex Sans', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
-  --text-2xs: 11.5px;
+  --text-2xs: 12px;
   --text-xs: 12px;
-  --text-sm: 12.5px;
-  --text-md: 13px;
+  --text-sm: 12px;
+  --text-md: 14px;
   --text-base: 14px;
-  --text-lg: 15px;
-  --text-xl: 17px;
+  --text-lg: 16px;
+  --text-xl: 16px;
   --text-2xl: 20px;
-  --text-3xl: 22px;
+  --text-3xl: 24px;
 
-  --shadow-sm: 0 1px 2px rgb(20 23 28 / 0.08);
-  --shadow-toast: 0 6px 20px rgb(20 23 28 / 0.18);
+  --shadow-sm: 0 1px 2px rgb(20 23 28 / 0.06);
+  --shadow-toast: 0 6px 20px rgb(20 23 28 / 0.07);
   --focus-ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent);
 
-  --control-h: 40px;
-  --control-h-sm: 36px;
+  --control-h: 44px;
+  --control-h-sm: 44px;
   --sidebar-width: 216px;
   --duration: 150ms;
 }
