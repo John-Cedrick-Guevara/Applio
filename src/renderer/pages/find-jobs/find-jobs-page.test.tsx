@@ -14,7 +14,7 @@ describe('FindJobsPage', () => {
     await screen.findByRole('list', { name: 'Sources this scan checks' });
     expect(run).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: 'Start scan' }));
-    const enabled = (await api.listSources()).filter((src) => src.enabled).map((src) => src.id);
+    const enabled = (await api.listSources()).filter((src) => src.enabled && src.kind !== 'clip').map((src) => src.id);
     expect(run).toHaveBeenCalledWith({ sourceIds: enabled, draft: false });
     const results = await screen.findByRole('region', { name: 'Scan results' });
     expect(within(results).getByRole('list', { name: 'What the scan kept' })).toHaveTextContent(/14\s*posts fetched.*11\s*new.*2\s*passed your filters.*0\s*drafted/);
@@ -33,7 +33,7 @@ describe('FindJobsPage', () => {
     await userEvent.click(screen.getByRole('checkbox', { name: /Also draft strong matches right away/ }));
     expect(screen.getByText('About 25–40k tokens per strong match')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Start scan' }));
-    const ids = (await api.listSources()).filter((src) => src.enabled).map((src) => src.id);
+    const ids = (await api.listSources()).filter((src) => src.enabled && src.kind !== 'clip').map((src) => src.id);
     expect(run).toHaveBeenCalledWith({ sourceIds: ids.slice(1), draft: true });
     expect(rest.length).toBe(ids.length - 1);
   });
@@ -73,6 +73,8 @@ describe('FindJobsPage', () => {
     renderWithApp(<FindJobsPage />);
     const list = await screen.findByRole('list', { name: 'Sources this scan checks' });
     expect(within(list).getAllByRole('listitem').length).toBeGreaterThan(0);
+    // Clipped jobs come from the operator pasting them, never from a scan.
+    expect(within(list).queryByText('Clipped jobs')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Change sources in Settings' })).toHaveAttribute('href', '#/settings');
   });
 

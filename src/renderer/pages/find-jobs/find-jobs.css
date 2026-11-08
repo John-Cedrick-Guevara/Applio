@@ -19,3 +19,4 @@
 .find-jobs-sources li { padding: 0; }
 .find-jobs-draft { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-4); border-radius: var(--radius); background: var(--surface-subtle); }
 .find-jobs-draft input, .find-jobs-source input { width: 18px; height: 18px; accent-color: var(--accent); }
+.find-jobs-hint { display: block; margin-top: var(--space-1); }

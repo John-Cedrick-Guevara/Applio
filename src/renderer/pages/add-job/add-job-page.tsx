@@ -170,7 +170,7 @@ function PreviewCard({ preview, draftThreshold, added, onAdded, onEdit, onDiscar
         <div className="preview-text">
           <div className="cell-sub">{preview.company} · {preview.sourceName}</div>
           <h2 className="preview-title">{preview.title}</h2>
-          {preview.tags.length ? <p className="preview-facts">{preview.tags.join(' · ')}</p> : null}
+          {preview.tags.length ? <p className="preview-tags-line">{preview.tags.join(' · ')}</p> : null}
         </div>
         <ScoreBlock score={preview.score} note={above ? `Above draft threshold (${draftThreshold})` : `Below draft threshold (${draftThreshold})`} />
       </div>
