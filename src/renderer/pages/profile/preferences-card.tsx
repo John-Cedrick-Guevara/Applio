@@ -71,6 +71,11 @@ function PreferencesForm({ preferences, location, onDone }: { preferences: Prefe
     setDraft((d) => ({ ...d, [key]: value }));
     setError(null);
   };
+  /** A pay edit: from now on the form's pay replaces the saved minimum. */
+  const setPay = <K extends 'payAmount' | 'payCurrency' | 'payPeriod'>(key: K, value: PreferencesDraft[K]) => {
+    setDraft((d) => ({ ...d, [key]: value, payTouched: true }));
+    setError(null);
+  };
   const toggleType = (type: EmploymentType, on: boolean) =>
     set('types', on ? WORK_TYPES.filter((t) => t === type || draft.types.includes(t)) : draft.types.filter((t) => t !== type));
 
@@ -117,12 +122,12 @@ function PreferencesForm({ preferences, location, onDone }: { preferences: Prefe
         </div>
         <fieldset className="field span-2 prefs-fieldset">
           <legend>Minimum pay</legend>
-          <div className="row nowrap-row">
-            <input id="p-pay" className="input mono" inputMode="numeric" aria-label="Minimum pay amount" placeholder="None" value={draft.payAmount} onChange={(e) => set('payAmount', e.target.value)} />
-            <select className="select" aria-label="Currency" value={draft.payCurrency} onChange={(e) => set('payCurrency', e.target.value)}>
+          <div className="pay-row">
+            <input id="p-pay" className="input mono" inputMode="numeric" aria-label="Minimum pay amount" placeholder="None" value={draft.payAmount} onChange={(e) => setPay('payAmount', e.target.value)} />
+            <select className="select" aria-label="Currency" value={draft.payCurrency} onChange={(e) => setPay('payCurrency', e.target.value)}>
               {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
-            <select className="select" aria-label="Per" value={draft.payPeriod} onChange={(e) => set('payPeriod', e.target.value as PayPeriod)}>
+            <select className="select" aria-label="Per" value={draft.payPeriod} onChange={(e) => setPay('payPeriod', e.target.value as PayPeriod)}>
               {PAY_PERIODS.map((p) => <option key={p} value={p}>per {p}</option>)}
             </select>
           </div>

@@ -137,7 +137,6 @@ function WhatWasSent({ job }: { job: Job }) {
               {f}
             </button>
           ))}
-          <button type="button" className="file-chip mono" title="Open the job folder" onClick={() => files.run('open the folder', () => api.openJobFolder(job.id))}>sent.md</button>
         </div>
       </div>
     </div>

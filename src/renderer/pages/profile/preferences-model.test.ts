@@ -24,16 +24,16 @@ describe('preferences draft', () => {
   });
 
   it('writes minimum pay with its currency and period, so it is never read as yearly dollars by accident', () => {
-    const result = fromDraft({ ...toDraft(prefs), payAmount: '30000', payCurrency: 'PHP', payPeriod: 'month' }, prefs);
+    const result = fromDraft({ ...toDraft(prefs), payAmount: '30000', payCurrency: 'PHP', payPeriod: 'month', payTouched: true }, prefs);
     expect(result).toMatchObject({ ok: true, value: { minimumPay: '30,000 PHP / month' } });
   });
 
   it('saves no minimum when the amount is empty', () => {
-    expect(fromDraft({ ...toDraft(prefs), payAmount: ' ' }, prefs)).toMatchObject({ ok: true, value: { minimumPay: '' } });
+    expect(fromDraft({ ...toDraft(prefs), payAmount: ' ', payTouched: true }, prefs)).toMatchObject({ ok: true, value: { minimumPay: '' } });
   });
 
   it('refuses an amount that is not a number', () => {
-    expect(fromDraft({ ...toDraft(prefs), payAmount: 'thirty' }, prefs)).toEqual({ ok: false, error: 'Enter the minimum pay as a number, e.g. 30000.' });
+    expect(fromDraft({ ...toDraft(prefs), payAmount: 'thirty', payTouched: true }, prefs)).toEqual({ ok: false, error: 'Enter the minimum pay as a number, e.g. 30000.' });
   });
 
   it('requires at least one target role', () => {
@@ -42,6 +42,16 @@ describe('preferences draft', () => {
 });
 
 describe('minimum pay', () => {
+  it('keeps a saved minimum exactly as it was when the pay fields are not touched', () => {
+    const withAlternatives = { ...prefs, minimumPay: '$120k / year or $45 / hour' };
+    const draft = { ...toDraft(withAlternatives), roles: 'Backend Engineer' };
+    expect(fromDraft(draft, withAlternatives)).toMatchObject({ ok: true, value: { minimumPay: '$120k / year or $45 / hour' } });
+  });
+
+  it('reads only the first of several alternatives, with its own period', () => {
+    expect(readPay('$120k / year or $45 / hour')).toEqual({ amount: '120000', currency: 'USD', period: 'year' });
+  });
+
   it('reads a saved minimum back into amount, currency and period', () => {
     expect(readPay('30,000 PHP / month')).toEqual({ amount: '30000', currency: 'PHP', period: 'month' });
     expect(readPay('$45 / hour')).toEqual({ amount: '45', currency: 'USD', period: 'hour' });

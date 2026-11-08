@@ -16,6 +16,8 @@ export interface PreferencesDraft {
   payAmount: string;
   payCurrency: string;
   payPeriod: PayPeriod;
+  /** True once the operator changed a pay field; until then the saved minimum is kept exactly as it was. */
+  payTouched?: boolean;
 }
 
 /** Splits comma-separated input into trimmed, non-empty items. */
@@ -26,7 +28,9 @@ export function parseList(input: string): string[] {
 const CURRENCY_SIGN: Record<string, string> = { $: 'USD', '€': 'EUR', '£': 'GBP', '₱': 'PHP', '₹': 'INR' };
 
 /** A saved minimum ("30,000 PHP / month", "$45 / hour") as its parts; parts it doesn't name are empty. */
-export function readPay(text: string): { amount: string; currency: string; period: PayPeriod | '' } {
+export function readPay(minimumPay: string): { amount: string; currency: string; period: PayPeriod | '' } {
+  // "$120k / year or $45 / hour": the editor holds one minimum, so it reads the first, with its own period.
+  const text = minimumPay.split(/\bor\b/i)[0] ?? '';
   const amount = /(\d[\d,]*(?:\.\d+)?)\s*(k)?/i.exec(text);
   const value = amount ? Number(amount[1]!.replace(/,/g, '')) * (amount[2] ? 1000 : 1) : undefined;
   const code = /\b(USD|EUR|GBP|PHP|AUD|CAD|SGD|INR|JPY|NZD|CHF)\b/i.exec(text)?.[1]?.toUpperCase();
@@ -77,7 +81,7 @@ export function fromDraft(d: PreferencesDraft, base: Preferences): { ok: true; v
   if (targetRoles.length === 0) return { ok: false, error: 'Add at least one role, e.g. "Backend Engineer".' };
   const raw = d.payAmount.replace(/[,\s]/g, '');
   if (raw && !/^\d+(\.\d+)?$/.test(raw)) return { ok: false, error: 'Enter the minimum pay as a number, e.g. 30000.' };
-  const minimumPay = raw ? `${Number(raw).toLocaleString('en-US')} ${d.payCurrency} / ${d.payPeriod}` : '';
+  const minimumPay = !d.payTouched ? base.minimumPay : raw ? `${Number(raw).toLocaleString('en-US')} ${d.payCurrency} / ${d.payPeriod}` : '';
   return {
     ok: true,
     value: { ...base, targetRoles, seniority: d.seniority.trim(), employmentTypes: d.types, remoteOnly: d.remoteOnly, hoursOverlap: d.hours.trim(), minimumPay },
