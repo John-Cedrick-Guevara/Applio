@@ -99,6 +99,14 @@ describe('JSON boards', () => {
     expect(dropped).toBe(0);
   });
 
+  it("drop Remote OK tags that the post never mentions, which are SEO filler (QA 2026-11-07 #15)", async () => {
+    const body = fixture('remoteok') as Record<string, unknown>[];
+    const job = body.find((j) => j && typeof j === 'object' && !('legal' in j))!;
+    Object.assign(job, { description: '<p>We use TypeScript and Postgres.</p>', tags: ['typescript', 'salesforce', 'hr', 'postgres'] });
+    const { jobs } = await board('remoteok').fetchJobs(replay(body).http);
+    expect(jobs.find((j) => j.externalId === String(job.id))?.tags).toEqual(['typescript', 'postgres']);
+  });
+
   it("repair Remote OK's double-encoded UTF-8, which its API sends for accented text", async () => {
     const { jobs } = await board('remoteok').fetchJobs(replay(fixture('remoteok')).http);
     const vogel = jobs.find((j) => j.company === 'Vogel')!;

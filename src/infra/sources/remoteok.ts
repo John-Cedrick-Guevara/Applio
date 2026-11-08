@@ -31,7 +31,11 @@ export const remoteOk: JobSource = {
     // The first element is the API's legal notice, not a job.
     const items = body.filter((item) => !(item && typeof item === 'object' && 'legal' in item));
     const text = (s: string) => decodeEntities(repairMojibake(s)).trim();
-    return parseItems(Item, items, (j) => ({
+    return parseItems(Item, items, (j) => {
+      const description = htmlToText(repairMojibake(j.description));
+      // Remote OK pads tags with SEO terms ("salesforce, hr, recruiter" on a full-stack role); keep only ones the post mentions.
+      const mentioned = (tag: string) => new RegExp(`\\b${tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(description);
+      return {
       sourceId: 'remoteok',
       sourceName: 'Remote OK',
       externalId: j.id,
@@ -39,12 +43,13 @@ export const remoteOk: JobSource = {
       title: text(j.position),
       boardUrl: j.url,
       applyUrl: j.apply_url,
-      description: htmlToText(repairMojibake(j.description)),
+      description,
       location: text(j.location) || 'Worldwide',
       postedAt: isoFrom(j.date),
-      tags: j.tags.map(text),
+      tags: j.tags.map(text).filter(mentioned),
       remote: true,
       salary: j.salary_min && j.salary_max ? `$${j.salary_min.toLocaleString('en-US')}–$${j.salary_max.toLocaleString('en-US')}` : undefined,
-    }));
+      };
+    });
   },
 };
