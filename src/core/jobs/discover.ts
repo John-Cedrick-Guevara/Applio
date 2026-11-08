@@ -33,9 +33,15 @@ export interface DiscoverPorts {
   poll: () => Promise<RunSourcesResult>;
   /** Dedup keys of every job already stored, sent ones included. */
   existingKeys: () => ReadonlySet<string>;
-  filters: () => { preferences: Preferences; blocklist: readonly string[] };
-  /** Stores the new jobs and the run together, so a crash can't leave one without the other. @returns The run's id. */
-  save: (jobs: { job: Job; dedupKey: string }[], details: RunDetails, summary: RunSummary) => number;
+  /** Keys of every job an earlier run saw, dropped ones included. */
+  seenKeys: () => ReadonlySet<string>;
+  /** `homeLocation`: the operator's profile location line, for the location rule. */
+  filters: () => { preferences: Preferences; blocklist: readonly string[]; homeLocation: string };
+  /**
+   * Stores the new jobs, the run and the keys it saw together, so a crash can't leave one without the others.
+   * @returns The run's id.
+   */
+  save: (jobs: { job: Job; dedupKey: string }[], details: RunDetails, summary: RunSummary, seen: readonly string[]) => number;
   /** Scores the new jobs, charging their tokens to the run. */
   score: (jobIds: readonly string[], runId: number) => Promise<ScoreResult>;
   /** Drafts the strong matches, charging their tokens to the run. */
@@ -87,14 +93,16 @@ export async function discover(ports: DiscoverPorts): Promise<RunSummary> {
   const filters = ports.filters();
   if (!filters.preferences.targetRoles.some((r) => r.trim())) throw new NoTargetRolesError();
   const polled = await ports.poll();
-  const { passed, report } = triage(polled.jobs, { existingKeys: ports.existingKeys(), ...filters });
+  const { passed, fresh, report } = triage(polled.jobs, { existingKeys: ports.existingKeys(), ...filters });
   const at = ports.now().toISOString();
-  const summary: RunSummary = { at, found: report.found, newAfterDedup: report.found - report.duplicates, passedFilters: report.passed, drafted: 0 };
+  // New means no run saw it before; jobs the filters dropped last time aren't new again.
+  const seen = ports.seenKeys();
+  const summary: RunSummary = { at, found: report.found, newAfterDedup: fresh.filter((k) => !seen.has(k)).length, passedFilters: report.passed, drafted: 0 };
   const jobs = passed.map((j) => ({ job: toJob(j, ports.newId(), at), dedupKey: j.dedupKey }));
   const details: RunDetails = { duplicates: report.duplicates, dropped: report.dropped, sources: polled.sources };
   // Read before saving, so this run's new jobs aren't counted as left over too.
   const leftover = ports.leftover();
-  const runId = ports.save(jobs, details, summary);
+  const runId = ports.save(jobs, details, summary, fresh);
   try {
     // ponytail: a job that always fails scoring is retried every run; the budget guard caps the cost.
     const scoring = await ports.score([...jobs.map((j) => j.job.id), ...leftover.unscored], runId);

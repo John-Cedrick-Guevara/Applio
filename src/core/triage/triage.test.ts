@@ -59,6 +59,72 @@ describe('triage prefilter', () => {
   });
 });
 
+describe('seniority rule', () => {
+  it('drops senior-and-up titles for an entry-level operator, keeping junior ones', () => {
+    const { passed, report } = run(
+      [discovered({ title: 'Senior Backend Engineer' }), discovered({ company: 'B', title: 'Junior Backend Engineer' }), discovered({ company: 'C', title: 'Staff Platform Engineer' })],
+      { preferences: { seniority: 'Entry level' } },
+    );
+    expect(passed.map((j) => j.title)).toEqual(['Junior Backend Engineer']);
+    expect(report.dropped.seniority).toBe(2);
+  });
+
+  it('keeps a title that names both levels, like "Senior/Junior"', () => {
+    expect(run([discovered({ title: 'Backend Engineer (junior to senior)' })], { preferences: { seniority: 'Entry level' } }).passed).toHaveLength(1);
+  });
+
+  it('drops only staff-and-up for a mid-level operator', () => {
+    const { passed } = run([discovered({ title: 'Senior Backend Engineer' }), discovered({ company: 'B', title: 'Principal Backend Engineer' })], { preferences: { seniority: 'Mid level' } });
+    expect(passed.map((j) => j.title)).toEqual(['Senior Backend Engineer']);
+  });
+
+  it('drops nothing for seniority when none is set', () => {
+    expect(run([discovered({ title: 'Principal Backend Engineer' })]).passed).toHaveLength(1);
+  });
+});
+
+describe('location rule', () => {
+  const ph = (jobs: ReturnType<typeof discovered>[]) => triage(jobs, { existingKeys: new Set(), preferences: prefs, blocklist: [], homeLocation: 'Marikina, Philippines' });
+
+  it('drops a job limited to regions that leave the operator out', () => {
+    const { passed, report } = ph([discovered({ location: 'Remote (US only)' }), discovered({ company: 'B', location: 'Czechia, Hungary, Slovakia' }), discovered({ company: 'C', location: 'REMOTE (EEA)' })]);
+    expect(passed).toEqual([]);
+    expect(report.dropped.location).toBe(3);
+  });
+
+  it.each(['Worldwide', 'Anywhere in the World', 'Not specified', 'Remote', 'Philippines', 'Remote (APAC-friendly)', 'Berlin', 'REMOTE (Europe, Africa, W Asia)'])('keeps a job located %j: worldwide, the operator\'s own region, or unreadable', (location) => {
+    expect(ph([discovered({ location })]).passed).toHaveLength(1);
+  });
+
+  it('reads a region named in the title, which boards often use instead of the location', () => {
+    expect(ph([discovered({ title: 'Senior Backend Engineer - EU', location: 'Anywhere in the World' })]).report.dropped.location).toBe(1);
+  });
+
+  it("skips the rule when the operator's own country can't be read", () => {
+    expect(triage([discovered({ location: 'USA' })], { existingKeys: new Set(), preferences: prefs, blocklist: [], homeLocation: 'Open to remote' }).passed).toHaveLength(1);
+  });
+});
+
+describe('role match', () => {
+  it.each([
+    ['SEO and Web Dev Specialist', 'Web Developer'],
+    ['QA Engineer – Backend & Frontend', 'Back-end Engineer'],
+    ['Software Engineer Interviewer', 'Software Engineer'],
+  ])('does not match %j to the target %j', (title, role) => {
+    expect(run([discovered({ title })], { preferences: { targetRoles: [role] } }).report.dropped.role).toBe(1);
+  });
+
+  it.each([
+    ['AI/Automation Engineer', 'AI Engineer'],
+    ['Backend Engineer, Payments', 'Backend Engineer'],
+    ['Software Development Engineer II - CRM', 'Software Engineer'],
+    ['Mechatronics Engineer, AI Engineer', 'AI Engineer'],
+    ['Software Engineer Infrastructure', 'Software Engineer'],
+  ])('matches %j to the target %j', (title, role) => {
+    expect(run([discovered({ title })], { preferences: { targetRoles: [role] } }).passed).toHaveLength(1);
+  });
+});
+
 describe('triage report', () => {
   it('counts what was found, merged, dropped per reason and passed', () => {
     const { report, passed } = run(
@@ -75,7 +141,7 @@ describe('triage report', () => {
     expect(passed.map((j) => j.company)).toEqual(['Keep']);
     expect(report).toEqual({
       found: 6, duplicates: 2, passed: 1,
-      dropped: { blocklist: 1, type: 0, remote: 1, role: 1, pay: 0, hours: 0 },
+      dropped: { blocklist: 1, type: 0, remote: 1, role: 1, seniority: 0, location: 0, pay: 0, hours: 0 },
     });
   });
 

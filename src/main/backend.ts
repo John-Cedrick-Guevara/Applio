@@ -110,6 +110,9 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
   /** The operator's answers for one job's next draft, kept so a later re-draft still has them. */
   const answersKey = (jobId: string) => `answers:${jobId}`;
   const jobs = createJobsRepo(db);
+  // Dedup rules can change between versions ("Labs" stopped counting in QA 2026-11-07); stored keys follow them.
+  const rekeyed = jobs.rekey(dedupKey);
+  if (rekeyed.collided) console.warn(`[dedup] ${rekeyed.collided} stored job(s) match another under the current rules; their old keys were kept.`);
   const drafts = createDraftsRepo(db);
   const sends = createSendsRepo(db);
   const activity = createActivityRepo(db);
@@ -272,9 +275,14 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     discover({
       poll: () => runSources({ sources, isEnabled: (id) => sourcesRepo.get(id)?.enabled ?? false, polls, httpFor, today: () => localDay(new Date()) }),
       existingKeys: () => jobs.dedupKeys(),
-      filters: () => ({ preferences: profile.getProfile().preferences, blocklist: settings.getSettings().blocklist }),
-      save: (found, details, summary) =>
+      seenKeys: () => jobs.seenKeys(),
+      filters: () => {
+        const p = profile.getProfile();
+        return { preferences: p.preferences, blocklist: settings.getSettings().blocklist, homeLocation: p.contact.location };
+      },
+      save: (found, details, summary, seen) =>
         transaction(db, () => {
+          jobs.markSeen(seen, summary.at);
           for (const { job, dedupKey } of found) jobs.insert(job, { dedupKey, createdAt: summary.at });
           return activity.addRun(summary, details);
         }),
@@ -633,7 +641,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
         factIds: () => new Set(profile.getProfile().facts.map((f) => f.id)),
         existing: (company, title) => {
           const found = jobs.findByDedupKey(dedupKey({ company, title }));
-          return found ? { title: found.title, status: found.status } : undefined;
+          return found ? { id: found.id, title: found.title, status: found.status } : undefined;
         },
       });
       const previewId = randomUUID();

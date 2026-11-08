@@ -54,8 +54,8 @@ export function runLine(run: RunSummary | undefined): string {
   if (!run) return 'No runs yet. Run discovery to fill the queue.';
   const when = `Last run ${formatClock(run.at)}`;
   if (run.found === 0 && run.atLimit) return `${when} · every source has used today's polls; they poll again tomorrow`;
-  // Jobs dropped by filters aren't stored, so "not yet in Applio" counts them again each run.
-  const line = `${when} · ${run.found} found · ${run.newAfterDedup} not yet in Applio · ${run.passedFilters} passed filters · ${run.drafted} drafted`;
+  // "New" is jobs no earlier run saw, dropped ones included, so the same filtered-out jobs aren't new every run.
+  const line = `${when} · ${run.found} found · ${run.newAfterDedup} new · ${run.passedFilters} passed filters · ${run.drafted} drafted`;
   return run.atLimit ? `${line} · ${run.atLimit} source${run.atLimit === 1 ? '' : 's'} at today's limit` : line;
 }
 

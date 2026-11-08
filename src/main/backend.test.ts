@@ -293,8 +293,8 @@ describe('createBackend discovery', () => {
   it('does not save the same job again on the next run', async () => {
     const { api } = await searchingBackend();
     await api.runDiscovery();
-    // The dropped job isn't stored, so it's new again and dropped again, for free.
-    expect(await api.runDiscovery()).toMatchObject({ found: 2, newAfterDedup: 1, passedFilters: 0 });
+    // The dropped job isn't stored, but its key is remembered, so it isn't counted as new again (QA 2026-11-07 #14).
+    expect(await api.runDiscovery()).toMatchObject({ found: 2, newAfterDedup: 0, passedFilters: 0 });
   });
 
   it('stays paused across a restart, refuses Run now, and shows no next run', async () => {
@@ -867,7 +867,7 @@ describe('createBackend discovery', () => {
     const first = await api.addJob(await api.analyzeJob({ kind: 'text', value: 'post' }));
     await vi.waitFor(async () => expect((await api.getJob(first.id)).status).toBe('drafted'));
     const again = await api.analyzeJob({ kind: 'text', value: 'post' });
-    expect(again.route).toMatch(/^Already in Applio \(drafted\)/);
+    expect(again.duplicate).toEqual({ jobId: first.id, status: 'drafted' });
     await expect(api.addJob(again)).rejects.toThrow('Senior TypeScript Engineer at Brightline Studio is already in Applio (drafted).');
   });
 
