@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Job } from '../../../shared/types';
 import type { SendRecord } from '../../../shared/types';
 import { formatClock } from '../../lib/format';
-import { effortLevel, gmailIssue, traceLine, modeLabel, pendingReason, primaryAction, queueState, runLine, runResult, sendState } from './review-model';
+import { effortLevel, filesState, gmailIssue, traceLine, modeLabel, pendingReason, primaryAction, queueState, runLine, runResult, sendState } from './review-model';
 
 const job = (over: Partial<Job>): Job => ({
   id: 'x', sourceId: 's', sourceName: 'S', company: 'C', title: 'T', url: '', location: '', employmentType: 'full-time',
@@ -180,8 +180,23 @@ describe('gmailIssue', () => {
   });
 });
 
+describe('filesState', () => {
+  it('is saving while a fresh draft has no folder yet', () => {
+    expect(filesState(job({ status: 'drafted' }))).toEqual({ kind: 'saving' });
+  });
+  it('passes on why the files could not be saved', () => {
+    expect(filesState(job({ status: 'drafted', history: [{ status: 'drafted', at: '', note: "Couldn't save the files: printing failed" }] }))).toEqual({ kind: 'failed', reason: "Couldn't save the files: printing failed" });
+  });
+  it('is ready once the folder exists', () => {
+    expect(filesState(job({ status: 'drafted', folderPath: '/out/acme' }))).toEqual({ kind: 'ready' });
+  });
+});
+
 describe('traceLine', () => {
-  const clean = { stale: false, unverified: [], forbidden: [] };
+  const clean = { stale: false, unverified: [], forbidden: [], placeholders: [] };
+  it('puts a leftover placeholder first, since the draft cannot be sent with it', () => {
+    expect(traceLine({ edited: false, check: { ...clean, placeholders: ['[Your Name]'] } }, 12)).toEqual({ text: 'Replace [Your Name] before sending', ok: false });
+  });
   it('claims every claim traced only when the check found nothing', () => {
     expect(traceLine({ edited: false, check: clean }, 12)).toEqual({ text: 'Every claim traced to your fact bank · 12 facts used', ok: true });
   });

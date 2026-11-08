@@ -1,3 +1,5 @@
+import { findPlaceholder } from './placeholders';
+
 /** What a draft may draw on: the fact bank, profile and the posting itself. */
 export interface CheckSources {
   facts: readonly { id: string; group: string; text: string }[];
@@ -49,7 +51,7 @@ const forms = (term: string) => [term, term.replace(/(ship|ing|ed|s)$/, '')].fil
  * or posting states (e.g. "Marikina", "PhD", "70%"), and any term the operator's notes
  * forbid, in the letter or the résumé. Résumé bullets are traced by fact ID when saved.
  */
-export function checkDraft(draft: { coverLetter: string; resume: readonly { items: readonly { text: string }[] }[] }, sources: CheckSources): { unverified: UnverifiedLine[]; forbidden: string[] } {
+export function checkDraft(draft: { coverLetter: string; resume: readonly { items: readonly { text: string }[] }[] }, sources: CheckSources): { unverified: UnverifiedLine[]; forbidden: string[]; placeholders: string[] } {
   const known = [
     ...sources.facts.flatMap((f) => [f.text, f.group]),
     ...sources.groups.flatMap((g) => [g.name, g.context ?? '', g.dates ?? '']),
@@ -60,7 +62,11 @@ export function checkDraft(draft: { coverLetter: string; resume: readonly { item
   const knownWords = new Set(known.toLowerCase().match(/[a-z0-9+#]+/g) ?? []);
   const knownNumbers = new Set(numbersIn(known));
 
-  const unverified = sentences(draft.coverLetter).flatMap((line) => {
+  // Template placeholders ("[Your Name]") are reported on their own; their lines aren't claims to trace.
+  const texts = [draft.coverLetter, ...draft.resume.flatMap((s) => s.items.map((i) => i.text))];
+  const placeholders = [...new Set(texts.flatMap((t) => t.match(/\[[^\]\n]{1,40}\]/g) ?? []))];
+
+  const unverified = sentences(draft.coverLetter).filter((line) => !findPlaceholder(line)).flatMap((line) => {
     const words = [...line.matchAll(/\b[A-Z][A-Za-z0-9+#]*\b/g)].filter((m) => m.index !== 0 || /[a-z][A-Z]|[A-Z]{2}/.test(m[0]));
     const terms = [
       ...words.map((m) => m[0]).filter((w) => !NOT_CLAIMS.has(w.toLowerCase()) && !knownWords.has(w.toLowerCase())),
@@ -73,7 +79,7 @@ export function checkDraft(draft: { coverLetter: string; resume: readonly { item
   const forbidden = [...new Set(forbiddenTerms(sources.contact.notes).flatMap(forms))]
     .filter((t) => new RegExp(`\\b${t}\\b`).test(text))
     .sort();
-  return { unverified, forbidden };
+  return { unverified, forbidden, placeholders };
 }
 
 /**

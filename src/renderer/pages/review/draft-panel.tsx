@@ -12,7 +12,7 @@ import { CHANNEL_LABEL } from '../../lib/labels';
 import { navigate } from '../../lib/router';
 import type { DocumentOwner } from '../../../shared/templates/application-documents';
 import { DraftDocument, type DocTab } from './draft-document';
-import { modeLabel, primaryAction, sendState, effortLevel, type SendState } from './review-model';
+import { filesState, modeLabel, primaryAction, sendState, effortLevel, type SendState } from './review-model';
 import { SourceCredit } from '../../components/source-credit';
 
 interface DraftPanelProps {
@@ -77,6 +77,7 @@ function DraftDetail({ job, draft, send, nextId, thresholds, owner, autonomyBySo
   const state = sendState(job, send);
   const waiting = job.status === 'drafted';
   const needsGmail = job.channel === 'email' ? gmailIssue : undefined;
+  const files = filesState(job);
   const foundAt = job.history[0]?.at ?? job.postedAt;
 
   /** Approves (or retries) and then re-reads the job and its send log, so what's shown is what happened, success or not. */
@@ -214,6 +215,16 @@ function DraftDetail({ job, draft, send, nextId, thresholds, owner, autonomyBySo
             </div>
           </div>
         ) : null}
+        {waiting && files.kind === 'saving' ? (
+          <div className="banner banner-warning" role="status">
+            <span className="row"><span className="spinner" aria-hidden="true" />Saving the résumé and letter PDFs. Approve comes on in a moment.</span>
+          </div>
+        ) : null}
+        {waiting && files.kind === 'failed' ? (
+          <div className="banner banner-danger" role="alert">
+            <span>{files.reason} The draft is here, but there's nothing to attach yet. Redraft to print it again.</span>
+          </div>
+        ) : null}
         {waiting && needsGmail ? (
           <div className="banner banner-warning">
             <span>{needsGmail.message}</span>
@@ -233,7 +244,7 @@ function DraftDetail({ job, draft, send, nextId, thresholds, owner, autonomyBySo
             ) : needsGmail ? (
               <a className={buttonClass('primary')} href="#/settings">{needsGmail.action}</a>
             ) : (
-              <Button variant="primary" busy={sending.pending} onClick={job.suspicious && !confirming ? () => setConfirming(true) : approve}>{sending.pending ? (job.channel === 'email' ? 'Sending…' : 'Submitting…') : primary.label}</Button>
+              <Button variant="primary" busy={sending.pending} disabled={files.kind !== 'ready' || !!draft?.check?.placeholders?.length} onClick={job.suspicious && !confirming ? () => setConfirming(true) : approve}>{sending.pending ? (job.channel === 'email' ? 'Sending…' : 'Submitting…') : primary.label}</Button>
             )}
           </div>
         ) : null}

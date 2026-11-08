@@ -13,7 +13,7 @@ const sources: CheckSources = {
 describe('checkDraft', () => {
   it('passes a letter whose names and numbers all come from the facts, profile or posting', () => {
     const letter = 'Hi Quillstack team,\n\nAt Afterhours PH I built LLM agents that cut support replies 40%. I also shipped a TypeScript MCP server.\n\nJohn Guevara';
-    expect(checkDraft({ coverLetter: letter, resume: [] }, sources)).toEqual({ unverified: [], forbidden: [] });
+    expect(checkDraft({ coverLetter: letter, resume: [] }, sources)).toEqual({ unverified: [], forbidden: [], placeholders: [] });
   });
 
   it('flags a place and a degree that appear in no fact (QA 2026-11-07 #10)', () => {
@@ -37,6 +37,14 @@ describe('checkDraft', () => {
     const withNotes = { ...sources, contact: { ...sources.contact, notes: "Never use 'Internship' for the Afterhours role." } };
     const draft = { coverLetter: 'I was an AI Developer intern at Afterhours PH.', resume: [{ items: [{ text: 'Internship: built agents' }] }] };
     expect(checkDraft(draft, withNotes).forbidden).toEqual(['intern', 'internship']);
+  });
+});
+
+describe('placeholders', () => {
+  it('names a template placeholder left in the letter or résumé, apart from unverified lines', () => {
+    const out = checkDraft({ coverLetter: 'Dear team,\n\n[Your Name]', resume: [{ items: [{ text: 'Led [Team] work' }] }] }, sources);
+    expect(out.placeholders).toEqual(['[Your Name]', '[Team]']);
+    expect(out.unverified).toEqual([]);
   });
 });
 

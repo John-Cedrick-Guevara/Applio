@@ -155,6 +155,8 @@ export interface DraftCheck {
   unverified: { line: string; terms: string[] }[];
   /** Terms the operator's notes forbid that the draft uses anyway. */
   forbidden: string[];
+  /** Template placeholders left in ("[Your Name]"); a draft with any can't be sent. */
+  placeholders: string[];
 }
 
 /** Questions Claude asked instead of drafting, waiting on the operator (SPEC F4). */

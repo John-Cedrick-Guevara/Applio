@@ -113,12 +113,21 @@ describe('ReviewPage', () => {
 
   it('claims every line traced only when the check says so', async () => {
     const api = createMockApi({ latencyMs: 0 });
-    const plain = { ...api, getDraft: async (id: string) => ({ ...(await api.getDraft(id))!, check: { stale: false, unverified: [{ line: 'I am based in Marikina City.', terms: ['Marikina'] }], forbidden: [] } }) };
+    const plain = { ...api, getDraft: async (id: string) => ({ ...(await api.getDraft(id))!, check: { stale: false, unverified: [{ line: 'I am based in Marikina City.', terms: ['Marikina'] }], forbidden: [], placeholders: [] } }) };
     renderWithApp(<ReviewPage params={{ id: 'j1' }} />, plain);
     const detail = await screen.findByRole('region', { name: 'Draft detail' });
     expect(await within(detail).findByText('Résumé traced to facts · cover letter: 1 unverified line')).toBeInTheDocument();
     expect(within(detail).queryByText(/Every claim traced/)).not.toBeInTheDocument();
     expect(within(detail).getByText(/I am based in Marikina City/)).toBeInTheDocument();
+  });
+
+  it('waits to approve until the PDFs are saved, and says so', async () => {
+    const api = await withGmail();
+    const saving = { ...api, getJob: async (id: string) => ({ ...(await api.getJob(id)), folderPath: undefined }) };
+    renderWithApp(<ReviewPage params={{ id: 'j1' }} />, saving);
+    const detail = await screen.findByRole('region', { name: 'Draft detail' });
+    expect(await within(detail).findByText(/Saving the résumé and letter PDFs/)).toBeInTheDocument();
+    expect(within(detail).getByRole('button', { name: 'Approve & send email' })).toBeDisabled();
   });
 
   it('offers Set up Gmail instead of Approve while Gmail is not set up', async () => {

@@ -139,6 +139,13 @@ describe('approveDraft over email', () => {
     await expect(approveDraft('j1', ports)).rejects.toThrow("Today's cap for email applications is reached (10). Raise it in Guardrails, or send tomorrow.");
   });
 
+  it('says the files are still being saved when the draft has no folder yet', async () => {
+    const { ports, job } = setup({ folderPath: undefined });
+    ports.folder = () => undefined;
+    await expect(approveDraft('j1', ports)).rejects.toThrow('Applio is still saving the résumé and letter PDFs. Approve again in a moment.');
+    expect(job().status).toBe('drafted');
+  });
+
   it("refuses to send before the résumé PDF is saved, without approving", async () => {
     const { ports, job } = setup();
     ports.fileExists = () => false;
@@ -156,6 +163,26 @@ describe('approveDraft over email', () => {
     expect(job().status).toBe('drafted');
     expect(ports.saveAiAnswers).not.toHaveBeenCalled();
     expect(ports.sendEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe('approveDraft with a template placeholder left in', () => {
+  it('refuses to send a letter that still has a placeholder, and leaves the draft waiting', async () => {
+    const { ports, job } = setup();
+    const base = ports.draft('j1')!;
+    ports.draft = () => ({ ...base, coverLetter: 'Dear team,\n\nBest,\n[Your Name]' });
+    await expect(approveDraft('j1', ports)).rejects.toThrow('Replace [Your Name] in the letter before sending.');
+    expect(job().status).toBe('drafted');
+    expect(ports.sendEmail).not.toHaveBeenCalled();
+  });
+
+  it('never types a placeholder answer into a form; that question is left for the operator', async () => {
+    const { ports } = setup({ channel: 'ats', applyTarget: 'jobs.lever.co', applyUrl: 'https://jobs.lever.co/acme/1' });
+    ports.bankAnswers = () => [{ question: 'Expected rate', answer: '[Your rate]' }, { question: 'Phone', answer: '+63 917 555 0100' }];
+    await approveDraft('j1', ports);
+    const answers = vi.mocked(ports.submitAts).mock.calls[0]![0].input.answers;
+    expect(answers).toContainEqual({ question: 'Phone', answer: '+63 917 555 0100' });
+    expect(answers.some((a) => a.answer.includes('[Your rate]'))).toBe(false);
   });
 });
 

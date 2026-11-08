@@ -1,4 +1,5 @@
 import { AppError } from '../../shared/errors';
+import { findPlaceholder } from '../../shared/placeholders';
 import { documentNames, isLockedLayout, signOff, type DocumentOwner } from '../../shared/templates/application-documents';
 import type { ApplyChannel, Draft, Job, JobStatus, SendRecord, SentBy, SentRecord } from '../../shared/types';
 import type { FillInput, FillStep } from './ats-plan';
@@ -110,6 +111,9 @@ const readyToSend = (jobId: string, channel: ApplyChannel, ports: ApplyPorts) =>
   const job = ports.job(jobId);
   const draft = ports.draft(jobId);
   if (!draft) throw new SendBlockedError(`Job ${jobId} has no draft to send.`);
+  // A half-filled template must never reach a recruiter (QA 2026-11-08).
+  const placeholder = findPlaceholder(draft.coverLetter);
+  if (placeholder) throw new SendBlockedError(`Replace ${placeholder} in the letter before sending.`);
 
   const earlier = ports.sendLog.get(jobId);
   if (earlier?.state === 'sent') throw new SendBlockedError(`This application was already sent at ${earlier.at}.`);
@@ -126,8 +130,10 @@ const readyToSend = (jobId: string, channel: ApplyChannel, ports: ApplyPorts) =>
   if (channel === 'ats' && !job.applyUrl) throw new SendBlockedError("This job has no form link, so Applio can't open its application. Use the manual handoff.");
 
   const folder = ports.folder(job);
-  const resume = folder ? join(folder, 'resume.pdf') : undefined;
-  if (!folder || !resume || !ports.fileExists(resume)) {
+  // Claude marks the job drafted mid-turn; the PDFs follow once its turn ends.
+  if (!folder) throw new SendBlockedError('Applio is still saving the résumé and letter PDFs. Approve again in a moment.');
+  const resume = join(folder, 'resume.pdf');
+  if (!ports.fileExists(resume)) {
     throw new SendBlockedError("The résumé PDF isn't saved yet, so there's nothing to attach. Open the job folder to check it.");
   }
   return { job, draft, folder, resume };
@@ -206,7 +212,8 @@ export async function sendByAts(jobId: string, sentBy: SentBy, ports: ApplyPorts
     files: { resume: upload(resume, names.resume), ...(withLetter ? { coverLetter: upload(coverLetter, names.letter) } : {}) },
     letter: draft.coverLetter,
     // The draft's own answers first: they were written for this posting.
-    answers: [...draft.answers.map(({ question, answer }) => ({ question, answer })), ...ports.bankAnswers()],
+    // An answer that's still a placeholder ("[Your rate]") is left out, so the form hands that question to the operator.
+    answers: [...draft.answers.map(({ question, answer }) => ({ question, answer })), ...ports.bankAnswers()].filter((a) => !findPlaceholder(a.answer)),
   };
 
   ports.sendLog.claim(jobId, 'ats', ports.now().toISOString());

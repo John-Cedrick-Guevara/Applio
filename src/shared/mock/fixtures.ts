@@ -119,7 +119,7 @@ const DRAFT_COPY: Record<string, Pick<Draft, 'headline' | 'summary' | 'resume' |
         { text: 'Owned on-call for payments across three time zones.', factId: 'f3' },
       ] },
     ],
-    coverLetter: 'Hi Northwind team,\n\nI am applying for the Senior Backend Engineer role. For the last five years I have built and run Node.js services in production, most recently the payments service at [Previous Company], where I redesigned the invoicing schema and cut p95 query time from 900 ms to 120 ms.\n\nYour post mentions usage metering. I built exactly that: an SQS and ECS pipeline with idempotent consumers, so retries never double-billed a customer.\n\nI work async-first across time zones and I am comfortable owning on-call for what I ship.\n\nResume attached. Happy to walk through any of it.\n\n[Your Name]',
+    coverLetter: 'Hi Northwind team,\n\nI am applying for the Senior Backend Engineer role. For the last five years I have built and run Node.js services in production, most recently the payments service at Acme, where I redesigned the invoicing schema and cut p95 query time from 900 ms to 120 ms.\n\nYour post mentions usage metering. I built exactly that: an SQS and ECS pipeline with idempotent consumers, so retries never double-billed a customer.\n\nI work async-first across time zones and I am comfortable owning on-call for what I ship.\n\nResume attached. Happy to walk through any of it.\n\nSam Rivera',
   },
   j2: {
     headline: 'Full-stack Engineer',
@@ -130,7 +130,7 @@ const DRAFT_COPY: Record<string, Pick<Draft, 'headline' | 'summary' | 'resume' |
         { text: 'Built Node.js APIs serving the web and mobile apps.', factId: 'f2' },
       ] },
     ],
-    coverLetter: 'Hi Fieldwork team,\n\nI build product features end to end in TypeScript, from React screens down to the Node.js API and the database. At [Previous Company] I shipped the customer self-serve portal on my own, working directly with design and support.\n\nScheduling tools for field teams is a problem I would enjoy, and I would like to bring that end-to-end habit to it.\n\n[Your Name]',
+    coverLetter: 'Hi Fieldwork team,\n\nI build product features end to end in TypeScript, from React screens down to the Node.js API and the database. At Acme I shipped the customer self-serve portal on my own, working directly with design and support.\n\nScheduling tools for field teams is a problem I would enjoy, and I would like to bring that end-to-end habit to it.\n\nSam Rivera',
   },
   j3: {
     headline: 'Platform Engineer',
@@ -140,7 +140,7 @@ const DRAFT_COPY: Record<string, Pick<Draft, 'headline' | 'summary' | 'resume' |
         { text: 'Migrated services to Kubernetes with zero-downtime rollouts.', factId: 'f5' },
       ] },
     ],
-    coverLetter: 'Hi Ledgerly team,\n\nI run Kubernetes platforms for payment systems and keep every piece of infrastructure in Terraform. At [Previous Company] I moved our services to Kubernetes with zero-downtime rollouts and cut CI time in half.\n\n[Your Name]',
+    coverLetter: 'Hi Ledgerly team,\n\nI run Kubernetes platforms for payment systems and keep every piece of infrastructure in Terraform. At Acme I moved our services to Kubernetes with zero-downtime rollouts and cut CI time in half.\n\nSam Rivera',
   },
   j4: {
     headline: 'Full-stack Developer',
@@ -148,7 +148,7 @@ const DRAFT_COPY: Record<string, Pick<Draft, 'headline' | 'summary' | 'resume' |
     resume: [
       { heading: 'Projects', items: [{ text: 'Shipped an offline-first Electron app syncing SQLite with a REST API.', factId: 'f6' }] },
     ],
-    coverLetter: 'Hi,\n\nI have shipped two Electron apps that keep a local SQLite database in sync with a REST API, which is the core of what you describe. I can deliver a working build every week so you see progress early.\n\nProposed plan: week 1 schema and sync, weeks 2–4 screens, weeks 5–6 packaging and fixes.\n\n[Your Name]',
+    coverLetter: 'Hi,\n\nI have shipped two Electron apps that keep a local SQLite database in sync with a REST API, which is the core of what you describe. I can deliver a working build every week so you see progress early.\n\nProposed plan: week 1 schema and sync, weeks 2–4 screens, weeks 5–6 packaging and fixes.\n\nSam Rivera',
   },
 };
 
@@ -165,7 +165,7 @@ export function seedDrafts(jobs: Job[], now: Date): Draft[] {
         headline: j.title,
         summary: `${j.title} with five years of production TypeScript and Node.js.`,
         resume: [{ heading: '[Previous Company] — Senior Software Engineer · 2022 – now', items: [{ text: 'Redesigned the invoicing schema in PostgreSQL; p95 query time dropped from 900 ms to 120 ms.', factId: 'f1' }] }],
-        coverLetter: `Hi ${j.company} team,\n\nI am applying for the ${j.title} role. For the last five years I have built and run Node.js services in production.\n\n[Your Name]`,
+        coverLetter: `Hi ${j.company} team,\n\nI am applying for the ${j.title} role. For the last five years I have built and run Node.js services in production.\n\nSam Rivera`,
       }),
       answers: [
         { question: 'How many years of experience do you have with Kubernetes?', answer: '4', origin: 'bank', tokens: 0 },

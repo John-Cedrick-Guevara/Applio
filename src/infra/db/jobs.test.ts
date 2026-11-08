@@ -47,6 +47,14 @@ describe('jobs repository', () => {
     expect(jobs.seenKeys()).toEqual(new Set(['a|x', 'b|y']));
   });
 
+  it("moves the version when a job's files are saved, so open pages pick up the folder", () => {
+    const jobs = setup();
+    jobs.insert({ ...first, folderPath: undefined }, { dedupKey: 'k', createdAt: NOW.toISOString() });
+    const before = jobs.version();
+    jobs.update(first.id, { folderPath: '/out/acme' });
+    expect(jobs.version()).toBeGreaterThan(before);
+  });
+
   it('returns undefined for an unknown job', () => {
     expect(setup().get('missing')).toBeUndefined();
   });
