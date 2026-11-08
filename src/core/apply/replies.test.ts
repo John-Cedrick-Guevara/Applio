@@ -60,6 +60,11 @@ describe('classifyReply', () => {
 });
 
 describe('replySummary', () => {
+  it('cuts the quoted thread even when Gmail wraps "On … wrote:" across two lines (QA 2026-11-07 #17)', () => {
+    const text = 'Thanks John, we will be in touch.\n\nOn Sat, Nov 7, 2026 at 5:17 PM John Cedrick Guevara <\njohn@gmail.com> wrote:\n> Dear team,';
+    expect(replySummary(mail({ text }))).toBe('Thanks John, we will be in touch.');
+  });
+
   it('keeps the first new lines, dropping quoted history and signatures, at most 200 characters', () => {
     const text = 'Hi Sam,\n\nThanks for applying. Are you free Tuesday?\n\nOn Mon, Nov 10, 2026 at 9:00 AM Sam wrote:\n> Dear team\n> I build APIs';
     expect(replySummary(mail({ text }))).toBe('Hi Sam, Thanks for applying. Are you free Tuesday?');

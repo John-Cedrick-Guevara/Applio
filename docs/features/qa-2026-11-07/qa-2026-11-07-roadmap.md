@@ -20,7 +20,7 @@ Source: [QA report](../../qa/2026-11-07-qa-report.md). 18 issues (1 blocker, 9 m
 - [x] **PR 3** `fix/triage-precision` — `fix(triage): drop out-of-reach roles and near-duplicates before AI` — #4, #6, #14. Why: most tokens went on Senior/US-only jobs; "Labs" duplicates got through.
 - [x] **PR 4** `fix/structured-preferences` — `fix(profile): make every filter editable and pay unambiguous` — #9. Depends on PR 3 (seniority rule).
 - [x] **PR 5** `fix/review-below-threshold` — `feat(ui): open, draft or dismiss below-threshold jobs` — #5.
-- [ ] **PR 6** `fix/draft-provenance` — `fix(generation): flag stale drafts and trace the cover letter` — #10.
+- [x] **PR 6** `fix/draft-provenance` — `fix(generation): flag stale drafts and trace the cover letter` — #10.
 - [ ] **PR 7** `fix/ui-polish` — `fix(ui): clear status, counts and toasts across pages` — #13, #16, #17, #18, plus from #4/#14: drop counts per reason on Usage, and Run now disabled when every source is at its limit.
 - [ ] **PR 8** `fix/source-quality` — `fix(sources): validate HN fields and RemoteOK tags and links` — #15.
 

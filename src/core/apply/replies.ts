@@ -83,6 +83,7 @@ export function replySummary(mail: IncomingMail): string {
     if (/^On .+wrote:$/.test(line.trim()) || /^-{2,}\s*$/.test(line.trim()) || /^_{5,}/.test(line)) break;
     if (!line.trim().startsWith('>')) fresh.push(line.trim());
   }
-  const summary = fresh.filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+  // Gmail wraps a long "On <date> <name> <address> wrote:" line, so it's cut again once lines are joined.
+  const summary = fresh.filter(Boolean).join(' ').replace(/\s+/g, ' ').replace(/\s*\bOn \w{3},? .{0,160}?wrote:.*$/, '').trim();
   return (summary || mail.subject).slice(0, 200);
 }

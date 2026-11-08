@@ -126,6 +126,7 @@ function ReviewLayout({ data, selectedId, onJobChange, onStatusChange, onRunComp
             key={currentId}
             job={data.undrafted.find((j) => j.id === currentId)!}
             draftThreshold={data.thresholds.draft}
+            {...(data.status.budgetStop ? { budgetStop: data.status.budgetStop } : {})}
             onChanged={onRunComplete}
           />
         ) : currentId ? (

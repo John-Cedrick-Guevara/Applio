@@ -79,6 +79,13 @@ describe('discover', () => {
     expect([...saved[0]!.seen].sort()).toEqual(['acme|senior backend engineer', 'evil|backend engineer', 'globex|sales manager']);
   });
 
+  it('records no run when every source has used its polls and nothing is left to retry', async () => {
+    const { run, saved, score } = setup({ jobs: [], sources: [{ sourceId: 'remotive', outcome: 'limit', jobs: 0, dropped: 0 }, { sourceId: 'hn', outcome: 'disabled', jobs: 0, dropped: 0 }] });
+    expect(await run()).toMatchObject({ found: 0, atLimit: 1 });
+    expect(saved).toEqual([]);
+    expect(score).not.toHaveBeenCalled();
+  });
+
   it('also retries jobs an earlier run left unscored or undrafted', async () => {
     const { run, score, draft } = setup(polled, [], ['Backend Engineer'], { unscored: ['old-1'], undrafted: ['old-2'] });
     await run();

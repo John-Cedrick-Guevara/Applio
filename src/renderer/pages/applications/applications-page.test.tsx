@@ -70,6 +70,15 @@ describe('ApplicationsPage', () => {
     expect(within(detail).queryByText(/Edited after sending/)).not.toBeInTheDocument();
   });
 
+  it('opens the sent résumé from its file chip', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const open = vi.spyOn(api, 'openDraftFile');
+    renderWithApp(<ApplicationsPage />, api);
+    await userEvent.click(await screen.findByRole('button', { name: /Tessellate/ }));
+    await userEvent.click(await screen.findByRole('button', { name: 'resume.pdf' }));
+    expect(open).toHaveBeenCalledWith('j10', 'resume');
+  });
+
   it('says an application made outside Applio has no send record, rather than inventing one', async () => {
     const api = createMockApi({ latencyMs: 0 });
     await api.markApplied('j3');

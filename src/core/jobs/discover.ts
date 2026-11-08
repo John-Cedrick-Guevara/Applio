@@ -93,6 +93,12 @@ export async function discover(ports: DiscoverPorts): Promise<RunSummary> {
   const filters = ports.filters();
   if (!filters.preferences.targetRoles.some((r) => r.trim())) throw new NoTargetRolesError();
   const polled = await ports.poll();
+  // Nothing fetched because every source is at its daily limit, and nothing waiting to retry: no run to record.
+  const atLimit = polled.sources.filter((s) => s.outcome === 'limit').length;
+  const leftoverNow = ports.leftover();
+  if (polled.jobs.length === 0 && atLimit > 0 && polled.sources.every((s) => s.outcome === 'limit' || s.outcome === 'disabled') && leftoverNow.unscored.length === 0 && leftoverNow.undrafted.length === 0) {
+    return { at: ports.now().toISOString(), found: 0, newAfterDedup: 0, passedFilters: 0, drafted: 0, atLimit };
+  }
   const { passed, fresh, report } = triage(polled.jobs, { existingKeys: ports.existingKeys(), ...filters });
   const at = ports.now().toISOString();
   // New means no run saw it before; jobs the filters dropped last time aren't new again.

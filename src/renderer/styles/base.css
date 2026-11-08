@@ -242,6 +242,9 @@ button {
 }
 
 .engine-line > :first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -253,6 +256,7 @@ button {
 
 .engine-dot-ok { background: var(--success); }
 .engine-dot-warn { background: var(--warning); }
+.engine-dot-stop { background: var(--danger-text); }
 
 .engine-name {
   font-weight: 500;

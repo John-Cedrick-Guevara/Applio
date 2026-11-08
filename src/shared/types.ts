@@ -321,6 +321,8 @@ export interface Usage {
   tokensByDay: { date: string; tokens: number }[];
   dailyTokenBudget: number;
   quotas: Quota[];
+  /** What the free prefilter did in the period (SPEC F3.2): found, merged, passed, and drops per reason. */
+  prefilter?: { found: number; duplicates: number; passed: number; dropped: { reason: string; count: number }[] };
 }
 
 export type AiEngine = 'claude-code' | 'api-key';
@@ -396,6 +398,10 @@ export interface AppStatus {
   jobsVersion?: number;
   /** Jobs Claude is drafting right now, from Add job or answered questions. */
   drafting?: string[];
+  /** Why AI is stopped (a daily or monthly token budget used up); absent while AI can run. */
+  budgetStop?: string;
+  /** Every enabled source has used today's polls, so Run now would fetch nothing. */
+  sourcesAtLimit?: boolean;
 }
 
 /** What "Add job" learned from a pasted post or link, before it joins the queue. */

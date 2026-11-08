@@ -245,6 +245,9 @@ export function seedUsage(now: Date, period: UsagePeriod): Usage {
       ? [['tailor', 26_400], ['score', 9_100], ['answers', 3_200], ['prep', 2_500], ['follow-up', 0]]
       : [['tailor', 742_000], ['score', 268_000], ['answers', 96_000], ['prep', 71_000], ['follow-up', 33_000]]
     ).map(([step, tokens]) => ({ step: step as UsageStep, tokens: tokens as number })),
+    prefilter: today
+      ? { found: 83, duplicates: 0, passed: 19, dropped: [{ reason: 'seniority', count: 42 }, { reason: 'location', count: 18 }, { reason: 'role', count: 4 }] }
+      : { found: 581, duplicates: 64, passed: 102, dropped: [{ reason: 'seniority', count: 260 }, { reason: 'location', count: 118 }, { reason: 'role', count: 37 }] },
     quotas: [
       { id: 'tokens-day', label: 'Claude tokens', sub: 'Daily budget', used: 82_000, limit: 150_000, warnAt: 0.8, unit: 'tokens' },
       { id: 'tokens-month', label: 'Claude tokens', sub: 'Monthly budget', used: 1_210_000, limit: 3_000_000, warnAt: 0.8, unit: 'tokens' },

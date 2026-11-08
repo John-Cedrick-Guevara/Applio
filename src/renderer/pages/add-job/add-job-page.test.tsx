@@ -52,6 +52,14 @@ describe('AddJobPage', () => {
     expect(within(result).queryByRole('button', { name: 'Add to review queue' })).not.toBeInTheDocument();
   });
 
+  it('disables Analyze with the reason once the daily token budget is used', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const spent = { ...api, getStatus: async () => ({ ...(await api.getStatus()), budgetStop: "Today's Claude token budget is used up." }) };
+    renderWithApp(<AddJobPage />, spent);
+    expect(await screen.findByText(/Today's Claude token budget is used up/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Analyze job' })).toBeDisabled();
+  });
+
   it('caps platform links at draft → approve', async () => {
     renderWithApp(<AddJobPage />);
     await userEvent.click(screen.getByRole('tab', { name: 'Paste link' }));

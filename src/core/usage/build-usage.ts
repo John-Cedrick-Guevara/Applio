@@ -17,6 +17,8 @@ export interface UsageInput {
   polls: { id: string; name: string; used: number; limit: number }[];
   settings: Pick<Settings, 'dailyTokenBudget' | 'monthlyTokenBudget' | 'maxPerChannelPerDay'>;
   gmailDailyCap: number;
+  /** Each discovery run's prefilter counts, from its stored details. */
+  runs: { at: string; found: number; duplicates: number; passed: number; dropped: Partial<Record<string, number>> }[];
 }
 
 const localDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -75,8 +77,21 @@ export function buildUsage(period: UsagePeriod, input: UsageInput): Usage {
       avgNote: sent.length ? `Across ${sent.length} application${sent.length === 1 ? '' : 's'}: scoring, tailoring, answers` : 'No applications sent yet',
       savedByAnswerBank: { tokens: reused * TOKENS_PER_ANSWER, answersReused: reused },
     },
+    prefilter: prefilterOf(inPeriod(input.runs)),
     tokensByStep: STEPS.map((step) => ({ step, tokens: sum(usage.filter((u) => u.step === step).map((u) => u.tokens)) })),
     tokensByDay: days.map((date) => ({ date, tokens: byDay.get(date)! })),
     quotas,
+  };
+}
+
+/** What the free prefilter did over the period: totals, and drops per reason, biggest first (zero reasons left out). */
+function prefilterOf(runs: UsageInput['runs']): NonNullable<Usage['prefilter']> {
+  const dropped = new Map<string, number>();
+  for (const r of runs) for (const [reason, n] of Object.entries(r.dropped)) dropped.set(reason, (dropped.get(reason) ?? 0) + (n ?? 0));
+  return {
+    found: sum(runs.map((r) => r.found)),
+    duplicates: sum(runs.map((r) => r.duplicates)),
+    passed: sum(runs.map((r) => r.passed)),
+    dropped: [...dropped].filter(([, count]) => count > 0).map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count),
   };
 }

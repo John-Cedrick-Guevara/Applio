@@ -15,6 +15,21 @@ describe('HandoffPage', () => {
     expect(screen.getByText('How many years of experience do you have with Kubernetes?')).toBeInTheDocument();
   });
 
+  it('numbers only the steps it shows, with no gap when there are no screening questions', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const noAnswers = { ...api, getDraft: async (id: string) => ({ ...(await api.getDraft(id))!, answers: [] }) };
+    const { container } = renderWithApp(<HandoffPage params={{ id: 'j3' }} />, noAnswers);
+    await screen.findByText('Upload your tailored resume');
+    expect([...container.querySelectorAll('.step-num')].map((n) => n.textContent)).toEqual(['1', '2', '3', '4']);
+  });
+
+  it('words the assisted-fill tip for a career-site job as career sites, not platforms', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const careerSite = { ...api, getJob: async (id: string) => ({ ...(await api.getJob(id)), channel: 'custom' as const, platform: undefined }) };
+    renderWithApp(<HandoffPage params={{ id: 'j3' }} />, careerSite);
+    expect(await screen.findByText(/Turn on assisted fill for company career sites/)).toBeInTheDocument();
+  });
+
   it('copies an answer to the clipboard', async () => {
     const user = userEvent.setup();
     open();

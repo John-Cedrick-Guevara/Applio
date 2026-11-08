@@ -338,6 +338,20 @@ describe('createBackend discovery', () => {
     expect(deps.setLaunchAtLogin).toHaveBeenCalledTimes(1);
   });
 
+  it('pushes the new token total after every AI call, and says when the daily budget stops AI', async () => {
+    const b = await searchingBackend();
+    await b.api.saveSettings({ dailyTokenBudget: 1_000, monthlyTokenBudget: 1_000 });
+    b.deps.engines['claude-code'] = {
+      check: async () => ({ ready: true, message: 'ok' }),
+      complete: async ({ jobIds }) => ({ text: JSON.stringify(jobIds.map((jobId) => ({ jobId, score: 10, roleSummary: 'r', descriptionSummary: 'd', strengths: [], gaps: [] }))), inputTokens: 900, outputTokens: 200 }),
+    };
+    vi.mocked(b.deps.onStatus).mockClear();
+    await b.api.runDiscovery();
+    const pushed = vi.mocked(b.deps.onStatus).mock.calls.map(([s]) => s.tokensToday);
+    expect(pushed).toContain(1_100);
+    expect((await b.api.getStatus()).budgetStop).toMatch(/budget/i);
+  });
+
   it('reports tokens used today from the usage records', async () => {
     const { api } = backendIn();
     expect((await api.getStatus()).tokensToday).toBe(0);

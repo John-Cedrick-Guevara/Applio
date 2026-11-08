@@ -104,6 +104,7 @@ function StatusCorrection({ job, onJob }: { job: Job; onJob: (job: Job) => void 
 function WhatWasSent({ job }: { job: Job }) {
   const api = useApi();
   const { data: send, loading } = useAsync(() => api.getSend(job.id), [api, job.id]);
+  const files = useAction();
   const [full, setFull] = useState(false);
   if (loading) return null;
 
@@ -131,7 +132,12 @@ function WhatWasSent({ job }: { job: Job }) {
         <p className={full || !long ? 'sent-body sent-body-full' : 'sent-body sent-body-clamped'}>{send.body}</p>
         {long ? <Button size="sm" variant="link" onClick={() => setFull((f) => !f)}>{full ? 'Show less' : 'Show all'}</Button> : null}
         <div className="row" aria-label="Attachments">
-          {send.attachments.map((f) => <span key={f} className="file-chip mono">{f}</span>)}
+          {send.attachments.map((f) => (
+            <button key={f} type="button" className="file-chip mono" title={`Open ${f}`} onClick={() => files.run('open the file', () => api.openDraftFile(job.id, /letter|cover|proposal/i.test(f) ? 'letter' : 'resume'))}>
+              {f}
+            </button>
+          ))}
+          <button type="button" className="file-chip mono" title="Open the job folder" onClick={() => files.run('open the folder', () => api.openJobFolder(job.id))}>sent.md</button>
         </div>
       </div>
     </div>

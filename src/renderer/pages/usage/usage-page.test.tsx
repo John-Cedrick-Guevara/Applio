@@ -25,6 +25,13 @@ describe('UsagePage', () => {
     expect(within(await row('Gmail sends', /Per day/)).getByRole('meter')).toHaveAttribute('aria-valuenow', '4');
   });
 
+  it('shows how many jobs each filter dropped before AI, biggest first', async () => {
+    renderWithApp(<UsagePage />);
+    const list = await screen.findByRole('list', { name: 'Dropped by filter' });
+    expect(within(list).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Above your level42', 'Outside your country18', 'Not a target role4']);
+    expect(screen.getByText(/83 found · 0 already seen · 19 scored · 77% dropped for free/)).toBeInTheDocument();
+  });
+
   it('switches to this month', async () => {
     renderWithApp(<UsagePage />);
     await screen.findByText('55% of daily budget');

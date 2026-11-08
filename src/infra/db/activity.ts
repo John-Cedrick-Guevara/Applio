@@ -24,6 +24,8 @@ export interface ActivityRepo {
   updateDetails(runId: number, details: RunDetails, drafted: number): void;
   /** Undefined when there's no run yet, or the last one predates run details. */
   latestRunDetails(): RunDetails | undefined;
+  /** Runs at or after `since`, with their prefilter counts, for the usage page. */
+  runsSince(since: string): { at: string; found: number; duplicates: number; passed: number; dropped: Partial<Record<string, number>> }[];
   recordUsage(record: UsageRecord): void;
   /** The mean budget tokens of the step's last 5 calls, or undefined with none: the pre-flight estimate. */
   recentCost(step: UsageStep): number | undefined;
@@ -44,6 +46,7 @@ export function createActivityRepo(db: DatabaseSync): ActivityRepo {
   const recentFor = db.prepare('SELECT COUNT(*) AS n, AVG(tokens) AS avg FROM (SELECT tokens FROM usage_records WHERE step = ? ORDER BY id DESC LIMIT 5)');
   const setDetails = db.prepare('UPDATE run_summaries SET details = ?, drafted = ? WHERE id = ?');
   const sumSince = db.prepare('SELECT COALESCE(SUM(tokens), 0) AS tokens FROM usage_records WHERE at >= ?');
+  const selectRunsSince = db.prepare('SELECT at, found, passed_filters, details FROM run_summaries WHERE at >= ? ORDER BY at');
   const sumByStep = db.prepare('SELECT step, SUM(tokens) AS tokens FROM usage_records WHERE at >= ? GROUP BY step ORDER BY step');
 
   return {
@@ -63,6 +66,11 @@ export function createActivityRepo(db: DatabaseSync): ActivityRepo {
       const details = selectLatest.get()?.details;
       return details == null ? undefined : json<RunDetails>(details);
     },
+    runsSince: (since) =>
+      selectRunsSince.all(since).map((r) => {
+        const details = r.details == null ? undefined : json<RunDetails>(r.details);
+        return { at: String(r.at), found: Number(r.found), passed: Number(r.passed_filters), duplicates: details?.duplicates ?? 0, dropped: details?.dropped ?? {} };
+      }),
     recordUsage: (u) => void insertUsage.run(u.at, u.step, u.tokens, u.inputTokens ?? 0, u.outputTokens ?? 0, u.cacheReadTokens ?? 0, nullable(u.jobId), nullable(u.runId)),
     recentCost: (step) => {
       const row = recentFor.get(step);

@@ -12,6 +12,8 @@ import { pendingReason } from './review-model';
 interface JobPanelProps {
   job: Job;
   draftThreshold: number;
+  /** Why AI is stopped for now (budget used up); disables Draft this one with that reason. */
+  budgetStop?: string;
   /** Called after a draft starts or the job is dismissed, so the queue reloads. */
   onChanged: () => void;
 }
@@ -21,7 +23,7 @@ interface JobPanelProps {
  * Shows why it wasn't drafted and what it is, with Draft this one and Dismiss, so a
  * good match under the threshold is one click from a draft instead of a settings change.
  */
-export function JobPanel({ job, draftThreshold, onChanged }: JobPanelProps) {
+export function JobPanel({ job, draftThreshold, budgetStop, onChanged }: JobPanelProps) {
   const api = useApi();
   const action = useAction();
   const scored = job.status === 'scored';
@@ -75,11 +77,11 @@ export function JobPanel({ job, draftThreshold, onChanged }: JobPanelProps) {
       <div className="draft-footer">
         <div className="draft-footer-meta">
           <span>Apply via <strong>{CHANNEL_LABEL[job.channel]}</strong> · {job.applyTarget}</span>
-          {scored ? <span>A draft takes about 25–40k tokens and one to two minutes.</span> : null}
+          {scored ? <span>{budgetStop ?? 'A draft takes about 25–40k tokens and one to two minutes.'}</span> : null}
         </div>
         <div className="row">
           <Button busy={action.pending} onClick={dismiss}>Dismiss</Button>
-          {scored ? <Button variant="primary" busy={action.pending} onClick={draft}>Draft this one</Button> : null}
+          {scored ? <Button variant="primary" busy={action.pending} disabled={!!budgetStop} onClick={draft}>Draft this one</Button> : null}
         </div>
       </div>
     </section>

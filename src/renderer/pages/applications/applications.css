@@ -191,7 +191,13 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-xs);
   background: var(--surface);
+  color: inherit;
   font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.file-chip:hover {
+  border-color: var(--text-muted);
 }
 
 .side-panel {

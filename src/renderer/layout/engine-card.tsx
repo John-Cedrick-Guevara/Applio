@@ -16,8 +16,10 @@ export function EngineCard() {
   useEffect(() => window.applioEvents?.onStatus(setData), [setData]);
   if (!status) return null;
 
-  const state = status.paused ? 'Paused' : status.engineReady ? 'Ready' : 'Needs setup';
-  const tone = status.paused || !status.engineReady ? 'warn' : 'ok';
+  const state = status.budgetStop ? 'Paused · daily budget used' : status.paused ? 'Paused' : status.engineReady ? 'Ready' : 'Needs setup';
+  const tone = status.budgetStop ? 'stop' : status.paused || !status.engineReady ? 'warn' : 'ok';
+  // Whole thousands past 10k, so "226.9k / 500k" doesn't run past the card.
+  const tokens = (n: number) => formatTokens(n >= 10_000 && n < 1_000_000 ? Math.round(n / 1000) * 1000 : n);
   const pct = Math.min(100, Math.round((status.tokensToday / Math.max(1, status.dailyTokenBudget)) * 100));
 
   return (
@@ -27,6 +29,12 @@ export function EngineCard() {
         <span className="engine-name">{status.engine === 'claude-code' ? 'Claude Code' : 'Anthropic API'}</span>
         <span className="engine-state">{state}</span>
       </div>
+      {status.budgetStop ? (
+        <div className="engine-line">
+          <span className="cell-sub">AI waits until tomorrow.</span>
+          <a href="#/settings">Raise budget</a>
+        </div>
+      ) : null}
       <div className="engine-line">
         <span>Next run</span>
         <span className="mono">{status.paused || !status.nextRunAt ? 'Paused' : formatClock(status.nextRunAt)}</span>
@@ -34,7 +42,7 @@ export function EngineCard() {
       <div>
         <div className="engine-line">
           <span>Tokens today</span>
-          <span className="mono">{formatTokens(status.tokensToday)} / {formatTokens(status.dailyTokenBudget)}</span>
+          <span className="mono">{tokens(status.tokensToday)} / {tokens(status.dailyTokenBudget)}</span>
         </div>
         <div className={pct >= 80 ? 'engine-meter engine-meter-warn' : 'engine-meter'} role="meter" aria-label="Tokens used today" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
           <div style={{ width: `${pct}%` }} />
