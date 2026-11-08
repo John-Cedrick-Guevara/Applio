@@ -94,6 +94,6 @@
 
 
 /* v3: plain facts as a text line; the added job's draft followed on the page. */
-.preview-facts { margin: 0; color: var(--text-secondary); }
+.preview-tags-line { margin: 0; color: var(--text-secondary); }
 .preview-progress { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5) var(--space-6); border-top: 1px solid var(--border-soft); }
 .preview-progress-actions { justify-content: flex-end; }

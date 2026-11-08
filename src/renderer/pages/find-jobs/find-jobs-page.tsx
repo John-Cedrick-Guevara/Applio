@@ -21,7 +21,8 @@ export default function FindJobsPage() {
   const api = useApi();
   const state = useAsync(async () => {
     const [status, sources] = await Promise.all([api.getStatus(), api.listSources()]);
-    return { status, sources: sources.filter((s) => s.enabled) };
+    // Clipped jobs arrive when the operator pastes them; a scan never polls them.
+    return { status, sources: sources.filter((s) => s.enabled && s.kind !== 'clip') };
   }, [api]);
 
   return (
@@ -100,7 +101,7 @@ function Scan({ budgetStop, atLimit, sources }: { budgetStop?: string; atLimit: 
               <input type="checkbox" checked={draft} onChange={(e) => setDraft(e.target.checked)} />
               <span>
                 <span className="strong">Also draft strong matches right away</span>
-                <span className="cell-sub"> Off saves tokens: strong matches wait in Review, one click from a draft.</span>
+                <span className="cell-sub find-jobs-hint">Off saves tokens: strong matches wait in Review, one click from a draft.</span>
               </span>
             </label>
           </div>
