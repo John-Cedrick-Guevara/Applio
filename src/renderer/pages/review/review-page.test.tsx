@@ -1,6 +1,7 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import type { AppStatus } from '../../../shared/types';
 import { createMockApi } from '../../../shared/mock/mock-api';
 import { resumeBody } from '../../../shared/templates/application-documents';
 import { renderWithApp } from '../../../test/render';
@@ -128,6 +129,27 @@ describe('ReviewPage', () => {
     const detail = await screen.findByRole('region', { name: 'Draft detail' });
     expect(await within(detail).findByText(/Saving the résumé and letter PDFs/)).toBeInTheDocument();
     expect(within(detail).getByRole('button', { name: 'Approve & send email' })).toBeDisabled();
+  });
+
+  it('turns Approve on by itself once main reports the PDFs were saved (QA 2026-11-08)', async () => {
+    const api = await withGmail();
+    let saved = false;
+    const later = { ...api, getJob: async (id: string) => ({ ...(await api.getJob(id)), ...(saved ? {} : { folderPath: undefined }) }) };
+    const listeners = new Set<(s: AppStatus) => void>();
+    window.applioEvents = { onStatus: (l) => (listeners.add(l), () => listeners.delete(l)) };
+    const push = async (jobsVersion: number) => {
+      const status = { ...(await api.getStatus()), jobsVersion };
+      act(() => listeners.forEach((l) => l(status)));
+    };
+    renderWithApp(<ReviewPage params={{ id: 'j1' }} />, later);
+    const detail = await screen.findByRole('region', { name: 'Draft detail' });
+    await push(1);
+    expect(await within(detail).findByText(/Saving the résumé and letter PDFs/)).toBeInTheDocument();
+    saved = true;
+    await push(2);
+    await waitFor(() => expect(within(detail).getByRole('button', { name: 'Approve & send email' })).toBeEnabled());
+    expect(within(detail).queryByText(/Saving the résumé and letter PDFs/)).not.toBeInTheDocument();
+    delete window.applioEvents;
   });
 
   it('offers Set up Gmail instead of Approve while Gmail is not set up', async () => {

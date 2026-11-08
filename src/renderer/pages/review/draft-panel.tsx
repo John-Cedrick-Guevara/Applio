@@ -7,6 +7,7 @@ import { Icon } from '../../components/icons';
 import { ScoreBlock } from '../../components/score-block';
 import { useAction } from '../../hooks/use-action';
 import { useAsync } from '../../hooks/use-async';
+import { useJobsVersion } from '../../hooks/use-jobs-version';
 import { formatClock, formatRelative, formatTokens } from '../../lib/format';
 import { CHANNEL_LABEL } from '../../lib/labels';
 import { navigate } from '../../lib/router';
@@ -30,10 +31,13 @@ interface DraftPanelProps {
 /** Selected draft: match header, fit, documents and the approve/skip/edit footer. */
 export function DraftPanel({ jobId, ...rest }: DraftPanelProps) {
   const api = useApi();
+  // Main reports job changes (the PDFs landing, a send, a redraft); reload so this panel never shows a stale state.
+  // Existing data stays on screen while it reloads, so an edit in progress isn't lost.
+  const jobsChanges = useJobsVersion();
   const state = useAsync(async () => {
     const [job, draft, send] = await Promise.all([api.getJob(jobId), api.getDraft(jobId), api.getSend(jobId)]);
     return { job, draft, send };
-  }, [api, jobId]);
+  }, [api, jobId, jobsChanges]);
 
   return (
     <section className="card card-flush draft-panel" aria-label="Draft detail">
