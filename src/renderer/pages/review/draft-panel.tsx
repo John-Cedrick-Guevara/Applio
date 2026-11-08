@@ -22,8 +22,8 @@ interface DraftPanelProps {
   /** Whose name and email go on the documents. */
   owner: DocumentOwner;
   autonomyBySource: Record<string, Autonomy>;
-  /** Gmail's address and app password are saved, so an email draft can be sent. */
-  gmailReady: boolean;
+  /** Why an email draft can't send right now (Gmail missing or rejected), from `gmailIssue`. */
+  gmailIssue?: { message: string; action: string };
   onJobChange: (job: Job) => void;
 }
 
@@ -64,7 +64,7 @@ interface DetailProps extends Omit<DraftPanelProps, 'jobId' | 'onJobChange'> {
   onDraft: (draft: Draft) => void;
 }
 
-function DraftDetail({ job, draft, send, nextId, thresholds, owner, autonomyBySource, gmailReady, onJob, onDraft }: DetailProps) {
+function DraftDetail({ job, draft, send, nextId, thresholds, owner, autonomyBySource, gmailIssue, onJob, onDraft }: DetailProps) {
   const api = useApi();
   const action = useAction();
   // Its own action, so a failed send's message stays on screen and never reads as a skip or edit error.
@@ -74,7 +74,7 @@ function DraftDetail({ job, draft, send, nextId, thresholds, owner, autonomyBySo
   const primary = primaryAction(job);
   const state = sendState(job, send);
   const waiting = job.status === 'drafted';
-  const needsGmail = job.channel === 'email' && !gmailReady;
+  const needsGmail = job.channel === 'email' ? gmailIssue : undefined;
   const foundAt = job.history[0]?.at ?? job.postedAt;
 
   /** Approves (or retries) and then re-reads the job and its send log, so what's shown is what happened, success or not. */
@@ -185,8 +185,7 @@ function DraftDetail({ job, draft, send, nextId, thresholds, owner, autonomyBySo
         ) : null}
         {waiting && needsGmail ? (
           <div className="banner banner-warning">
-            <span>Gmail isn't set up, so approving can't send this email.</span>
-            <a href="#/settings">Set up Gmail</a>
+            <span>{needsGmail.message}</span>
           </div>
         ) : null}
         <div className="draft-footer-meta">
@@ -201,7 +200,7 @@ function DraftDetail({ job, draft, send, nextId, thresholds, owner, autonomyBySo
             {primary.handoff ? (
               <a className={buttonClass('primary')} href={`#/handoff/${job.id}`}>{primary.label}</a>
             ) : needsGmail ? (
-              <a className={buttonClass('primary')} href="#/settings">Set up Gmail to send</a>
+              <a className={buttonClass('primary')} href="#/settings">{needsGmail.action}</a>
             ) : (
               <Button variant="primary" busy={sending.pending} onClick={approve}>{sending.pending ? (job.channel === 'email' ? 'Sending…' : 'Submitting…') : primary.label}</Button>
             )}

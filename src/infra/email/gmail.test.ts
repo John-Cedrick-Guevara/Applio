@@ -61,7 +61,7 @@ describe('Gmail sender', () => {
   });
 
   it.each([
-    ['EAUTH', 'Invalid login: 535-5.7.8 Username and Password not accepted', 'Gmail rejected the address or app password. Create an app password at myaccount.google.com/apppasswords and save it below.'],
+    ['EAUTH', 'Invalid login: 535-5.7.8 Username and Password not accepted', 'Gmail rejected the address or app password. Create an app password at myaccount.google.com/apppasswords and save it in Settings.'],
     ['ECONNECTION', 'connect ECONNREFUSED', "Couldn't reach Gmail. Check the connection and try again."],
     ['EENVELOPE', 'No recipients defined', 'Gmail refused the email: No recipients defined'],
   ])('explains a %s failure without the password', async (code, raw, readable) => {
@@ -69,5 +69,25 @@ describe('Gmail sender', () => {
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toBe(readable);
     expect((error as Error).message).not.toContain(PASS);
+  });
+
+  it('verifies the address and app password without sending anything', async () => {
+    let verified = 0;
+    const sent: unknown[] = [];
+    const gmail = createGmail({ user: 'sam@gmail.com', pass: PASS, transport: () => ({ sendMail: async (m) => void sent.push(m), verify: async () => void verified++ }) });
+    await gmail.verify();
+    expect(verified).toBe(1);
+    expect(sent).toEqual([]);
+  });
+
+  it('says plainly when Gmail rejects the app password on verify, marked as a sign-in failure', async () => {
+    const gmail = createGmail({ user: 'sam@gmail.com', pass: PASS, transport: () => ({ sendMail: async () => {}, verify: async () => Promise.reject(Object.assign(new Error('535 bad'), { code: 'EAUTH' })) }) });
+    const error = await gmail.verify().catch((e: Error & { code: string }) => e);
+    expect(error).toMatchObject({ code: 'email_auth', message: expect.stringContaining('Gmail rejected the address or app password') });
+  });
+
+  it('marks an unreachable Gmail as offline, not as a wrong password', async () => {
+    const error = await failing('ETIMEDOUT', 'timeout').send({ from: 'a', to: 'b', subject: 's', text: 't', attachments: [] }).catch((e: Error & { code: string }) => e);
+    expect(error).toMatchObject({ code: 'email_offline' });
   });
 });

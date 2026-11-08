@@ -11,6 +11,7 @@ import { DraftingPanel } from './drafting-panel';
 import { QuestionsPanel } from './questions-panel';
 import { ReviewHeader } from './review-header';
 import { ReviewQueue } from './review-queue';
+import { gmailIssue } from './review-model';
 import './review.css';
 
 /** Everything Review needs, loaded together so the split view renders in one pass. Covers every status in `REVIEW_STATUSES`. */
@@ -40,7 +41,7 @@ async function loadReview(api: ReturnType<typeof useApi>) {
     undrafted: [...scored, ...found],
     below: scored.filter((j) => (j.score ?? 0) < settings.draftThreshold && !questions.has(j.id)).sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
     thresholds: { draft: settings.draftThreshold, auto: settings.autoSendThreshold },
-    gmailReady: !!settings.gmailAddress && settings.secretsSet.gmailAppPassword,
+    gmailIssue: gmailIssue(settings),
     owner: { name: settings.fullName, email: settings.gmailAddress, contact: profile.contact, groups: profile.factGroups },
     autonomyBySource: Object.fromEntries(sources.map((s) => [s.id, s.autonomy])) as Record<string, Autonomy>,
     status,
@@ -127,7 +128,7 @@ function ReviewLayout({ data, selectedId, onJobChange, onStatusChange, onRunComp
             thresholds={data.thresholds}
             owner={data.owner}
             autonomyBySource={data.autonomyBySource}
-            gmailReady={data.gmailReady}
+            gmailIssue={data.gmailIssue}
             onJobChange={onJobChange}
           />
         ) : (

@@ -33,7 +33,7 @@ import { buildUsage } from '../core/usage/build-usage';
 import { quotaLevel } from '../shared/quota';
 import { createBotApi } from '../infra/telegram/bot-api';
 import { fetchPublicPage, isPlatformUrl } from '../infra/web/fetch-page';
-import { createSettingsService } from '../core/settings/settings-service';
+import { CHECKS_KEY, createSettingsService } from '../core/settings/settings-service';
 import {
   createActivityRepo, createDraftsRepo, createJobsRepo, createSendsRepo, createPollsRepo, createProfileRepo, createSettingsRepo, createSourcesRepo, createQuestionsRepo, transaction,
 } from '../infra/db';
@@ -42,7 +42,7 @@ import { findJobFolder, writeApplication } from '../infra/fs/application-files';
 import { readResumeText } from '../infra/resume/read-resume';
 import type { SecretStore } from '../infra/secrets/secret-store';
 import type { ApplioApi } from '../shared/api';
-import type { Draft, AiEngine as EngineKind, AppStatus, InterviewPrep, Job, QuestionAnswer } from '../shared/types';
+import type { ConnectionCheck, Draft, AiEngine as EngineKind, AppStatus, InterviewPrep, Job, QuestionAnswer, Settings } from '../shared/types';
 import { AUTONOMY_LEVELS } from '../shared/autonomy';
 import { nextStatuses } from '../shared/status';
 import { matchesFilter } from '../shared/job-filter';
@@ -341,6 +341,57 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     return createGmail({ user, pass, ...(mailTransport ? { transport: mailTransport } : {}) });
   };
 
+  /** Records how a sign-in went (`Settings.checks`), so the page calls a connection Connected only after it worked. */
+  const recordCheck = (kind: 'gmail' | 'telegram', err?: unknown) => {
+    const at = new Date().toISOString();
+    const code = (err as { code?: unknown } | undefined)?.code;
+    const check: ConnectionCheck =
+      err === undefined
+        ? { ok: true, at, message: kind === 'gmail' ? 'Signed in to Gmail.' : 'Test message delivered.' }
+        : { ok: false, at, message: err instanceof Error ? err.message : String(err), ...(code === 'email_offline' || code === 'telegram_offline' ? { offline: true } : {}) };
+    const checks = (kv.get(CHECKS_KEY) as Settings['checks'] | undefined) ?? {};
+    kv.set(CHECKS_KEY, { ...checks, [kind]: check });
+  };
+
+  /** Sends through Gmail and keeps its check current: a sent email proves the password, a sign-in refusal disproves it. */
+  const sendGmail = async (message: Parameters<ReturnType<typeof gmail>['send']>[0]) => {
+    try {
+      await gmail().send(message);
+      recordCheck('gmail');
+    } catch (err) {
+      if ((err as { code?: unknown }).code === 'email_auth') recordCheck('gmail', err);
+      throw err;
+    }
+  };
+
+  /** Telegram's check: a short message to the operator's chat, the only way to prove both the token and the chat ID. */
+  const telegramHello = async () => {
+    const t = telegram();
+    if (!t) throw new Error('Missing credentials. Fill in the fields above first.');
+    await t.api.sendMessage(t.chatId, 'Applio is connected. Matches, drafts and replies will show up here.');
+  };
+
+  /**
+   * Signs in with a connection's saved credentials, once both parts are there, and
+   * records the result. Gmail is checked without sending; Telegram with a test message.
+   * Changed credentials always drop the old result first, so a stale "Connected" never shows.
+   */
+  const verifyConnection = async (kind: 'gmail' | 'telegram') => {
+    const s = settings.getSettings();
+    const checks = (kv.get(CHECKS_KEY) as Settings['checks'] | undefined) ?? {};
+    const { [kind]: _old, ...others } = checks;
+    kv.set(CHECKS_KEY, others);
+    const complete = kind === 'gmail' ? !!s.gmailAddress && s.secretsSet.gmailAppPassword : !!s.telegramChatId && s.secretsSet.telegramBotToken;
+    if (!complete) return;
+    try {
+      if (kind === 'gmail') await gmail().verify();
+      else await telegramHello();
+      recordCheck(kind);
+    } catch (err) {
+      recordCheck(kind, err);
+    }
+  };
+
   const localMidnight = () => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
@@ -356,7 +407,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       }),
     note,
     sendLog: sends,
-    sendEmail: (message) => gmail().send(message),
+    sendEmail: sendGmail,
     checkSetup: (channel) => void (channel === 'email' && gmail()),
     folder: (job) => jobFolder(job),
     fileExists: existsSync,
@@ -550,19 +601,23 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     updateSource: later(settings.updateSource),
     getSettings: later(settings.getSettings),
     // Engine, budget and interval all show in the status card, so a save pushes it.
-    saveSettings: later((patch) => {
-      const next = settings.saveSettings(patch);
+    saveSettings: async (patch) => {
+      settings.saveSettings(patch);
       if (patch.launchAtLogin !== undefined) setLaunchAtLogin(patch.launchAtLogin);
       if (patch.aiEngine !== undefined) void checkEngine();
+      if (patch.gmailAddress !== undefined) await verifyConnection('gmail');
+      if (patch.telegramChatId !== undefined) await verifyConnection('telegram');
       pushStatus();
-      return next;
-    }),
-    setSecret: later((key, value) => {
-      const next = settings.setSecret(key, value);
+      return settings.getSettings();
+    },
+    setSecret: async (key, value) => {
+      settings.setSecret(key, value);
       if (key === 'anthropicApiKey') void checkEngine();
+      if (key === 'gmailAppPassword') await verifyConnection('gmail');
+      if (key === 'telegramBotToken') await verifyConnection('telegram');
       pushStatus();
-      return next;
-    }),
+      return settings.getSettings();
+    },
 
     approveDraft: (jobId) => approveDraft(jobId, applyPorts),
 
@@ -653,7 +708,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
           const row = sends.get(id);
           return row?.state === 'sent' ? { subject: row.subject, ...(row.messageId ? { messageId: row.messageId } : {}) } : undefined;
         },
-        sendEmail: (message) => gmail().send(message),
+        sendEmail: sendGmail,
         owner,
         folder: jobFolder,
         appendFile: (path, text) => appendFileSync(path, text),
@@ -690,17 +745,20 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
         if (!secretsSet.gmailAppPassword || !gmailAddress) return { ok: false, message: 'Missing credentials. Fill in the fields above first.' };
         try {
           await gmail().sendTest();
+          recordCheck('gmail');
           return { ok: true, message: `Test email sent to ${gmailAddress}` };
         } catch (err) {
+          recordCheck('gmail', err);
           return { ok: false, message: err instanceof Error ? err.message : String(err) };
         }
       }
-      const t = secretsSet.telegramBotToken && telegramChatId ? telegram() : undefined;
-      if (!t) return { ok: false, message: 'Missing credentials. Fill in the fields above first.' };
+      if (!secretsSet.telegramBotToken || !telegramChatId) return { ok: false, message: 'Missing credentials. Fill in the fields above first.' };
       try {
-        await t.api.sendMessage(t.chatId, 'Applio is connected. Matches, drafts and replies will show up here.');
+        await telegramHello();
+        recordCheck('telegram');
         return { ok: true, message: 'Test message delivered to Telegram' };
       } catch (err) {
+        recordCheck('telegram', err);
         return { ok: false, message: err instanceof Error ? err.message : String(err) };
       }
     },

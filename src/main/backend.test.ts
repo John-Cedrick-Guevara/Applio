@@ -68,7 +68,9 @@ beforeEach(() => ((telegram = []), (telegramUpdates = [])));
 let outbox: { to?: unknown; subject?: unknown; text?: unknown; attachments?: unknown }[] = [];
 /** Set to make the fake SMTP refuse the next sends, like a wrong app password or a dropped network. */
 let smtpRefuses: string | undefined;
-beforeEach(() => ((outbox = []), (smtpRefuses = undefined)));
+/** Set to make the fake SMTP sign-in fail with nodemailer's code: EAUTH for a wrong password, ETIMEDOUT for no network. */
+let smtpSignIn: 'EAUTH' | 'ETIMEDOUT' | undefined;
+beforeEach(() => ((outbox = []), (smtpRefuses = undefined), (smtpSignIn = undefined)));
 
 /** A fake Gmail inbox holding the given messages, so no test reaches real IMAP. */
 const fakeInbox = (messages: { uid: number; envelope: object; headers?: Buffer; bodyStructure?: object }[] = []) => (): InboxClient =>
@@ -95,8 +97,13 @@ const backendIn = (folder = (dir = mkdtempSync(join(tmpdir(), 'applio-backend-')
     // Stands in for Gmail's SMTP: records each message instead of sending it.
     mailTransport: () => ({
       sendMail: async (m) => {
+        if (smtpSignIn) throw Object.assign(new Error('535 Username and Password not accepted'), { code: smtpSignIn });
         if (smtpRefuses) throw new Error(smtpRefuses);
         outbox.push(m);
+      },
+      verify: async () => {
+        if (smtpSignIn) throw Object.assign(new Error('535 Username and Password not accepted'), { code: smtpSignIn });
+        return true;
       },
     }),
     // Stands in for Applio's form window: "submits" and reports what it filled.
@@ -602,6 +609,48 @@ describe('createBackend discovery', () => {
     expect((await api.skipJob(job.id)).status).toBe('skipped');
   });
 
+  it('signs in to Gmail when its credentials are saved, sending nothing, and only then calls it connected', async () => {
+    const { api } = backendIn();
+    expect((await api.saveSettings({ gmailAddress: 'sam@gmail.com' })).checks.gmail).toBeUndefined();
+    const saved = await api.setSecret('gmailAppPassword', PASSWORD);
+    expect(saved.checks.gmail).toMatchObject({ ok: true });
+    expect(outbox).toEqual([]);
+  });
+
+  it('records a rejected app password as a failed check, never as connected', async () => {
+    const { api } = backendIn();
+    await api.saveSettings({ gmailAddress: 'sam@gmail.com' });
+    smtpSignIn = 'EAUTH';
+    const saved = await api.setSecret('gmailAppPassword', 'qafakeqafakeqafk');
+    expect(saved.checks.gmail).toMatchObject({ ok: false, message: expect.stringContaining('Gmail rejected the address or app password') });
+    expect(saved.checks.gmail?.offline).toBeUndefined();
+  });
+
+  it('records an unreachable Gmail as not verified, not as a wrong password', async () => {
+    const { api } = backendIn();
+    await api.saveSettings({ gmailAddress: 'sam@gmail.com' });
+    smtpSignIn = 'ETIMEDOUT';
+    expect((await api.setSecret('gmailAppPassword', PASSWORD)).checks.gmail).toMatchObject({ ok: false, offline: true });
+  });
+
+  it('marks Gmail as failing when a send is rejected for its password, and as working again after a send goes out', async () => {
+    const { api, job } = await emailJob();
+    smtpSignIn = 'EAUTH';
+    await expect(api.approveDraft(job.id)).rejects.toThrow('Gmail rejected');
+    expect((await api.getSettings()).checks.gmail).toMatchObject({ ok: false });
+    smtpSignIn = undefined;
+    await api.approveDraft(job.id);
+    expect((await api.getSettings()).checks.gmail).toMatchObject({ ok: true });
+  });
+
+  it('checks Telegram with a test message when its token and chat are saved', async () => {
+    const { api } = backendIn();
+    await api.saveSettings({ telegramChatId: '12345' });
+    const saved = await api.setSecret('telegramBotToken', '123:abc');
+    expect(saved.checks.telegram).toMatchObject({ ok: true });
+    expect(telegram.map((c) => c.method)).toEqual(['sendMessage']);
+  });
+
   it('sends a test email to the operator’s own address', async () => {
     const { api } = backendIn();
     await api.saveSettings({ gmailAddress: 'sam@gmail.com' });
@@ -702,9 +751,11 @@ describe('createBackend discovery', () => {
   });
 
   const TOKEN = '123456:ABC-secret-token';
+  /** Sets Telegram up, then forgets the setup check's test message so tests see only what came after. */
   const withTelegram = async (api: ApplioApi) => {
     await api.saveSettings({ telegramChatId: '42' });
     await api.setSecret('telegramBotToken', TOKEN);
+    telegram = [];
   };
 
   it('tells Telegram about a draft waiting for approval, with Approve, Open and Skip', async () => {

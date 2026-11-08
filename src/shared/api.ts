@@ -117,7 +117,7 @@ export interface ApplioApi {
 
   // Settings
   getSettings(): Promise<Settings>;
-  saveSettings(patch: Partial<Omit<Settings, 'secretsSet'>>): Promise<Settings>;
+  saveSettings(patch: Partial<Omit<Settings, 'secretsSet' | 'checks'>>): Promise<Settings>;
   /** Write-only: secrets go to the OS keychain and are never returned. */
   setSecret(key: SecretKey, value: string): Promise<Settings>;
   /** `command`: a terminal command that fixes it, when there is one (signing in Applio's Claude Code profile). */

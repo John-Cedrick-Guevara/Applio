@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Job } from '../../../shared/types';
 import type { SendRecord } from '../../../shared/types';
 import { formatClock } from '../../lib/format';
-import { effortLevel, modeLabel, pendingReason, primaryAction, queueState, runLine, runResult, sendState } from './review-model';
+import { effortLevel, gmailIssue, modeLabel, pendingReason, primaryAction, queueState, runLine, runResult, sendState } from './review-model';
 
 const job = (over: Partial<Job>): Job => ({
   id: 'x', sourceId: 's', sourceName: 'S', company: 'C', title: 'T', url: '', location: '', employmentType: 'full-time',
@@ -161,5 +161,21 @@ describe('sendState', () => {
 
   it('is skipped for a skipped job', () => {
     expect(sendState(job({ status: 'skipped' }), null)).toEqual({ kind: 'skipped' });
+  });
+});
+
+describe('gmailIssue', () => {
+  const set = { anthropicApiKey: false, gmailAppPassword: true, telegramBotToken: false };
+  const at = '2026-11-08T09:00:00.000Z';
+  it('asks for setup while the address or app password is missing', () => {
+    expect(gmailIssue({ gmailAddress: '', secretsSet: set, checks: {} })?.action).toBe('Set up Gmail to send');
+  });
+  it('asks for a fix when the saved password was rejected', () => {
+    expect(gmailIssue({ gmailAddress: 'a@b.co', secretsSet: set, checks: { gmail: { ok: false, at, message: 'Rejected.' } } })).toMatchObject({ action: 'Fix Gmail to send', message: expect.stringContaining('Rejected.') });
+  });
+  it('lets the operator send when Gmail signed in, was never checked, or was only unreachable', () => {
+    expect(gmailIssue({ gmailAddress: 'a@b.co', secretsSet: set, checks: { gmail: { ok: true, at, message: '' } } })).toBeUndefined();
+    expect(gmailIssue({ gmailAddress: 'a@b.co', secretsSet: set, checks: {} })).toBeUndefined();
+    expect(gmailIssue({ gmailAddress: 'a@b.co', secretsSet: set, checks: { gmail: { ok: false, offline: true, at, message: '' } } })).toBeUndefined();
   });
 });

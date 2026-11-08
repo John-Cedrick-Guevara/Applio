@@ -4,9 +4,10 @@ import { AppError } from '../../shared/errors';
 type Fetch = (url: string, init: RequestInit) => Promise<Response>;
 
 /** Telegram refused or couldn't be reached. Never carries the token, which is part of every request URL. */
+/** `code`: `telegram_auth` for a wrong token or chat, `telegram_offline` when Telegram can't be reached. */
 export class TelegramError extends AppError {
-  constructor(message: string) {
-    super('telegram_failed', message);
+  constructor(message: string, code: 'telegram_failed' | 'telegram_auth' | 'telegram_offline' = 'telegram_failed') {
+    super(code, message);
   }
 }
 
@@ -31,12 +32,12 @@ export function createBotApi(token: string, fetch: Fetch): BotApi {
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
     } catch {
-      throw new TelegramError("Couldn't reach Telegram.");
+      throw new TelegramError("Couldn't reach Telegram.", 'telegram_offline');
     }
     const data = (await res.json().catch(() => ({}))) as { ok?: boolean; result?: T; description?: string };
     // A malformed token makes the URL unknown, so Telegram answers 404 rather than 401.
-    if (res.status === 401 || res.status === 404) throw new TelegramError('Telegram rejected the bot token. Copy it from @BotFather and save it again.');
-    if (/chat not found/i.test(data.description ?? '')) throw new TelegramError("Telegram can't find that chat. Open your bot in Telegram, press Start, then check the chat ID and test again.");
+    if (res.status === 401 || res.status === 404) throw new TelegramError('Telegram rejected the bot token. Copy it from @BotFather and save it again.', 'telegram_auth');
+    if (/chat not found/i.test(data.description ?? '')) throw new TelegramError("Telegram can't find that chat. Open your bot in Telegram, press Start, then check the chat ID and test again.", 'telegram_auth');
     if (!data.ok) throw new TelegramError(`Telegram refused: ${data.description ?? `HTTP ${res.status}`}`);
     return data.result as T;
   };

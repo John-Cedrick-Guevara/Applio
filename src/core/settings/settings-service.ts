@@ -22,6 +22,8 @@ type SettingsMethods = 'getSettings' | 'saveSettings' | 'setSecret' | 'listSourc
 export type SettingsService = { [M in SettingsMethods]: (...args: Parameters<ApplioApi[M]>) => Awaited<ReturnType<ApplioApi[M]>> };
 
 const KEY = 'settings';
+/** Where main keeps each connection's last sign-in check (`Settings.checks`). */
+export const CHECKS_KEY = 'connectionChecks';
 const SECRET_KEYS: readonly SecretKey[] = ['anthropicApiKey', 'gmailAppPassword', 'telegramBotToken'];
 
 /**
@@ -42,6 +44,7 @@ export function createSettingsService({ kv, sources, secrets }: SettingsPorts): 
   const getSettings = (): Settings => ({
     ...stored(),
     secretsSet: Object.fromEntries(SECRET_KEYS.map((k) => [k, secrets.has(k)])) as Settings['secretsSet'],
+    checks: (kv.get(CHECKS_KEY) as Settings['checks'] | undefined) ?? {},
   });
 
   return {

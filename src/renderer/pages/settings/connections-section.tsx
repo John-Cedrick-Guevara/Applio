@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { ConnectionKind, SecretKey, Settings } from '../../../shared/types';
+import type { ConnectionCheck, ConnectionKind, SecretKey, Settings } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { Button } from '../../components/button';
 import { CopyButton } from '../../components/copy-button';
@@ -8,6 +8,7 @@ import { useToast } from '../../components/toast';
 import { useAction } from '../../hooks/use-action';
 import { useAsync } from '../../hooks/use-async';
 import { EMAIL_PATTERN } from '../../../shared/patterns';
+import { connectionBadge } from './connections-model';
 
 type Props = { settings: Settings; onChange: (s: Settings) => void };
 
@@ -22,6 +23,7 @@ export function ConnectionsSection({ settings, onChange }: Props) {
       <ConnectionRow
         title="Gmail"
         ready={gmailReady}
+        check={settings.checks.gmail}
         readyText={`${settings.gmailAddress} · app password · sends with SMTP, watches replies with IMAP`}
         setupText="Use an app password from Google Account → Security, never your normal password."
         field={{ key: 'gmailAddress', label: 'Gmail address', value: settings.gmailAddress, valid: (v) => EMAIL_PATTERN.test(v), invalid: 'Enter a valid email address.' }}
@@ -32,6 +34,7 @@ export function ConnectionsSection({ settings, onChange }: Props) {
       <ConnectionRow
         title="Telegram"
         ready={telegramReady}
+        check={settings.checks.telegram}
         readyText="New matches, drafts to approve, replies, follow-ups due, limit warnings"
         setupText="Create a bot with @BotFather, then send it /start to get your chat ID."
         field={{ key: 'telegramChatId', label: 'Chat ID', value: settings.telegramChatId, valid: (v) => /^-?\d+$/.test(v), invalid: 'Chat IDs are numbers, e.g. 123456789.' }}
@@ -119,7 +122,9 @@ function EngineRow({ settings, onChange }: Props) {
 
 interface ConnectionRowProps {
   title: string;
+  /** Both parts are saved. Whether they work is `check`. */
   ready: boolean;
+  check?: ConnectionCheck;
   readyText: string;
   setupText: string;
   field: { key: 'gmailAddress' | 'telegramChatId'; label: string; value: string; valid: (v: string) => boolean; invalid: string };
@@ -129,34 +134,53 @@ interface ConnectionRowProps {
 }
 
 /** A credential-backed integration: setup fields until connected, then a status line and a test button. */
-function ConnectionRow({ title, ready, readyText, setupText, field, secret, test, onChange }: ConnectionRowProps) {
+function ConnectionRow({ title, ready, check, readyText, setupText, field, secret, test, onChange }: ConnectionRowProps) {
   const api = useApi();
   const action = useAction();
   const toast = useToast();
   const [value, setValue] = useState(field.value);
   const [secretValue, setSecretValue] = useState('');
   const [error, setError] = useState<string | null>(null);
-  // A connected row hides its fields; Change brings them back to replace a token or chat.
+  // A verified row hides its fields; Change brings them back. Anything short of verified keeps them open to fix.
   const [editing, setEditing] = useState(false);
+  const badge = connectionBadge(ready, check);
+  const connected = badge.label === 'Connected';
+
+  /** After a save: say whether the new credentials signed in, not just that they were stored. */
+  const report = (next: Settings) => {
+    const result = next.checks[test.kind as 'gmail' | 'telegram'];
+    if (!result) return;
+    toast.show(result.ok ? `${title} signed in` : result.offline ? `Saved. ${result.message}` : `Saved, but ${title} can't sign in. ${result.message}`, result.ok ? 'success' : 'error');
+  };
 
   const saveField = async () => {
     const v = value.trim();
     if (v === field.value) return;
     if (v && !field.valid(v)) return setError(field.invalid);
-    const next = await action.run(`save the ${field.label.toLowerCase()}`, () => api.saveSettings({ [field.key]: v }), 'Saved');
-    if (next) onChange(next);
+    const next = await action.run(`save the ${field.label.toLowerCase()}`, () => api.saveSettings({ [field.key]: v }));
+    if (!next) return;
+    onChange(next);
+    if (next.checks[test.kind as 'gmail' | 'telegram']) report(next);
+    else toast.show('Saved', 'success');
   };
 
   const saveSecret = async () => {
     if (!secretValue) return;
-    const next = await action.run(`save the ${secret.label.toLowerCase()}`, () => api.setSecret(secret.key, secretValue), `${secret.label} saved to your system keychain`);
+    const next = await action.run(`save the ${secret.label.toLowerCase()}`, () => api.setSecret(secret.key, secretValue));
     setSecretValue('');
-    if (next) onChange(next);
+    if (!next) return;
+    onChange(next);
+    if (next.checks[test.kind as 'gmail' | 'telegram']) report(next);
+    else toast.show(`${secret.label} saved to your system keychain`, 'success');
+    setEditing(false);
   };
 
   const runTest = async () => {
     const result = await action.run(`test ${title}`, () => api.testConnection(test.kind));
-    if (result) toast.show(result.message, result.ok ? 'success' : 'error');
+    if (!result) return;
+    toast.show(result.message, result.ok ? 'success' : 'error');
+    // A test is a sign-in too, so the badge follows it.
+    onChange(await api.getSettings());
   };
 
   return (
@@ -164,10 +188,11 @@ function ConnectionRow({ title, ready, readyText, setupText, field, secret, test
       <div className="settings-row-text wide">
         <div className="row">
           <span className="settings-row-name">{title}</span>
-          <span className={ready ? 'badge badge-success' : 'badge badge-warning'}>{ready ? 'Connected' : 'Not set up'}</span>
+          <span className={`badge badge-${badge.tone}`}>{badge.label}</span>
         </div>
         <div className="cell-sub settings-desc">{ready ? readyText : setupText}</div>
-        {ready && !editing ? null : (
+        {badge.detail ? <div className={badge.tone === 'danger' ? 'cell-sub field-error' : 'cell-sub'} role={badge.tone === 'danger' ? 'alert' : undefined}>{badge.detail}</div> : null}
+        {connected && !editing ? null : (
           <div className="connection-fields">
             <div className="field">
               <label htmlFor={`f-${field.key}`}>{field.label}</label>
@@ -193,8 +218,8 @@ function ConnectionRow({ title, ready, readyText, setupText, field, secret, test
         )}
       </div>
       <div className="row">
-        {ready && !editing ? <Button aria-label={`Change ${title}`} onClick={() => setEditing(true)}>Change</Button> : null}
-        <Button busy={action.pending} onClick={runTest}>{action.pending ? 'Sending…' : test.label}</Button>
+        {connected && !editing ? <Button aria-label={`Change ${title}`} onClick={() => setEditing(true)}>Change</Button> : null}
+        <Button busy={action.pending} onClick={runTest}>{action.pending ? 'Checking…' : test.label}</Button>
       </div>
     </div>
   );

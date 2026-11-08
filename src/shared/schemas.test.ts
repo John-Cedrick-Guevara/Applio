@@ -100,7 +100,10 @@ describe('API argument schemas', () => {
     it('accepts every saved setting and rejects thresholds out of range', () => {
       const settings: Partial<ReturnType<typeof seedSettings>> = seedSettings();
       delete settings.secretsSet;
+      delete settings.checks;
       expect(parseApiArgs('saveSettings', [settings])).toHaveLength(1);
+      // Sign-in checks come from main; the page can't mark a connection verified.
+      expect(rejects('saveSettings', [{ checks: { gmail: { ok: true, at: '', message: '' } } }])).toThrow(InvalidRequestError);
       expect(rejects('saveSettings', [{ draftThreshold: 120 }])).toThrow(InvalidRequestError);
       expect(rejects('saveSettings', [{ maxPerChannelPerDay: 2.5 }])).toThrow(InvalidRequestError);
     });
