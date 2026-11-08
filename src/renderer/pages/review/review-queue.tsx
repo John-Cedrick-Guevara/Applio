@@ -3,7 +3,8 @@ import type { Job } from '../../../shared/types';
 import { buttonClass } from '../../components/button';
 import { CHANNEL_LABEL } from '../../lib/labels';
 import { navigate } from '../../lib/router';
-import { pendingReason, queueGroups, queueState, sendsOnApprove, type QueueFilter, type QueueGroup } from './review-model';
+import { pendingReason } from '../../lib/job-progress';
+import { queueGroups, queueState, sendsOnApprove, type QueueFilter, type QueueGroup } from './review-model';
 
 interface ReviewQueueProps {
   jobs: Job[];

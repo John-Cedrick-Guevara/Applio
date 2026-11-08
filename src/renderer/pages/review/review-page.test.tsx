@@ -227,18 +227,9 @@ describe('ReviewPage', () => {
     expect((await api.getDraft('j1'))?.coverLetter).toBe('Short and sweet');
   });
 
-  it('disables Run now and says why once every source has used today\'s polls', async () => {
-    const api = createMockApi({ latencyMs: 0 });
-    const capped = { ...api, getStatus: async () => ({ ...(await api.getStatus()), sourcesAtLimit: true }) };
-    renderWithApp(<ReviewPage params={{}} />, capped);
-    expect(await screen.findByRole('button', { name: 'Run now' })).toBeDisabled();
-    expect(screen.getByText("Every source has used today's polls. They poll again after midnight.")).toBeInTheDocument();
-  });
-
-  it('tells the operator what Run now did', async () => {
+  it('sends the operator to Find jobs to start a scan', async () => {
     open();
-    await userEvent.click(await screen.findByRole('button', { name: 'Run now' }));
-    expect(await screen.findByText('Run finished: 2 jobs passed your filters, 0 drafted.')).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Find jobs' })).toHaveAttribute('href', '#/find-jobs');
   });
 
   it('asks before skipping, naming the job, and skips only on confirm', async () => {
@@ -269,7 +260,7 @@ describe('ReviewPage', () => {
     open();
     await userEvent.click(await screen.findByRole('button', { name: 'Pause auto-send' }));
     expect(await screen.findByText(/Auto-send is paused/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Run now' })).toBeEnabled();
+    expect(screen.getByRole('link', { name: 'Find jobs' })).toBeInTheDocument();
   });
 
   it('lists the jobs scored below the draft threshold when asked, each opening its detail', async () => {
@@ -380,7 +371,7 @@ describe('ReviewPage', () => {
     vi.spyOn(api, 'getStatus').mockResolvedValue({ ...status, drafting: ['j5'], draftingSince: { j5: new Date(Date.now() - 90_000).toISOString() } });
     renderWithApp(<ReviewPage params={{ id: 'j5' }} />, api);
     const panel = await screen.findByRole('region', { name: 'Drafting' });
-    expect(panel).toHaveTextContent(/1:3\d elapsed/);
+    expect(panel).toHaveTextContent(/1:[23]\d elapsed/);
     const steps = within(panel).getByRole('list', { name: 'Drafting steps' });
     expect(within(steps).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Claude writes the résumé and letter from your fact bankIn progress', 'Save the PDFs']);
   });

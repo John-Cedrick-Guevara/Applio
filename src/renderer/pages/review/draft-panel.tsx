@@ -15,7 +15,8 @@ import { CHANNEL_LABEL } from '../../lib/labels';
 import { navigate } from '../../lib/router';
 import type { DocumentOwner } from '../../../shared/templates/application-documents';
 import { DraftDocument, type DocTab } from './draft-document';
-import { filesState, jobSteps, modeLabel, primaryAction, sendState, effortLevel, type SendState } from './review-model';
+import { filesState } from '../../lib/job-progress';
+import { jobSteps, modeLabel, primaryAction, sendState, effortLevel, type SendState } from './review-model';
 import { SourceCredit } from '../../components/source-credit';
 
 interface DraftPanelProps {

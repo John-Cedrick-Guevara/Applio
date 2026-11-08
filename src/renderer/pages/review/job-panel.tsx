@@ -7,7 +7,7 @@ import { SourceCredit } from '../../components/source-credit';
 import { useAction } from '../../hooks/use-action';
 import { CHANNEL_LABEL } from '../../lib/labels';
 import { navigate } from '../../lib/router';
-import { pendingReason } from './review-model';
+import { pendingReason } from '../../lib/job-progress';
 
 interface JobPanelProps {
   job: Job;
