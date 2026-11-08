@@ -130,3 +130,31 @@ export function filesState(job: Pick<Job, 'folderPath' | 'history'>): { kind: 'r
   const failed = job.history.findLast((e) => e.note?.startsWith("Couldn't save the files"))?.note;
   return failed ? { kind: 'failed', reason: failed } : { kind: 'saving' };
 }
+
+/** Which of the queue's filters a group sits under. */
+export type QueueFilter = 'attention' | 'send' | 'handoff';
+
+export interface QueueGroup {
+  key: 'unsent' | 'asking' | 'drafting' | 'send' | 'handoff';
+  label: string;
+  filter: QueueFilter;
+  jobs: Job[];
+}
+
+/**
+ * The Review queue grouped by what the operator does next, most urgent first:
+ * approved but not sent, Claude's questions, drafting now, then drafts to send
+ * and drafts to hand off. Each group is best match first; empty groups are left out.
+ */
+export function queueGroups(queue: readonly Job[], asking: readonly Job[], drafting: readonly Job[]): QueueGroup[] {
+  const best = (jobs: readonly Job[]) => [...jobs].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+  const drafted = queue.filter((j) => j.status !== 'approved');
+  const groups: QueueGroup[] = [
+    { key: 'unsent', label: 'Approved, not sent', filter: 'attention', jobs: best(queue.filter((j) => j.status === 'approved')) },
+    { key: 'asking', label: 'Needs your answers', filter: 'attention', jobs: best(asking) },
+    { key: 'drafting', label: 'Drafting now', filter: 'attention', jobs: best(drafting) },
+    { key: 'send', label: 'Ready to send', filter: 'send', jobs: best(drafted.filter((j) => sendsOnApprove(j.channel))) },
+    { key: 'handoff', label: 'To hand off', filter: 'handoff', jobs: best(drafted.filter((j) => !sendsOnApprove(j.channel))) },
+  ];
+  return groups.filter((g) => g.jobs.length > 0);
+}

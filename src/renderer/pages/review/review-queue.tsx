@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Job } from '../../../shared/types';
 import { buttonClass } from '../../components/button';
 import { CHANNEL_LABEL } from '../../lib/labels';
-import { pendingReason, queueState, sendsOnApprove } from './review-model';
+import { pendingReason, queueGroups, queueState, sendsOnApprove, type QueueFilter, type QueueGroup } from './review-model';
 
 interface ReviewQueueProps {
   jobs: Job[];
@@ -18,153 +18,139 @@ interface ReviewQueueProps {
   draftThreshold: number;
 }
 
-/** "Waiting on you": one row per draft, linking to it. Manual-handoff channels get an amber chip. */
+const FILTERS: { id: QueueFilter | 'all'; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'attention', label: 'Needs you' },
+  { id: 'send', label: 'Send' },
+  { id: 'handoff', label: 'Hand off' },
+];
+
+/** At or past this many drafts with a low draft score, the queue suggests raising the score. */
+const CROWDED = 12;
+const LOW_DRAFT_SCORE = 50;
+
+/**
+ * "Waiting on you", grouped by what the operator does next (needs you, send, hand
+ * off) with a filter for each, two-line rows, and badges only for exceptions. The
+ * list scrolls inside its card, so a long queue never pushes the draft out of view.
+ */
 export function ReviewQueue({ jobs, currentId, below, waiting, asking, drafting, draftThreshold }: ReviewQueueProps) {
-  // Approved jobs that haven't gone out lead the list, so none drops out of sight.
-  const unsent = jobs.filter((j) => j.status === 'approved');
-  const rest = jobs.filter((j) => j.status !== 'approved');
+  const [filter, setFilter] = useState<QueueFilter | 'all'>('all');
   const [showBelow, setShowBelow] = useState(false);
   const [showWaiting, setShowWaiting] = useState(false);
+  const groups = queueGroups(jobs, asking, drafting);
+  const count = (f: QueueFilter | 'all') => groups.filter((g) => f === 'all' || g.filter === f).reduce((n, g) => n + g.jobs.length, 0);
+  const shown = groups.filter((g) => filter === 'all' || g.filter === filter);
+  const drafted = groups.filter((g) => g.key === 'send' || g.key === 'handoff').reduce((n, g) => n + g.jobs.length, 0);
+
   return (
     <section className="card card-flush review-queue" aria-label="Queue">
-      <div className="card-header">
-        <h2 className="queue-title">Waiting on you</h2>
-        <span className="cell-sub">Sorted by match</span>
+      <div className="card-header queue-head">
+        <h2 className="queue-title">Waiting on you <span className="queue-count">{count('all')}</span></h2>
+        <div className="queue-filters" role="group" aria-label="Show">
+          {FILTERS.filter((f) => f.id === 'all' || count(f.id) > 0).map((f) => (
+            <button key={f.id} type="button" className="queue-filter" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>
+              {f.label} <span className="queue-filter-count">{count(f.id)}</span>
+            </button>
+          ))}
+        </div>
       </div>
-      {drafting.length > 0 ? (
-        <>
-          <div className="queue-group-label">Drafting now</div>
-          <ul className="list-plain" aria-label="Drafting now">
-            {drafting.map((job) => (
-              <li key={job.id}>
-                <a href={`#/review/${job.id}`} className="queue-row" aria-current={job.id === currentId ? 'true' : undefined} aria-busy="true">
-                  <div className="queue-row-top">
-                    <div className="queue-row-text">
-                      <div className="queue-role">{job.title}</div>
-                      <div className="cell-sub">{job.company} · {job.sourceName}</div>
-                    </div>
-                    <span className="queue-score mono">{job.score}</span>
-                  </div>
-                  <div className="queue-row-meta"><span className="spinner" aria-hidden="true" /><span className="cell-sub">Claude is drafting…</span></div>
-                </a>
-              </li>
-            ))}
-          </ul>
-        </>
+
+      {drafted >= CROWDED && draftThreshold < LOW_DRAFT_SCORE ? (
+        <p className="queue-hint">
+          Your draft score is {draftThreshold}, so almost every match gets a draft. <a href="#/settings">Raise it in Settings</a> to see only strong matches.
+        </p>
       ) : null}
-      {asking.length > 0 ? (
-        <>
-          <div className="queue-group-label">Needs your answers</div>
-          <ul className="list-plain" aria-label="Needs your answers">
-            {asking.map((job) => (
-              <li key={job.id}>
-                <a href={`#/review/${job.id}`} className="queue-row" aria-current={job.id === currentId ? 'true' : undefined}>
-                  <div className="queue-row-top">
-                    <div className="queue-row-text">
-                      <div className="queue-role">{job.title}</div>
-                      <div className="cell-sub">{job.company} · {job.sourceName}</div>
-                    </div>
-                    <span className="queue-score mono">{job.score}</span>
-                  </div>
-                  <div className="queue-row-meta"><span className="badge badge-warning">Claude has questions</span></div>
-                </a>
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : null}
-      {unsent.length > 0 ? (
-        <>
-          <div className="queue-group-label">Approved, not sent ({unsent.length})</div>
-          <ul className="list-plain" aria-label="Approved, not sent">
-            {unsent.map((job) => <QueueRow key={job.id} job={job} currentId={currentId} />)}
-          </ul>
-        </>
-      ) : null}
-      <ul className="list-plain">
-        {rest.map((job) => (
-          <li key={job.id}>
-            <a
-              href={`#/review/${job.id}`}
-              className={['queue-row', job.status === 'skipped' && 'queue-row-skipped'].filter(Boolean).join(' ')}
-              aria-current={job.id === currentId ? 'true' : undefined}
-            >
-              <div className="queue-row-top">
-                <div className="queue-row-text">
-                  <div className="queue-role">{job.title}</div>
-                  <div className="cell-sub">{job.company} · {job.sourceName}</div>
-                </div>
-                <span className="queue-score mono">{job.score}</span>
-              </div>
-              <div className="queue-row-meta">
-                <span className={sendsOnApprove(job.channel) ? 'badge badge-neutral' : 'badge badge-warning'}>
-                  {job.platform ? job.applyTarget.split(' · ')[0] : CHANNEL_LABEL[job.channel]}
-                </span>
-                <span className="cell-sub">{queueState(job)}</span>
-                {job.suspicious ? <span className="badge badge-danger" title={job.suspicious}>Check post</span> : null}
-              </div>
-            </a>
-          </li>
-        ))}
-      </ul>
-      {waiting.length > 0 ? (
-        <div className="queue-footer">
-          {waiting.length} not scored or drafted yet; the next run retries them.{' '}
-          <button type="button" className={buttonClass('secondary', 'sm', 'queue-footer-action')} aria-expanded={showWaiting} aria-label={showWaiting ? 'Hide waiting jobs' : 'Show waiting jobs'} onClick={() => setShowWaiting((s) => !s)}>
-            {showWaiting ? 'Hide them' : 'Show them'}
-          </button>
-          {showWaiting ? (
-            <ul className="list-plain below-list">
-              {waiting.map((job) => (
-                <li key={job.id}>
-                  <a href={`#/review/${job.id}`} className="below-row" aria-current={job.id === currentId ? 'true' : undefined}>
-                    <span>{job.title}<span className="cell-sub"> · {job.company}</span><span className="cell-sub waiting-reason">{pendingReason(job)}</span></span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-      ) : null}
-      {below.length > 0 ? (
-        <div className="queue-footer">
-          {below.length} more scored below your draft threshold ({draftThreshold}).{' '}
-          <button type="button" className={buttonClass('secondary', 'sm', 'queue-footer-action')} aria-expanded={showBelow} onClick={() => setShowBelow((s) => !s)}>
-            {showBelow ? 'Hide them' : 'Show them'}
-          </button>
-          {showBelow ? (
-            <ul className="list-plain below-list">
-              {below.map((job) => (
-                <li key={job.id}>
-                  <a href={`#/review/${job.id}`} className="below-row" aria-current={job.id === currentId ? 'true' : undefined}>
-                    <span className="queue-score mono">{job.score}</span>
-                    <span>{job.title}<span className="cell-sub"> · {job.company} · {job.sourceName}</span></span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
-      ) : null}
+
+      <div className="queue-scroll">
+        {shown.map((g) => <Group key={g.key} group={g} currentId={currentId} />)}
+        {shown.length === 0 ? <p className="queue-empty cell-sub">Nothing here right now.</p> : null}
+
+        {filter === 'all' && waiting.length > 0 ? (
+          <div className="queue-footer">
+            {waiting.length} not scored or drafted yet; the next run retries them.{' '}
+            <button type="button" className={buttonClass('link', 'sm', 'queue-footer-action')} aria-expanded={showWaiting} aria-label={showWaiting ? 'Hide waiting jobs' : 'Show waiting jobs'} onClick={() => setShowWaiting((s) => !s)}>
+              {showWaiting ? 'Hide them' : 'Show them'}
+            </button>
+            {showWaiting ? (
+              <ul className="list-plain below-list">
+                {waiting.map((job) => (
+                  <li key={job.id}>
+                    <a href={`#/review/${job.id}`} className="below-row" aria-current={job.id === currentId ? 'true' : undefined}>
+                      <span>{job.title}<span className="cell-sub"> · {job.company}</span><span className="cell-sub waiting-reason">{pendingReason(job)}</span></span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+        {filter === 'all' && below.length > 0 ? (
+          <div className="queue-footer">
+            {below.length} more scored below your draft threshold ({draftThreshold}).{' '}
+            <button type="button" className={buttonClass('link', 'sm', 'queue-footer-action')} aria-expanded={showBelow} onClick={() => setShowBelow((s) => !s)}>
+              {showBelow ? 'Hide them' : 'Show them'}
+            </button>
+            {showBelow ? (
+              <ul className="list-plain below-list">
+                {below.map((job) => (
+                  <li key={job.id}>
+                    <a href={`#/review/${job.id}`} className="below-row" aria-current={job.id === currentId ? 'true' : undefined}>
+                      <span className="queue-score mono">{job.score}</span>
+                      <span>{job.title}<span className="cell-sub"> · {job.company} · {job.sourceName}</span></span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
     </section>
   );
 }
 
-/** A row for an approved job that hasn't gone out: red when a send failed, amber when it waits for a handoff. */
-function QueueRow({ job, currentId }: { job: Job; currentId?: string }) {
-  const failed = sendsOnApprove(job.channel);
+/** One group: a header with its count, then its rows. */
+function Group({ group, currentId }: { group: QueueGroup; currentId?: string }) {
+  return (
+    <>
+      <div className="queue-group-label">{group.label} ({group.jobs.length})</div>
+      <ul className="list-plain" aria-label={group.label}>
+        {group.jobs.map((job) => <QueueRow key={job.id} job={job} group={group.key} currentId={currentId} />)}
+      </ul>
+    </>
+  );
+}
+
+/**
+ * A two-line row: title and score, then company and channel. A badge shows only
+ * when something is off the normal path (a failed send, Claude's questions, a
+ * suspicious post, a skip); the group already says what the rest are waiting for.
+ */
+function QueueRow({ job, group, currentId }: { job: Job; group: QueueGroup['key']; currentId?: string }) {
+  const channel = job.platform ? job.applyTarget.split(' · ')[0] : CHANNEL_LABEL[job.channel];
+  const badge =
+    group === 'unsent' ? <span className={sendsOnApprove(job.channel) ? 'badge badge-danger' : 'badge badge-warning'}>{queueState(job)}</span>
+    : group === 'asking' ? <span className="badge badge-warning">Claude has questions</span>
+    : job.suspicious ? <span className="badge badge-danger" title={job.suspicious}>Check post</span>
+    : job.status === 'skipped' ? <span className="badge badge-neutral">Skipped</span>
+    : null;
   return (
     <li>
-      <a href={`#/review/${job.id}`} className="queue-row" aria-current={job.id === currentId ? 'true' : undefined}>
+      <a
+        href={`#/review/${job.id}`}
+        className={['queue-row', job.status === 'skipped' && 'queue-row-skipped'].filter(Boolean).join(' ')}
+        aria-current={job.id === currentId ? 'true' : undefined}
+        aria-busy={group === 'drafting' || undefined}
+      >
         <div className="queue-row-top">
-          <div className="queue-row-text">
-            <div className="queue-role">{job.title}</div>
-            <div className="cell-sub">{job.company} · {job.sourceName}</div>
-          </div>
+          <span className="queue-role" title={job.title}>{job.title}</span>
           <span className="queue-score mono">{job.score}</span>
         </div>
-        <div className="queue-row-meta">
-          <span className={failed ? 'badge badge-danger' : 'badge badge-warning'}>{queueState(job)}</span>
+        <div className="queue-row-sub cell-sub">
+          {group === 'drafting' ? <span className="spinner" aria-hidden="true" /> : null}
+          <span className="queue-row-where">{job.company} · {group === 'drafting' ? 'Claude is drafting…' : channel}</span>
+          {badge}
         </div>
       </a>
     </li>
