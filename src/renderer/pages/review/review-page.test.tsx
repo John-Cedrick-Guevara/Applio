@@ -101,7 +101,8 @@ describe('ReviewPage', () => {
     const api = await withGmail();
     renderWithApp(<ReviewPage params={{ id: 'j1' }} />, api);
     await userEvent.click(await screen.findByRole('button', { name: 'Approve & send email' }));
-    expect(await screen.findByText(/Sent to jobs@northwind-labs.example/)).toBeInTheDocument();
+    const detail = screen.getByRole('region', { name: 'Draft detail' });
+    expect(await within(detail).findByText(/Sent to jobs@northwind-labs.example/)).toBeInTheDocument();
     expect((await api.getJob('j1')).status).toBe('applied');
   });
 
@@ -261,18 +262,6 @@ describe('ReviewPage', () => {
   it('sends the operator to Find jobs to start a scan', async () => {
     open();
     expect(await screen.findByRole('link', { name: 'Find jobs' })).toHaveAttribute('href', '#/find-jobs');
-  });
-
-  it('asks before skipping, naming the job, and skips only on confirm', async () => {
-    const { api } = open('j1');
-    await userEvent.click(await screen.findByRole('button', { name: 'Skip job' }));
-    const dialog = screen.getByRole('dialog', { name: 'Skip job "Senior Backend Engineer" at Northwind Labs?' });
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-    expect((await api.getJob('j1')).status).toBe('drafted');
-    await userEvent.click(screen.getByRole('button', { name: 'Skip job' }));
-    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Skip job' }));
-    expect(await screen.findByText(/^Skipped /)).toBeInTheDocument();
-    expect((await api.getJob('j1')).status).toBe('skipped');
   });
 
   it('moves through the queue with the arrow keys', async () => {

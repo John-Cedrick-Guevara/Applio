@@ -1,6 +1,7 @@
 import { useApi } from '../api/api-context';
 import { Icon, Logo, type IconName } from '../components/icons';
 import { useAsync } from '../hooks/use-async';
+import { useJobsVersion } from '../hooks/use-jobs-version';
 import { usePath } from '../lib/router';
 import { newCount } from '../lib/job-lists';
 
@@ -31,16 +32,18 @@ const isActive = (path: string, to: string) => path === to || path.startsWith(`$
 export function Sidebar() {
   const api = useApi();
   const path = usePath();
+  // Reloads on navigation and whenever main reports a job changed (a saved skip, a send), so the badge never lags the list.
+  const jobsChanges = useJobsVersion();
   // Every decision in the Inbox: drafts and unsent approvals, plus Claude's open questions.
   const { data: pending } = useAsync(async () => {
     const [jobs, questions] = await Promise.all([api.listJobs({ statuses: ['drafted', 'approved'] }), api.listQuestions()]);
     return jobs.length + questions.length;
-  }, [api, path]);
+  }, [api, path, jobsChanges]);
   // Matches first seen since the last scan, so a scan's results are easy to find.
   const { data: fresh } = useAsync(async () => {
     const [matches, status] = await Promise.all([api.listJobs({ statuses: ['scored', 'found'] }), api.getStatus()]);
     return newCount(matches, status.lastRun?.at);
-  }, [api, path]);
+  }, [api, path, jobsChanges]);
 
   return (
     <aside className="sidebar">

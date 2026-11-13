@@ -12,7 +12,7 @@ const job = (id: string, over: Partial<Job> = {}): Job => ({
 });
 
 function queue(jobs: Job[], { currentId, drafting = [], sort = 'score' as InboxSort, onSort = vi.fn() } = {} as { currentId?: string; drafting?: Job[]; sort?: InboxSort; onSort?: (s: InboxSort) => void }) {
-  return render(<InboxQueue tabs={inboxTabs(jobs, [], sort)} drafting={drafting} {...(currentId ? { currentId } : {})} sort={sort} onSort={onSort} />);
+  return render(<InboxQueue tabs={inboxTabs(jobs, [], sort)} drafting={drafting} {...(currentId ? { currentId } : {})} sort={sort} onSort={onSort} autoNext onAutoNext={vi.fn()} onApproveKey={vi.fn()} onSkipKey={vi.fn()} />);
 }
 const tab = (name: RegExp) => screen.getByRole('tab', { name });
 
@@ -56,6 +56,12 @@ describe('InboxQueue', () => {
     queue([job('a')], { onSort });
     await userEvent.selectOptions(screen.getByLabelText('Sort'), 'oldest');
     expect(onSort).toHaveBeenCalledWith('oldest');
+  });
+
+  it('names the keys under the list, with the next-job switch on', () => {
+    queue([job('a')]);
+    expect(screen.getByText('↑ ↓ move · A approve · S skip')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Open the next job after each decision' })).toBeChecked();
   });
 
   it('lists jobs Claude is drafting, each linked', () => {
