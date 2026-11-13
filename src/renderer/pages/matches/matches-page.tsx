@@ -11,7 +11,7 @@ import { useJobsVersion } from '../../hooks/use-jobs-version';
 import { formatTokens } from '../../lib/format';
 import type { RouteParams } from '../../lib/router';
 import { CHANNEL_LABEL } from '../../lib/labels';
-import { DRAFT_TOKENS, SCORE_TOKENS, bucketOf, draftEstimate, matchRows, tabCounts, type MatchTab } from './matches-model';
+import { DRAFT_TOKENS, OLD_TRASH_DAYS, SCORE_TOKENS, bucketOf, draftEstimate, isOldTrash, matchRows, staleMatches, tabCounts, type MatchTab } from './matches-model';
 import './matches.css';
 
 /** How long after the last slider move the draft bar is saved. */
@@ -81,6 +81,19 @@ function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings, onJob
   const [query, setQuery] = useState('');
   const [onlyNew, setOnlyNew] = useState(onlyNewAtStart);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  // Clean up: a previewed, manual move of stale matches to the Trash.
+  const [cleaning, setCleaning] = useState(false);
+  const [olderOn, setOlderOn] = useState(true);
+  const [belowOn, setBelowOn] = useState(true);
+  const [days, setDays] = useState('14');
+  const [cleaned, setCleaned] = useState<{ jobs: Job[]; message: string } | null>(null);
+  const [showOldTrash, setShowOldTrash] = useState(false);
+  // The undo bar for a cleanup goes away on its own.
+  useEffect(() => {
+    if (!cleaned) return;
+    const timer = setTimeout(() => setCleaned(null), 15_000);
+    return () => clearTimeout(timer);
+  }, [cleaned]);
   // Skipped rows stay hidden after the skip is saved, until the list reloads without them;
   // a failed save brings its row back (the error toast says why).
   const [gone, setGone] = useState<ReadonlySet<string>>(new Set());
@@ -116,7 +129,13 @@ function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings, onJob
   };
 
   const visible = jobs.filter((j) => !gone.has(j.id));
-  const filters = { bar, tab, query, onlyNew, drafting: status.drafting ?? [], ...(status.lastRun ? { lastRunAt: status.lastRun.at } : {}) };
+  const now = Date.now();
+  const filters = { bar, tab, query, onlyNew, drafting: status.drafting ?? [], now, showOldTrash, ...(status.lastRun ? { lastRunAt: status.lastRun.at } : {}) };
+  const oldTrash = visible.filter((j) => isOldTrash(j, now)).length;
+  const daysNum = /^\d+$/.test(days) ? Number(days) : NaN;
+  const daysOk = daysNum >= 1 && daysNum <= 365;
+  const stale = staleMatches(visible, { olderOn, olderDays: daysOk ? daysNum : Infinity, belowOn, bar, drafting: status.drafting ?? [], now });
+  const cleanBlock = !daysOk ? 'Enter a whole number of days from 1 to 365.' : stale.picked.length === 0 ? 'Nothing matches these rules.' : undefined;
   const rows = matchRows(visible, filters);
   const counts = tabCounts(visible, filters);
   const strong = tabCounts(visible, { ...filters, query: '', onlyNew: false }).strong;
@@ -138,6 +157,29 @@ function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings, onJob
     const scored = picked.filter((j) => j.status === 'scored');
     for (const j of scored) await action.run('start the draft', () => api.draftJob(j.id));
   };
+  /** Moves the previewed matches to the Trash. One that fails stays a match; the rest still move. */
+  const moveStale = async () => {
+    const picked = stale.picked;
+    setCleaning(false);
+    const moved: Job[] = [];
+    for (const j of picked) {
+      const done = await action.run('skip the job', () => api.skipJob(j.id));
+      if (done) {
+        onJob(done);
+        moved.push(done);
+      }
+    }
+    if (moved.length) setCleaned({ jobs: moved, message: `Moved ${moved.length} match${moved.length === 1 ? '' : 'es'} to the Trash.` });
+  };
+  const undoCleanup = async () => {
+    const jobsToRestore = cleaned?.jobs ?? [];
+    setCleaned(null);
+    for (const j of jobsToRestore) {
+      const next = await action.run('restore the job', () => api.restoreJob(j.id));
+      if (next) onJob(next);
+    }
+  };
+
   // Restoring takes jobs out of the Trash, back to the status they had before the skip.
   const restore = async (picked: Job[]) => {
     setSelected(new Set());
@@ -182,7 +224,38 @@ function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings, onJob
             ))}
           </div>
           <label className="matches-new"><input type="checkbox" checked={onlyNew} onChange={(e) => setOnlyNew(e.target.checked)} />New since last scan</label>
+          <Button aria-expanded={cleaning} onClick={() => setCleaning((c) => !c)}>Clean up</Button>
         </div>
+
+        {cleaning ? (
+          <div className="matches-clean" role="region" aria-label="Clean up">
+            <h2 className="matches-clean-title">Clean up</h2>
+            <p className="cell-sub">Moves stale matches to the Trash. Nothing is deleted, and you can undo it.</p>
+            <label className="matches-clean-rule">
+              <input type="checkbox" checked={olderOn} onChange={(e) => setOlderOn(e.target.checked)} />
+              <span>Matches older than</span>
+              <input type="number" className="input matches-clean-days" aria-label="Days" min={1} max={365} step={1} value={days} onChange={(e) => setDays(e.target.value)} />
+              <span>days</span>
+              <span className="mono matches-clean-count">{daysOk ? stale.older.length : 0}</span>
+            </label>
+            <label className="matches-clean-rule">
+              <input type="checkbox" checked={belowOn} onChange={(e) => setBelowOn(e.target.checked)} />
+              <span>Matches below the draft bar ({bar})</span>
+              <span className="mono matches-clean-count">{stale.below.length}</span>
+            </label>
+            {stale.picked.length ? (
+              <ul className="list-plain matches-clean-list" aria-label="Would move">
+                {stale.picked.slice(0, 8).map((j) => <li key={j.id}><span>{j.title}</span> <span className="cell-sub">· {j.company}</span></li>)}
+                {stale.picked.length > 8 ? <li className="cell-sub">and {stale.picked.length - 8} more</li> : null}
+              </ul>
+            ) : null}
+            <div className="matches-clean-actions">
+              {cleanBlock ? <span id="clean-block" className="field-error">{cleanBlock}</span> : null}
+              <Button onClick={() => setCleaning(false)}>Cancel</Button>
+              <Button variant="primary" disabled={!!cleanBlock} aria-describedby={cleanBlock ? 'clean-block' : undefined} onClick={moveStale}>Move {cleanBlock && !daysOk ? 0 : stale.picked.length} to the Trash</Button>
+            </div>
+          </div>
+        ) : null}
 
         {chosen.length && tab === 'trash' ? (
           <div className="matches-selected" role="region" aria-label="Selected">
@@ -244,10 +317,18 @@ function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings, onJob
             </table>
           </div>
         ) : tab === 'trash' && !query && !onlyNew ? (
-          <div className="matches-empty">
-            <h2>The Trash is empty</h2>
-            <p className="muted">Jobs you skip or clean up wait here until you restore them.</p>
-          </div>
+          oldTrash > 0 && !showOldTrash ? (
+            <div className="matches-empty">
+              <h2>Nothing recent in the Trash</h2>
+              <p className="muted">{oldTrash} job{oldTrash === 1 ? '' : 's'} trashed more than {OLD_TRASH_DAYS} days ago {oldTrash === 1 ? 'is' : 'are'} hidden.</p>
+              <Button onClick={() => setShowOldTrash(true)}>Show older ({oldTrash})</Button>
+            </div>
+          ) : (
+            <div className="matches-empty">
+              <h2>The Trash is empty</h2>
+              <p className="muted">Jobs you skip or clean up wait here until you restore them.</p>
+            </div>
+          )
         ) : jobs.length ? (
           <div className="matches-empty">
             <h2>No matches fit your filters</h2>
@@ -261,6 +342,12 @@ function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings, onJob
             <a className={buttonClass('primary')} href="#/get-jobs">Get jobs</a>
           </div>
         )}
+        {tab === 'trash' && rows.length > 0 && oldTrash > 0 ? (
+          <p className="cell-sub matches-foot">
+            {showOldTrash ? `Showing jobs trashed more than ${OLD_TRASH_DAYS} days ago too.` : `${oldTrash} older than ${OLD_TRASH_DAYS} days ${oldTrash === 1 ? 'is' : 'are'} hidden.`}{' '}
+            <Button size="sm" variant="link" onClick={() => setShowOldTrash((v) => !v)}>{showOldTrash ? 'Hide older' : `Show older (${oldTrash})`}</Button>
+          </p>
+        ) : null}
         {status.budgetStop ? <p className="cell-sub matches-foot">{status.budgetStop} Drafting waits until it resets.</p> : null}
       </section>
 
@@ -268,6 +355,11 @@ function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings, onJob
         <div className="undo-bar" role="status" aria-label="Undo">
           <span>{skips.held.message}</span>
           <Button size="sm" variant="link" onClick={() => { unhide(skips.held!.ids); skips.undo(); }}>Undo</Button>
+        </div>
+      ) : cleaned ? (
+        <div className="undo-bar" role="status" aria-label="Undo">
+          <span>{cleaned.message}</span>
+          <Button size="sm" variant="link" onClick={undoCleanup}>Undo</Button>
         </div>
       ) : null}
     </>

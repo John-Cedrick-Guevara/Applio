@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createMockApi } from '../../../shared/mock/mock-api';
 import { ApiProvider } from '../../api/api-context';
 import { ToastProvider } from '../../components/toast';
@@ -225,6 +225,99 @@ describe('MatchesPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /^Trash/ }));
     expect(within(list).getByText('The Trash is empty')).toBeInTheDocument();
     expect(within(list).getByText(/Jobs you skip or clean up wait here until you restore them/)).toBeInTheDocument();
+  });
+
+  describe('Clean up', () => {
+    const DAY = 86_400_000;
+    afterEach(() => vi.useRealTimers());
+    /** Orbital (67) and Fernwood (not scored) with the draft bar at `bar`; `daysLater` moves the clock so the jobs have aged. */
+    async function cleanSetup({ bar = 60, daysLater = 0, over = {} as Partial<ReturnType<typeof createMockApi>> } = {}) {
+      const api = createMockApi({ latencyMs: 0 });
+      await api.saveSettings({ draftThreshold: bar });
+      if (daysLater) vi.useFakeTimers({ toFake: ['Date'], now: Date.now() + daysLater * DAY });
+      renderWithApp(<MatchesPage />, { ...api, ...over });
+      const list = await screen.findByRole('region', { name: 'Match list' });
+      await within(list).findByText(FERNWOOD);
+      return { api, list };
+    }
+    const openPanel = async () => {
+      await userEvent.click(screen.getByRole('button', { name: 'Clean up' }));
+      return screen.getByRole('region', { name: 'Clean up' });
+    };
+
+    it('opens with a count for each rule', async () => {
+      await cleanSetup({ bar: 70 });
+      const panel = await openPanel();
+      expect(within(panel).getByText(/Matches older than/).closest('label')).toHaveTextContent('0');
+      expect(within(panel).getByText('Matches below the draft bar (70)').closest('label')).toHaveTextContent('1');
+    });
+
+    it('previews what would move, and disables the button when nothing would', async () => {
+      await cleanSetup({ bar: 70 });
+      const panel = await openPanel();
+      expect(within(panel).getByText(ORBITAL)).toBeInTheDocument();
+      expect(within(panel).getByRole('button', { name: 'Move 1 to the Trash' })).toBeEnabled();
+      await userEvent.click(within(panel).getByRole('checkbox', { name: /below the draft bar/ }));
+      expect(within(panel).getByRole('button', { name: 'Move 0 to the Trash' })).toBeDisabled();
+      expect(within(panel).getByText('Nothing matches these rules.')).toBeInTheDocument();
+    });
+
+    it("refuses a days value that isn't a whole number from 1 to 365", async () => {
+      await cleanSetup();
+      const panel = await openPanel();
+      const days = within(panel).getByRole('spinbutton', { name: 'Days' });
+      await userEvent.clear(days);
+      await userEvent.type(days, '0');
+      expect(within(panel).getByText('Enter a whole number of days from 1 to 365.')).toBeInTheDocument();
+      expect(within(panel).getByRole('button', { name: /Move .* to the Trash/ })).toBeDisabled();
+    });
+
+    it('moves the previewed jobs to the Trash, then undoes it', async () => {
+      const base = createMockApi({ latencyMs: 0 });
+      const skipJob = vi.fn(base.skipJob);
+      const restoreJob = vi.fn(base.restoreJob);
+      const { list } = await cleanSetup({ bar: 70, over: { skipJob, restoreJob } });
+      const panel = await openPanel();
+      await userEvent.click(within(panel).getByRole('button', { name: 'Move 1 to the Trash' }));
+      expect(skipJob).toHaveBeenCalledWith('j5');
+      const undo = await screen.findByRole('status', { name: 'Undo' });
+      expect(undo).toHaveTextContent('Moved 1 match to the Trash.');
+      expect(screen.queryByRole('region', { name: 'Clean up' })).not.toBeInTheDocument();
+      expect(within(list).queryByText(ORBITAL)).not.toBeInTheDocument();
+      await userEvent.click(within(undo).getByRole('button', { name: 'Undo' }));
+      expect(restoreJob).toHaveBeenCalledWith('j5');
+      expect(await within(list).findByText(ORBITAL)).toBeInTheDocument();
+    });
+
+    it('counts age from when a job was first seen, and lists what it would move', async () => {
+      await cleanSetup({ daysLater: 20 });
+      const panel = await openPanel();
+      expect(within(panel).getByText(/Matches older than/).closest('label')).toHaveTextContent('2');
+      expect(within(panel).getByText(ORBITAL)).toBeInTheDocument();
+      expect(within(panel).getByText(FERNWOOD)).toBeInTheDocument();
+    });
+
+    it('keeps a job a match when its move fails, and moves the rest', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const base = createMockApi({ latencyMs: 0 });
+      const skipJob = vi.fn(async (id: string) => { if (id === 'j5') throw new Error('database is locked'); return base.skipJob(id); });
+      const { list } = await cleanSetup({ daysLater: 20, over: { skipJob } });
+      const panel = await openPanel();
+      await userEvent.click(within(panel).getByRole('button', { name: 'Move 2 to the Trash' }));
+      expect(await screen.findByText(/Couldn't skip the job/)).toBeInTheDocument();
+      expect(await screen.findByRole('status', { name: 'Undo' })).toHaveTextContent('Moved 1 match to the Trash.');
+      expect(within(list).getByText(ORBITAL)).toBeInTheDocument();
+      expect(within(list).queryByText(FERNWOOD)).not.toBeInTheDocument();
+    });
+
+    it('collapses Trash older than 30 days behind Show older, still counting it', async () => {
+      await cleanSetup({ daysLater: 40 });
+      await userEvent.click(screen.getByRole('button', { name: /^Trash/ }));
+      expect(screen.getByRole('button', { name: /^Trash/ })).toHaveTextContent('1');
+      expect(screen.getByText(/Nothing recent in the Trash/)).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Show older (1)' }));
+      expect(await screen.findByText('Backend Engineer (Java)')).toBeInTheDocument();
+    });
   });
 
   it('clears filters from an empty search', async () => {
