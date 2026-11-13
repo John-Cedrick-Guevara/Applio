@@ -332,6 +332,16 @@ describe('createBackend discovery', () => {
     expect(complete).toHaveBeenCalledTimes(1);
   });
 
+  it('lets a job whose scoring failed be scored again', async () => {
+    const { api, job, deps } = await unscoredJob();
+    const working = deps.engines['claude-code'].complete;
+    let failures = 2; // scoring tries once and retries once before giving up
+    deps.engines['claude-code'] = { check: async () => ({ ready: true, message: 'ok' }), complete: async (request) => { if (failures-- > 0) throw new Error('Claude Code timed out.'); return working(request); } };
+    await expect(api.scoreJob(job.id)).rejects.toThrow();
+    expect((await api.getJob(job.id)).status).toBe('found');
+    expect(await api.scoreJob(job.id)).toMatchObject({ status: 'scored', score: 81 });
+  });
+
   it('refuses to score once the token budget is used, without calling AI', async () => {
     const { api, job, complete, deps } = await unscoredJob();
     await api.saveSettings({ dailyTokenBudget: 1_000, monthlyTokenBudget: 1_000 });
