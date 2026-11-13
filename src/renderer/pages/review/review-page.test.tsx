@@ -269,11 +269,10 @@ describe('ReviewPage', () => {
     expect(first).toHaveFocus();
   });
 
-  it('pauses auto-send and still lets the operator start a scan', async () => {
+  it('offers Find jobs to start a scan, and leaves pausing to the activity bar', async () => {
     open();
-    await userEvent.click(await screen.findByRole('button', { name: 'Pause auto-send' }));
-    expect(await screen.findByText(/Auto-send is paused/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Find jobs' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Find jobs' })).toHaveAttribute('href', '#/find-jobs');
+    expect(screen.queryByRole('button', { name: 'Pause auto-send' })).not.toBeInTheDocument();
   });
 
   it('lists the jobs scored below the draft threshold when asked, each opening its detail', async () => {

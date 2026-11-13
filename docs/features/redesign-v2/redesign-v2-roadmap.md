@@ -34,7 +34,7 @@ Every PR's spec carries these must-not-break items:
 
 ## Stage 1 — Screens (frontend, real data)
 
-- [ ] **PR-1 — Job state card and one lifecycle**  Every job says where it is, why, and what moves it on, in one card.
+- [x] **PR-1 — Job state card and one lifecycle** (#78)  Every job says where it is, why, and what moves it on, in one card.
   - _branch:_ `feat/job-state-card`
   - _PR title:_ `feat(ui): add job state card and one five-stage lifecycle`
   - _why:_ draft warnings stack with no priority and three steppers use three vocabularies; one card and one stepper fix both everywhere
