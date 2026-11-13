@@ -25,7 +25,16 @@ Every job in Review says where it is, why, and what moves it on, in one card ins
 - AC-5: `review-model.test.ts` › jobSteps tests with the new labels; `add-job-page.test.tsx` › pipeline test asserts "Ready: done".
 - AC-6: `job-card.test.ts` › undraftedCard tests; `review-page.test.tsx` › below-bar, strong-match and skip tests.
 - AC-7: `review-page.test.tsx` › "below your draft bar (75)"; `settings-page.test.tsx` label check; manual read.
-- MNB-1..5: existing `review-page.test.tsx` tests for suspicious send, refused send, PDFs saving/landing, retry saving, and redraft/draft costs.
+- MNB-1: `review-page.test.tsx` › "warns in red about a suspicious post and sends it only after an explicit second confirm".
+- MNB-2: `review-page.test.tsx` › "keeps a refused send in Review as Not sent with the reason and Retry, never as Sent".
+- MNB-3: `review-page.test.tsx` › "waits to approve until the PDFs are saved, and says so", "turns Approve on by itself once main reports the PDFs were saved (QA 2026-11-08)".
+- MNB-4: `review-page.test.tsx` › "retries saving the PDFs without drafting again, after a failed save".
+- MNB-5: `review-page.test.tsx` › "marks a draft made from an older profile and redrafts it on request" (Redraft ≈ 25–40k); manual: Draft this one's footer cost line.
+
+## Known risks
+- The card hides lower-priority states behind "More notes": an operator may miss one. Mitigation: the count is in the summary ("2 more notes") and every folded state keeps its own action elsewhere (footer Set up Gmail, Approve's disabled reason).
+- Ladder order is a judgment call (draft content before channel setup). If it reads wrong in use, it's one list in `job-card.ts`.
+- Relabelled stepper and settings fields change accessible names; tests that query them were updated in this PR.
 
 ## Out of scope
 - Moving Approve/Skip into the card: the footer keeps the decision buttons; the card carries the recovery action (Retry, Redraft, Retry saving PDFs, Set up Gmail). Inbox (PR-4) revisits layout.
