@@ -2,6 +2,7 @@ import { useApi } from '../api/api-context';
 import { Icon, Logo, type IconName } from '../components/icons';
 import { useAsync } from '../hooks/use-async';
 import { usePath } from '../lib/router';
+import { newCount } from '../lib/job-lists';
 
 interface NavItem {
   to: string;
@@ -12,6 +13,7 @@ interface NavItem {
 /** Pages in the primary nav. Each page PR adds its entry here. */
 const NAV: NavItem[] = [
   { to: '/review', label: 'Review', icon: 'review' },
+  { to: '/matches', label: 'Matches', icon: 'matches' },
   { to: '/find-jobs', label: 'Find jobs', icon: 'search' },
   { to: '/applications', label: 'Applications', icon: 'applications' },
   { to: '/profile', label: 'Profile', icon: 'profile' },
@@ -30,6 +32,11 @@ export function Sidebar() {
   const api = useApi();
   const path = usePath();
   const { data: pending } = useAsync(() => api.listJobs({ statuses: ['drafted', 'approved'] }), [api, path]);
+  // Matches first seen since the last scan, so a scan's results are easy to find.
+  const { data: fresh } = useAsync(async () => {
+    const [matches, status] = await Promise.all([api.listJobs({ statuses: ['scored', 'found'] }), api.getStatus()]);
+    return newCount(matches, status.lastRun?.at);
+  }, [api, path]);
 
   return (
     <aside className="sidebar">
@@ -46,6 +53,7 @@ export function Sidebar() {
           <a key={item.to} href={`#${item.to}`} className="nav-link" aria-current={isActive(path, item.to) ? 'page' : undefined}>
             <Icon name={item.icon} />
             {item.label}
+            {item.icon === 'matches' && fresh ? <span className="nav-new">{fresh} new</span> : null}
             {item.icon === 'review' && pending?.length ? (
               <span className="nav-count" aria-label={`${pending.length} waiting on you`}>
                 {pending.length}

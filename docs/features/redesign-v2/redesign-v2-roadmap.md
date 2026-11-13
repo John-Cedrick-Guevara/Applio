@@ -47,7 +47,7 @@ Every PR's spec carries these must-not-break items:
   - [ ] vocabulary in `labels.ts`: Skip (not Dismiss), Draft bar, Auto-send at, Hand off, Not sent
   - [ ] tests: one per ladder rung, ties resolve by priority, Sent only with a sent record, next line per autonomy/channel
 
-- [ ] **PR-2 — Activity bar**  Running work, auto-send and budget visible on every page.
+- [x] **PR-2 — Activity bar** (#79)  Running work, auto-send and budget visible on every page.
   - _branch:_ `feat/activity-bar`
   - _PR title:_ `feat(ui): replace the engine card with an activity bar`
   - _why:_ scans and drafts are invisible once you leave the page that started them, and "will it send on its own?" has no answer on screen
