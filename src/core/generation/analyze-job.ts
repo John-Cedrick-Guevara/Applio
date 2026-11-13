@@ -117,3 +117,24 @@ export async function analyzePost(
   };
   return { preview, job };
 }
+
+/**
+ * Company/title pairs a post's first lines plainly state ("Role at Company",
+ * "Company is hiring a Role", "A — B" both ways), for a free duplicate check
+ * before any AI call. Anything less clear returns none and goes to analysis.
+ */
+export function statedJobs(text: string): { company: string; title: string }[] {
+  const out: { company: string; title: string }[] = [];
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(0, 3);
+  for (const raw of lines) {
+    const line = raw.replace(/^(job application for|apply for|we're hiring:?|hiring:?)\s+/i, '').split(/[.!](\s|$)/)[0]!.trim();
+    if (line.length > 140) continue;
+    let m = line.match(/^(.+?)\s+at\s+(.+)$/i);
+    if (m) out.push({ title: m[1]!, company: m[2]! });
+    m = line.match(/^(.+?)\s+is hiring\s+(?:an?\s+)?(.+)$/i);
+    if (m) out.push({ company: m[1]!, title: m[2]! });
+    m = line.match(/^(.+?)\s+[—–|-]\s+(.+)$/);
+    if (m) out.push({ company: m[1]!, title: m[2]! }, { company: m[2]!, title: m[1]! });
+  }
+  return out.map((p) => ({ company: p.company.trim(), title: p.title.trim() })).filter((p) => p.company && p.title && p.company.length <= 100 && p.title.length <= 100);
+}

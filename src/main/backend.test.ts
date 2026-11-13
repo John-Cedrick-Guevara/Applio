@@ -1040,6 +1040,25 @@ describe('createBackend discovery', () => {
     expect((await api.getJob(job.id)).history.at(-1)?.note).toBe('Assisted fill: 5 fields filled. You check them and click Submit.');
   });
 
+  it('finds a pasted job Applio already has without calling AI', async () => {
+    const { api, deps } = backendIn();
+    withSeededJobs(deps);
+    const complete = vi.fn(async () => ({ text: '{}', inputTokens: 0, outputTokens: 0 }));
+    deps.engines['claude-code'] = { check: async () => ({ ready: true, message: 'ok' }), complete };
+    const preview = await api.analyzeJob({ kind: 'text', value: 'Senior Backend Engineer at Northwind Labs\nWe build billing.' });
+    expect(preview).toMatchObject({ duplicate: { jobId: 'j1', status: 'drafted' }, tokensUsed: 0, company: 'Northwind Labs', title: 'Senior Backend Engineer' });
+    expect(complete).not.toHaveBeenCalled();
+  });
+
+  it('reads a post with no clear role and company with AI as before', async () => {
+    const { api, deps } = backendIn();
+    withSeededJobs(deps);
+    const complete = vi.fn(async () => ({ text: JSON.stringify({ company: 'Acme', title: 'Engineer', score: 50 }), inputTokens: 10, outputTokens: 10 }));
+    deps.engines['claude-code'] = { check: async () => ({ ready: true, message: 'ok' }), complete };
+    expect((await api.analyzeJob({ kind: 'text', value: 'Great role, apply now!' })).duplicate).toBeUndefined();
+    expect(complete).toHaveBeenCalledTimes(1);
+  });
+
   it('never fills an email or ATS job by assisted fill', async () => {
     const { api, job } = await emailJob();
     await api.saveSettings({ assistedFill: { platform: true, custom: true } });
