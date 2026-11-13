@@ -71,7 +71,7 @@ describe('ActivityBar', () => {
     events.push({ ...(await api.getStatus()), scan: { phase: 'scoring', startedAt: new Date().toISOString() }, drafting: ['j5', 'j6'] });
     await userEvent.click(screen.getByText(/Scanning ·/));
     const panel = screen.getByRole('list', { name: 'Running now' });
-    expect(within(panel).getByRole('link', { name: /scan/i })).toHaveAttribute('href', '#/find-jobs');
+    expect(within(panel).getByRole('link', { name: /scan/i })).toHaveAttribute('href', '#/get-jobs');
     expect(within(panel).getByRole('link', { name: /2 drafts/ })).toHaveAttribute('href', '#/inbox');
   });
 

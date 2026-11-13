@@ -9,6 +9,7 @@ import { useAsync } from '../../hooks/use-async';
 import { useHeldAction } from '../../hooks/use-held-action';
 import { useJobsVersion } from '../../hooks/use-jobs-version';
 import { formatTokens } from '../../lib/format';
+import type { RouteParams } from '../../lib/router';
 import { CHANNEL_LABEL } from '../../lib/labels';
 import { DRAFT_TOKENS, bucketOf, draftEstimate, matchRows, tabCounts, type MatchTab } from './matches-model';
 import './matches.css';
@@ -27,7 +28,7 @@ const TABS: { id: MatchTab; label: string }[] = [
  * Matches (redesign v2): every job with no draft yet, so sorting them happens in
  * one list with the draft bar beside it. Drafts started here go to Review.
  */
-export default function MatchesPage() {
+export default function MatchesPage({ params = {} }: { params?: RouteParams }) {
   const api = useApi();
   const jobsChanges = useJobsVersion();
   const state = useAsync(async () => {
@@ -41,26 +42,28 @@ export default function MatchesPage() {
     <div className="matches">
       <PageHeader title="Matches" description="Jobs that passed your filters but have no draft yet. Draft the ones worth it; drafts go to Review when ready." />
       <AsyncView state={state} what="your matches" rows={6}>
-        {(data) => <MatchesView jobs={data.jobs} settings={data.settings} status={data.status} onSettings={(settings) => state.setData((d) => ({ ...d, settings }))} />}
+        {(data) => <MatchesView onlyNewAtStart={params.view === 'new'} jobs={data.jobs} settings={data.settings} status={data.status} onSettings={(settings) => state.setData((d) => ({ ...d, settings }))} />}
       </AsyncView>
     </div>
   );
 }
 
 interface ViewProps {
+  /** Opened from a scan's "Open the n new matches" link (`/matches/new`). */
+  onlyNewAtStart: boolean;
   jobs: Job[];
   settings: Settings;
   status: AppStatus;
   onSettings: (settings: Settings) => void;
 }
 
-function MatchesView({ jobs, settings, status, onSettings }: ViewProps) {
+function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings }: ViewProps) {
   const api = useApi();
   const action = useAction();
   const [bar, setBar] = useState(settings.draftThreshold);
   const [tab, setTab] = useState<MatchTab>('all');
   const [query, setQuery] = useState('');
-  const [onlyNew, setOnlyNew] = useState(false);
+  const [onlyNew, setOnlyNew] = useState(onlyNewAtStart);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   // Skipped rows stay hidden after the skip is saved, until the list reloads without them;
   // a failed save brings its row back (the error toast says why).
@@ -203,7 +206,7 @@ function MatchesView({ jobs, settings, status, onSettings }: ViewProps) {
           <div className="matches-empty">
             <h2>No matches yet</h2>
             <p className="muted">Jobs that pass your filters land here after a scan, ready to draft.</p>
-            <a className={buttonClass('primary')} href="#/find-jobs">Find jobs</a>
+            <a className={buttonClass('primary')} href="#/get-jobs">Get jobs</a>
           </div>
         )}
         {status.budgetStop ? <p className="cell-sub matches-foot">{status.budgetStop} Drafting waits until it resets.</p> : null}

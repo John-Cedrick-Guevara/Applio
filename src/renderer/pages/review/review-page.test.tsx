@@ -259,9 +259,9 @@ describe('ReviewPage', () => {
     expect((await api.getDraft('j1'))?.coverLetter).toBe('Short and sweet');
   });
 
-  it('sends the operator to Find jobs to start a scan', async () => {
+  it('sends the operator to Get jobs to start a scan', async () => {
     open();
-    expect(await screen.findByRole('link', { name: 'Find jobs' })).toHaveAttribute('href', '#/find-jobs');
+    expect(await screen.findByRole('link', { name: 'Get jobs' })).toHaveAttribute('href', '#/get-jobs');
   });
 
   it('moves through the queue with the arrow keys', async () => {
@@ -276,9 +276,9 @@ describe('ReviewPage', () => {
     expect(first).toHaveFocus();
   });
 
-  it('offers Find jobs to start a scan, and leaves pausing to the activity bar', async () => {
+  it('offers Get jobs to start a scan, and leaves pausing to the activity bar', async () => {
     open();
-    expect(await screen.findByRole('link', { name: 'Find jobs' })).toHaveAttribute('href', '#/find-jobs');
+    expect(await screen.findByRole('link', { name: 'Get jobs' })).toHaveAttribute('href', '#/get-jobs');
     expect(screen.queryByRole('button', { name: 'Pause auto-send' })).not.toBeInTheDocument();
   });
 

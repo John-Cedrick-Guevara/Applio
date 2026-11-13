@@ -191,7 +191,7 @@ function ReviewLayout({ data, selectedId, onJobChange, onRunComplete }: LayoutPr
             <h2>Nothing needs a decision</h2>
             <p className="muted">Drafts land here when they're ready. Draft a match, or find new jobs.</p>
             <div className="row">
-              <a className={buttonClass('secondary')} href="#/find-jobs">Find jobs</a>
+              <a className={buttonClass('secondary')} href="#/get-jobs">Get jobs</a>
               <a className={buttonClass('primary')} href="#/matches">Open Matches</a>
             </div>
           </section>

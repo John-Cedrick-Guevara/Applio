@@ -1,19 +1,22 @@
 import { useEffect, useState } from 'react';
-import type { RunSummary, ScanPhase } from '../../../shared/types';
+import type { AppStatus, RunSummary, ScanPhase } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { AsyncView } from '../../components/async-view';
 import { Button } from '../../components/button';
 import { Callout, StepList } from '../../components/job-state';
-import { PageHeader } from '../../components/page-header';
 import { useAction } from '../../hooks/use-action';
 import { useAsync } from '../../hooks/use-async';
+import { costLine } from '../../lib/cost';
 import { runResult } from '../../lib/run-summary';
 import './find-jobs.css';
 
 const AT_LIMIT = "Every source has used today's polls. They poll again after midnight.";
 
+/** About what scoring a typical scan's new jobs costs; each run's real use is on the Usage page. */
+const SCAN_SCORE_TOKENS = 6_000;
+
 /**
- * Find jobs: the one place a scan starts (SPEC F2: scans only run when the
+ * Get jobs › Scan sources: where a scan starts (SPEC F2: scans only run when the
  * operator starts one). Says what a scan checks and costs before the click, why it
  * can't run when it can't, and what it kept once it's done.
  */
@@ -27,15 +30,16 @@ export default function FindJobsPage() {
 
   return (
     <div className="find-jobs">
-      <PageHeader title="Find jobs" description="Applio only scans when you start one, here or from the tray." />
       <AsyncView state={state} what="your sources" rows={4}>
-        {({ status, sources }) => <Scan budgetStop={status.budgetStop} atLimit={!!status.sourcesAtLimit} sources={sources.map((s) => ({ id: s.id, name: s.name, via: s.via }))} />}
+        {({ status, sources }) => <Scan status={status} sources={sources.map((s) => ({ id: s.id, name: s.name, via: s.via }))} />}
       </AsyncView>
     </div>
   );
 }
 
-function Scan({ budgetStop, atLimit, sources }: { budgetStop?: string; atLimit: boolean; sources: { id: string; name: string; via: string }[] }) {
+function Scan({ status, sources }: { status: AppStatus; sources: { id: string; name: string; via: string }[] }) {
+  const budgetStop = status.budgetStop;
+  const atLimit = !!status.sourcesAtLimit;
   const api = useApi();
   const runner = useAction();
   const [result, setResult] = useState<RunSummary>();
@@ -113,8 +117,8 @@ function Scan({ budgetStop, atLimit, sources }: { budgetStop?: string; atLimit: 
           <div className="find-jobs-foot">
             <dl className="find-jobs-cost">
               <div><dt>Fetch and filters</dt><dd>Free</dd></div>
-              <div><dt>Scoring</dt><dd>A few thousand tokens</dd></div>
-              <div><dt>Drafting</dt><dd>{draft ? 'About 25–40k tokens per strong match' : 'None now. Draft any match from Review.'}</dd></div>
+              <div><dt>Scoring</dt><dd>{costLine(SCAN_SCORE_TOKENS, status)}</dd></div>
+              <div><dt>Drafting</dt><dd>{draft ? '≈ 30k tokens per strong match, up to what is left today' : 'None now. Draft any match from Matches.'}</dd></div>
             </dl>
             <div className="find-jobs-start">
               {blocked ? <span className="field-error" role="alert">{blocked}</span> : null}
@@ -182,7 +186,9 @@ function Results({ run, onAgain }: { run: RunSummary; onAgain: () => void }) {
       </div>
       <div className="find-jobs-foot find-jobs-actions">
         <Button onClick={onAgain}>Scan again</Button>
-        <a className="btn btn-primary" href="#/matches">Open Matches</a>
+        {run.passedFilters ? (
+          <a className="btn btn-primary" href="#/matches/new">Open the {run.passedFilters} new match{run.passedFilters === 1 ? '' : 'es'}</a>
+        ) : <a className="btn btn-primary" href="#/matches">Open Matches</a>}
       </div>
     </section>
   );

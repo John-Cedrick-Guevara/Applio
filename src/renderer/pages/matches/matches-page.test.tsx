@@ -131,10 +131,16 @@ describe('MatchesPage', () => {
     expect(within(list).getByText(ORBITAL)).toBeInTheDocument();
   });
 
-  it('says no matches yet, pointing to a scan', async () => {
+  it('opens on new matches from a scan\'s link', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    renderWithApp(<MatchesPage params={{ view: 'new' }} />, api);
+    expect(await screen.findByRole('checkbox', { name: 'New since last scan' })).toBeChecked();
+  });
+
+  it('says no matches yet, pointing to Get jobs', async () => {
     const api = createMockApi({ latencyMs: 0 });
     renderWithApp(<MatchesPage />, { ...api, listJobs: async () => [] });
     expect(await screen.findByText('No matches yet')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Find jobs' })).toHaveAttribute('href', '#/find-jobs');
+    expect(screen.getByRole('link', { name: 'Get jobs' })).toHaveAttribute('href', '#/get-jobs');
   });
 });

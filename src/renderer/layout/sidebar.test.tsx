@@ -10,13 +10,19 @@ afterEach(() => {
 });
 
 describe('Sidebar', () => {
+  it('offers one Get jobs button and no separate Find jobs entry', async () => {
+    renderWithApp(<Sidebar />);
+    expect(await screen.findByRole('link', { name: 'Get jobs' })).toHaveAttribute('href', '#/get-jobs');
+    expect(screen.queryByRole('link', { name: /Find jobs|Add job/ })).not.toBeInTheDocument();
+  });
+
   it('updates the Inbox badge when main reports a job changed, without navigation', async () => {
     const listeners = new Set<(s: AppStatus) => void>();
     window.applioEvents = { onStatus: (l) => { listeners.add(l); return () => listeners.delete(l); } };
     const api = createMockApi({ latencyMs: 0 });
     renderWithApp(<Sidebar />, api);
     const link = await screen.findByRole('link', { name: /Inbox/ });
-    const before = Number(within(link).getByLabelText(/need a decision/).textContent);
+    const before = Number((await within(link).findByLabelText(/need a decision/)).textContent);
     const status = await api.getStatus();
     act(() => listeners.forEach((l) => l({ ...status, jobsVersion: 1 })));
     await api.skipJob('j1');

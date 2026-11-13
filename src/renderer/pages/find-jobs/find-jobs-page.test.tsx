@@ -19,7 +19,7 @@ describe('FindJobsPage', () => {
     const results = await screen.findByRole('region', { name: 'Scan results' });
     expect(within(results).getByRole('list', { name: 'What the scan kept' })).toHaveTextContent(/14\s*posts fetched.*11\s*new.*2\s*passed your filters.*0\s*drafted/);
     expect(results).toHaveTextContent('Scan finished: 2 jobs passed your filters, 0 drafted.');
-    expect(within(results).getByRole('link', { name: 'Open Matches' })).toHaveAttribute('href', '#/matches');
+    expect(within(results).getByRole('link', { name: 'Open the 2 new matches' })).toHaveAttribute('href', '#/matches/new');
   });
 
   it('scans only the sources left ticked, and drafts only when asked', async () => {
@@ -29,13 +29,19 @@ describe('FindJobsPage', () => {
     const list = await screen.findByRole('list', { name: 'Sources this scan checks' });
     const [first, ...rest] = within(list).getAllByRole('checkbox');
     await userEvent.click(first!);
-    expect(screen.getByText('None now. Draft any match from Review.')).toBeInTheDocument();
+    expect(screen.getByText('None now. Draft any match from Matches.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('checkbox', { name: /Also draft strong matches right away/ }));
-    expect(screen.getByText('About 25–40k tokens per strong match')).toBeInTheDocument();
+    expect(screen.getByText('≈ 30k tokens per strong match, up to what is left today')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Start scan' }));
     const ids = (await api.listSources()).filter((src) => src.enabled && src.kind !== 'clip').map((src) => src.id);
     expect(run).toHaveBeenCalledWith({ sourceIds: ids.slice(1), draft: true });
     expect(rest.length).toBe(ids.length - 1);
+  });
+
+  it("states the scan's cost against today's budget", async () => {
+    renderWithApp(<FindJobsPage />);
+    await screen.findByRole('list', { name: 'Sources this scan checks' });
+    expect(screen.getByText('≈ 6k tokens · 9% of the 68k left today')).toBeInTheDocument();
   });
 
   it('asks for at least one source before scanning', async () => {
