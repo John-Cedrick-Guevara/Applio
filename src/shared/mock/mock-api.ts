@@ -190,6 +190,16 @@ export function createMockApi({ latencyMs = 250, now = () => new Date(), sendFai
         return job;
       }),
 
+    // The mock scores at once with a fixed match; main asks Claude.
+    scoreJob: (jobId) =>
+      run(() => {
+        const job = findJob(jobId);
+        if (job.status !== 'found') throw new Error('Only jobs not scored yet can be scored.');
+        job.score = 71;
+        job.roleSummary = job.roleSummary ?? 'Scored on request.';
+        return transition(job, 'scored', 'Scored at your request');
+      }),
+
     // The mock drafts at once; main drafts in the background and reports it in `drafting`.
     draftJob: (jobId) =>
       run(() => {

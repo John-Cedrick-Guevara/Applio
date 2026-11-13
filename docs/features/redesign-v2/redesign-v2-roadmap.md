@@ -92,7 +92,7 @@ Every PR's spec carries these must-not-break items:
   - [ ] tests: tab membership per job state, badge equals list, auto-advance order, A blocked on handoff, approve has no undo, no job in neither Inbox nor Matches nor Applications
   - [ ] split up front: 4a `feat/inbox` (route, tabs, rows, badge, drafting list) and 4b `feat/inbox-flow` (approve-and-next, keys, undo), each reviewed and merged on its own
 
-- [ ] **PR-5 — Get jobs**  One place to bring jobs in: scan sources or paste a post.
+- [x] **PR-5 — Get jobs** (#83)  One place to bring jobs in: scan sources or paste a post.
   - _branch:_ `feat/get-jobs`
   - _PR title:_ `feat(ui): merge find jobs and add job into get jobs`
   - _why:_ two pages for one outcome, each explaining cost differently; the scan result lands on whatever is first in Review

@@ -52,6 +52,8 @@ export interface ApplioApi {
   approveDraft(jobId: string): Promise<Job>;
   /** Drafts a scored job the operator chose, below the threshold or not, in the background. @returns The job as it is now (still scored). */
   draftJob(jobId: string): Promise<Job>;
+  /** Scores one job a scan left unscored, now, through the quota guard. @returns The scored job. @throws When it isn't unscored, the budget is used up, or scoring failed. */
+  scoreJob(jobId: string): Promise<Job>;
   /** Drops a waiting draft and drafts the job again from the current profile, in the background. */
   redraft(jobId: string): Promise<Job>;
   /** Prints a draft's résumé and letter again (no AI, no tokens), after a failed save. @throws when the job has no draft or printing fails. */
@@ -137,7 +139,7 @@ export interface ApplioApi {
  * names over IPC, so this list is the renderer's entire reach into main.
  */
 export const API_METHODS = [
-  'listJobs', 'getJob', 'getDraft', 'getSend', 'updateCoverLetter', 'approveDraft', 'draftJob', 'redraft', 'saveDraftFiles', 'skipJob', 'markApplied', 'setStatus',
+  'listJobs', 'getJob', 'getDraft', 'getSend', 'updateCoverLetter', 'approveDraft', 'draftJob', 'scoreJob', 'redraft', 'saveDraftFiles', 'skipJob', 'markApplied', 'setStatus',
   'sendFollowUp', 'getInterviewPrep',
   'getStatus', 'runDiscovery', 'stopScan', 'setAutomationPaused',
   'openExternal', 'openJobFolder', 'openDraftFile', 'assistFill', 'chooseFolder', 'openOutputFolder',

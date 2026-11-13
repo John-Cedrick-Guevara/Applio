@@ -58,10 +58,24 @@ describe('MatchesPage', () => {
     expect(draftJob).toHaveBeenCalledWith('j5');
   });
 
-  it('says an unscored job waits for a scan', async () => {
-    const { list } = await setup();
-    expect(row(list, FERNWOOD)).toHaveTextContent('Not scored yet. Your next scan scores it.');
+  it('scores an unscored job on request, showing its cost', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const scoreJob = vi.fn(api.scoreJob);
+    const { list } = await setup({ scoreJob });
+    expect(row(list, FERNWOOD)).toHaveTextContent('Not scored yet. Score it now, or your next scan will.');
     expect(within(row(list, FERNWOOD)).queryByRole('button', { name: /Draft/ })).not.toBeInTheDocument();
+    await userEvent.click(within(row(list, FERNWOOD)).getByRole('button', { name: 'Score · ≈ 2k' }));
+    expect(scoreJob).toHaveBeenCalledWith('j6');
+    expect(await within(row(list, FERNWOOD)).findByText('71')).toBeInTheDocument();
+  });
+
+  it('scores the unscored jobs in a selection', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const scoreJob = vi.fn(api.scoreJob);
+    const { list } = await setup({ scoreJob });
+    await userEvent.click(within(row(list, FERNWOOD)).getByRole('checkbox'));
+    await userEvent.click(within(screen.getByRole('region', { name: 'Selected' })).getByRole('button', { name: 'Score 1' }));
+    expect(scoreJob).toHaveBeenCalledWith('j6');
   });
 
   it('drafts a selection, leaving unscored jobs out and saying so', async () => {
