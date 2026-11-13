@@ -130,4 +130,4 @@ Every PR's spec carries these must-not-break items:
 
 - [x] **PR-A — Fix the chopped UI** `fix/chopped-ui`  Step-list rows, banner buttons, Inbox row truncation, duplicate header button, activity-bar offset.
 - [x] **PR-B — Trash and Restore** `feat/trash`  Skipped jobs were in no list and a skip couldn't be undone; add a Trash tab in Matches, a `restoreJob` call, and a duplicate banner that says "You moved this to the Trash" with Restore.
-- [ ] **PR-C — Clean up** `feat/clean-up`  Manual "Clean up" in Matches with a preview: matches older than N days, matches below the draft bar, and Trash older than N days (collapsed). Cleaned jobs go to the Trash, restorable; nothing is permanently deleted.
+- [x] **PR-C — Clean up** `feat/clean-up`  Manual "Clean up" in Matches with a preview: matches older than N days, matches below the draft bar, and Trash older than N days (collapsed). Cleaned jobs go to the Trash, restorable; nothing is permanently deleted.

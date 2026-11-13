@@ -19,6 +19,25 @@ interface Filters {
   lastRunAt?: string;
   /** Jobs Claude is drafting now; the activity bar shows them instead. */
   drafting: readonly string[];
+  /** The clock for "trashed long ago" (ms); defaults to now. */
+  now?: number;
+  /** Shows jobs trashed more than OLD_TRASH_DAYS ago, which the Trash tab collapses by default. */
+  showOldTrash?: boolean;
+}
+
+const DAY_MS = 86_400_000;
+/** The Trash tab collapses jobs trashed longer ago than this behind "Show older". */
+export const OLD_TRASH_DAYS = 30;
+
+/** When a trashed job was skipped: the first event after its last non-skipped one (later notes carry the same status). */
+export function trashedAt(job: Job): string {
+  const i = job.history.findLastIndex((e) => e.status !== 'skipped');
+  return (job.history[i + 1] ?? job.history.at(-1))?.at ?? job.postedAt;
+}
+
+/** True for a trashed job skipped more than OLD_TRASH_DAYS before `now`. */
+export function isOldTrash(job: Job, now = Date.now()): boolean {
+  return job.status === 'skipped' && now - Date.parse(trashedAt(job)) > OLD_TRASH_DAYS * DAY_MS;
 }
 
 /** Which tab a job sits under: the Trash (skipped), at or above the draft bar, below it, or not scored yet. */
@@ -42,6 +61,7 @@ export function matchRows(jobs: readonly Job[], f: Filters): Job[] {
   return filtered(jobs, f)
     // "All" means every live match; the Trash is its own tab.
     .filter((j) => (f.tab === 'all' ? bucketOf(j, f.bar) !== 'trash' : bucketOf(j, f.bar) === f.tab))
+    .filter((j) => f.tab !== 'trash' || f.showOldTrash || !isOldTrash(j, f.now))
     .sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
 }
 
@@ -67,4 +87,22 @@ export function draftEstimate(selected: readonly Job[], status: Pick<AppStatus, 
     return { ...result, block: `About ${formatTokens(cost)} tokens is more than the ${formatTokens(left)} left today. Pick ${Math.floor(left / DRAFT_TOKENS)} or fewer, or raise the budget.` };
   }
   return result;
+}
+
+/**
+ * The matches Clean up would move to the Trash (manual, previewed first): found or
+ * scored jobs that are old (first seen `olderDays` or more ago) or below the draft bar.
+ * Never drafted, approved or sent jobs, and never one Claude is drafting. `older` and
+ * `below` are what each rule finds on its own, for the counts; `picked` is the union
+ * of the rules that are switched on.
+ */
+export function staleMatches(
+  jobs: readonly Job[],
+  { olderOn, olderDays, belowOn, bar, drafting, now }: { olderOn: boolean; olderDays: number; belowOn: boolean; bar: number; drafting: readonly string[]; now: number },
+): { older: Job[]; below: Job[]; picked: Job[] } {
+  const matches = jobs.filter((j) => (j.status === 'found' || j.status === 'scored') && !drafting.includes(j.id));
+  const older = matches.filter((j) => (now - Date.parse(j.history[0]?.at ?? j.postedAt)) / DAY_MS >= olderDays);
+  const below = matches.filter((j) => j.status === 'scored' && (j.score ?? 0) < bar);
+  const picked = matches.filter((j) => (olderOn && older.includes(j)) || (belowOn && below.includes(j)));
+  return { older, below, picked };
 }
