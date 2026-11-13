@@ -33,6 +33,9 @@ Rule cards from the review-pr skill (Pass 0 acceptance, 1 logic, 2 stress, 3 sec
 ## Verified in a browser (Chrome against the mock API, `npm run dev:web`)
 Get jobs (redirect from `/find-jobs`, cost line, scan result survives a tab round-trip, "Open the 2 new matches" → `/matches/new` with the filter on and a working empty state), Matches, and the Inbox (ArrowDown, S → Skipped + Undo, next job opens on the right tab).
 
+## Verified in a browser with a slowed scan (throwaway Vite config, deleted afterwards)
+The dev-web mock with an 8 s `runDiscovery`: Get jobs showed "Scanning · 0:01 elapsed", "Fetch posts · In progress", Stop scan and "Results land in Matches"; switching to Paste a job and back kept the scan on screen (the #86 fix). The activity bar kept saying "Nothing running" because the mock never pushes scan status; that bar state is covered by `activity-bar.test.tsx`.
+
 ## Verified against the real backend (scratch Electron harness, not committed)
 `createBackend` on a **copy** of the operator DB, real Claude Code engine and profile, no network sources, no sending. The real `~/Applio` DB and folders were checked untouched afterwards (same size and timestamp, no new files).
 - **Free duplicate check:** a job already in the DB, pasted as "Title at Company": returned as a duplicate with the real channel label and route, `tokensUsed` 0, token delta 0 (no AI call).
@@ -44,6 +47,6 @@ Get jobs (redirect from `/find-jobs`, cost line, scan result survives a tab roun
 
 ## Not verified
 - The Inbox/Matches/Get jobs **UI** against real data in Electron (only the mock API in Chrome); the real draft/approve flow above was exercised through the backend, not the redesigned screens.
-- A scan in progress in the browser (the mock finishes instantly; a test covers it).
+- The activity bar showing a scan in progress with real status pushes (only a test covers it; the mock has no push).
 - In dev-web the sidebar badge refreshes only on navigation (no status push in the mock); the real app pushes, and a test covers the push.
 - The Inbox badge leads the list by one for ~5 s while a skip is held (accepted).
