@@ -45,6 +45,16 @@ describe('StepList', () => {
   });
 });
 
+describe('StepList pending step', () => {
+  it("gives a pending step's dot its own class, so the row keeps its width", () => {
+    render(<StepList label="Drafting steps" steps={[{ label: 'Write', state: 'active' }, { label: 'Save the PDFs', state: 'pending' }]} />);
+    const row = screen.getByText('Save the PDFs').closest('li')!;
+    expect(row).toHaveClass('step-list-pending');
+    expect(row.querySelector('.step-list-dot')).not.toBeNull();
+    expect(row.querySelector('.step-list-pending')).toBeNull();
+  });
+});
+
 describe('JobStateCard', () => {
   it('says what is true, why, and what happens next, with its action', async () => {
     const onRetry = vi.fn();

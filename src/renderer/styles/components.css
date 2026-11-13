@@ -260,6 +260,8 @@ a.btn-secondary:hover { color: var(--text); }
 .banner-success a { color: var(--success-text); font-weight: 500; }
 .banner-danger { background: var(--danger-soft); color: var(--danger-text); }
 .banner-danger a, .banner-warning a { color: inherit; font-weight: 500; }
+/* A button in a banner keeps its own colours: the link rule above is more specific than .btn-primary. */
+.banner-warning .btn-primary, .banner-danger .btn-primary { color: var(--on-accent); }
 
 /* Forms */
 .field {
@@ -743,7 +745,7 @@ a.btn-secondary:hover { color: var(--text); }
 .step-list-done svg { color: var(--success); }
 .step-list-active { color: var(--text); font-weight: 600; }
 .step-list-active .spinner { color: var(--accent); width: 14px; height: 14px; }
-.step-list-pending { width: 12px; height: 12px; margin: 0 1px; border: 1.5px solid var(--border-dashed); border-radius: 50%; }
+.step-list-dot { width: 12px; height: 12px; margin: 0 1px; border: 1.5px solid var(--border-dashed); border-radius: 50%; }
 .step-list-label { flex: 1; }
 .step-list-note { font-size: var(--text-xs); font-weight: 400; color: var(--text-muted); }
 

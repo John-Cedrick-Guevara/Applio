@@ -2,13 +2,14 @@
 .inbox-queue {
   flex: 0 0 384px;
   max-width: 100%;
-  /* Stays in view beside a long draft, below the sticky activity bar; its list scrolls inside. */
+  /* Stays in view beside a long draft, just below the sticky activity bar (about 61px tall, flush to the top,
+     in a page padded 28px: so 61 + 16 - 28); its list scrolls inside. */
   position: sticky;
-  top: 64px;
+  top: 48px;
   align-self: flex-start;
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 64px - var(--space-4));
+  max-height: calc(100vh - 92px);
 }
 
 .inbox-tabs { display: flex; border-bottom: 1px solid var(--border); padding: 0 var(--space-1); }
@@ -37,8 +38,10 @@
 .inbox-row:hover { color: var(--text); background: var(--surface-subtle); }
 .inbox-row[aria-current='true'] { background: var(--surface-selected); box-shadow: inset 3px 0 0 var(--accent); }
 .inbox-row-score { flex: none; width: 28px; color: var(--text-secondary); }
-.inbox-row-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); }
-.inbox-row-role { color: var(--text); font-weight: 500; }
+/* Role and company truncate on their own: a long role can't push the company out of sight. */
+.inbox-row-text { flex: 1; min-width: 0; display: flex; color: var(--text-muted); }
+.inbox-row-role { flex: 0 1 auto; min-width: 8ch; max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-weight: 500; }
+.inbox-row-co { flex: 1 1 0; min-width: 8ch; overflow: hidden; text-overflow: ellipsis; white-space: pre; }
 .inbox-row-age { flex: none; }
 .inbox-empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: var(--space-5) var(--space-4); }
 .inbox-empty p { margin: 0; }

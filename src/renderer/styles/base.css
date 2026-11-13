@@ -217,6 +217,7 @@ button {
   }
 
   .activity-bar {
+    top: calc(-1 * var(--space-4));
     margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) var(--space-4);
     padding: var(--space-2) var(--space-4);
   }
@@ -225,7 +226,8 @@ button {
 /* Activity bar (redesign v2): running work, auto-send and budget above every page. */
 .activity-bar {
   position: sticky;
-  top: 0;
+  /* A sticky offset is measured from the scroll container's content edge, so cancel the page padding to sit flush at the window's top. */
+  top: -28px;
   z-index: 5;
   display: flex;
   flex-wrap: wrap;
