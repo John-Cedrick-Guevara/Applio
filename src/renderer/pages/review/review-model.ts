@@ -2,7 +2,7 @@ import { capAutonomy, maxAutonomyFor } from '../../../shared/autonomy';
 import type { ApplyChannel, Autonomy, Draft, Job, SendRecord, Settings } from '../../../shared/types';
 import { formatClock } from '../../lib/format';
 import { filesState } from '../../lib/job-progress';
-import { AUTONOMY_LABEL } from '../../lib/labels';
+import { AUTONOMY_LABEL, LIFECYCLE } from '../../lib/labels';
 
 /** True when approving sends straight away (email, standard ATS); otherwise the operator applies (SPEC F5). */
 export function sendsOnApprove(channel: ApplyChannel): boolean {
@@ -129,19 +129,18 @@ export function queueGroups(queue: readonly Job[], asking: readonly Job[], draft
 }
 
 export type StepState = 'done' | 'current' | 'blocked' | 'failed' | 'todo';
-const STEP_LABELS = ['Found', 'Scored', 'Drafted', 'PDFs saved', 'Sent'] as const;
-
 /**
- * Where a job is between Found and Sent, read from its records: the step it's on is
+ * Where a job is between New and Sent, read from its records: the step it's on is
  * in progress (`current`), waiting on the operator (`blocked`: a scan, Claude's
- * questions, a draft click, approval) or `failed`. Sent is
- * done only past Approved; an approved job with no sent record shows Sent as failed.
+ * questions, a draft click, approval) or `failed`. Drafted stays in progress until
+ * the PDFs are saved. Sent is done only past Approved; an approved job with no sent
+ * record shows Sent as failed.
  */
 export function jobSteps(
   job: Job,
   { drafting = false, send = null }: { drafting?: boolean; send?: SendRecord | null } = {},
 ): { label: string; state: StepState }[] {
-  const at = (index: number, state: StepState) => STEP_LABELS.map((label, i) => ({ label, state: i < index ? 'done' : i === index ? state : 'todo' } as const));
+  const at = (index: number, state: StepState) => LIFECYCLE.map((label, i) => ({ label, state: i < index ? 'done' : i === index ? state : 'todo' } as const));
   switch (job.status) {
     case 'found':
       return at(1, 'blocked');
@@ -149,7 +148,7 @@ export function jobSteps(
       return at(2, drafting ? 'current' : 'blocked');
     case 'drafted': {
       const files = filesState(job);
-      return files.kind === 'ready' ? at(4, 'blocked') : at(3, files.kind === 'failed' ? 'failed' : 'current');
+      return files.kind === 'ready' ? at(3, 'blocked') : at(2, files.kind === 'failed' ? 'failed' : 'current');
     }
     case 'approved': {
       const state = sendState(job, send);

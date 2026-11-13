@@ -1,5 +1,8 @@
 import type { ApplyChannel, Autonomy, EmploymentType, JobStatus } from '../../shared/types';
 
+/** The one lifecycle every screen's stepper uses (redesign v2): saving the PDFs is part of Drafted. */
+export const LIFECYCLE = ['New', 'Matched', 'Drafted', 'Ready', 'Sent'] as const;
+
 /** Operator-facing names, shared so every screen words things the same way. */
 export const AUTONOMY_LABEL: Record<Autonomy, string> = {
   notify: 'Notify',

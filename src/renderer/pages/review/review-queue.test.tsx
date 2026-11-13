@@ -30,15 +30,15 @@ describe('ReviewQueue', () => {
     expect(screen.queryByText('Draft ready')).not.toBeInTheDocument();
   });
 
-  it('suggests raising a low draft score when almost every match is drafted', () => {
+  it('suggests raising a low draft bar when almost every match is drafted', () => {
     queue(Array.from({ length: 12 }, (_, i) => job(String(i))), 10);
-    expect(screen.getByText(/Your draft score is 10, so almost every match gets a draft/)).toBeInTheDocument();
+    expect(screen.getByText(/Your draft bar is 10, so almost every match gets a draft/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Raise it in Settings' })).toHaveAttribute('href', '#/settings');
   });
 
-  it('stays quiet about the draft score when the queue is short or the score is high', () => {
+  it('stays quiet about the draft bar when the queue is short or the bar is high', () => {
     queue(Array.from({ length: 12 }, (_, i) => job(String(i))), 75);
-    expect(screen.queryByText(/Your draft score is/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Your draft bar is/)).not.toBeInTheDocument();
   });
 
   it('keeps the full title available when a long one is cut to one line', () => {

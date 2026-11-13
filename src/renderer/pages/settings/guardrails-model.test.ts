@@ -13,9 +13,9 @@ describe('parseGuardrails', () => {
     expect(!r.ok && r.errors.draft).toMatch(/0 and 100/);
   });
 
-  it('never auto-sends below the draft threshold', () => {
+  it('never auto-sends below the draft bar', () => {
     const r = parseGuardrails({ ...draft, auto: '60' });
-    expect(!r.ok && r.errors.auto).toMatch(/at least the draft score/);
+    expect(!r.ok && r.errors.auto).toMatch(/at least the draft bar/);
   });
 
   it('requires a positive token budget', () => {

@@ -282,7 +282,8 @@
 
 
 
-.draft-warning {
+/* The job state card sits in the flush panel with the same side gutter as the head and fit. */
+.card-flush.draft-panel > .job-card {
   margin: var(--space-4) var(--space-6) 0;
 }
 

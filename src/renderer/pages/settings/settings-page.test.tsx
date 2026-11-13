@@ -55,11 +55,11 @@ describe('SettingsPage', () => {
 
   it('validates guardrails and saves on blur', async () => {
     const { api } = renderWithApp(<SettingsPage />);
-    const auto = await screen.findByLabelText('Auto-send at match score');
+    const auto = await screen.findByLabelText('Auto-send at (match score)');
     await userEvent.clear(auto);
     await userEvent.type(auto, '60');
     await userEvent.tab();
-    expect(screen.getByText(/at least the draft score/)).toBeInTheDocument();
+    expect(screen.getByText(/at least the draft bar/)).toBeInTheDocument();
     await userEvent.clear(auto);
     await userEvent.type(auto, '90');
     await userEvent.tab();
