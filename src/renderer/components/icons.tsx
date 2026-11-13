@@ -11,6 +11,7 @@ const PATHS = {
   usage: <path d="M4 16v-5M10 16V4M16 16V9" />,
   settings: <><path d="M3 6h8M15 6h2M3 14h2M9 14h8" /><circle cx="13" cy="6" r="2" /><circle cx="7" cy="14" r="2" /></>,
   plus: <path d="M10 4v12M4 10h12" />,
+  matches: <path d="M4 5h12M4 10h12M4 15h7" />,
   check: <path d="M4 10l4 4 8-8" />,
   minus: <path d="M5 10h10" />,
   shield: <><path d="M10 2l6 3v5c0 4-3 7-6 8-3-1-6-4-6-8V5z" /><path d="M7 10l2 2 4-4" /></>,
