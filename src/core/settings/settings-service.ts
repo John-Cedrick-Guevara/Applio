@@ -53,7 +53,7 @@ export function createSettingsService({ kv, sources, secrets }: SettingsPorts): 
     saveSettings: (patch) => {
       const next = { ...stored(), ...patch };
       if (next.autoSendThreshold < next.draftThreshold) {
-        throw new InvalidSettingsError(`Auto-send must be at least the draft score (${next.draftThreshold}).`);
+        throw new InvalidSettingsError(`Auto-send must be at least the draft bar (${next.draftThreshold}).`);
       }
       if (next.monthlyTokenBudget < next.dailyTokenBudget) {
         throw new InvalidSettingsError(`The monthly token budget must be at least the daily one (${next.dailyTokenBudget.toLocaleString('en-US')}).`);
