@@ -324,6 +324,14 @@ describe('createBackend discovery', () => {
     await expect(api.scoreJob(job.id)).rejects.toThrow('Only jobs not scored yet can be scored.');
   });
 
+  it('scores a job once when asked twice at the same time, so it never spends twice', async () => {
+    const { api, job, complete } = await unscoredJob();
+    const first = api.scoreJob(job.id);
+    await expect(api.scoreJob(job.id)).rejects.toThrow('Already scoring this job.');
+    expect(await first).toMatchObject({ status: 'scored' });
+    expect(complete).toHaveBeenCalledTimes(1);
+  });
+
   it('refuses to score once the token budget is used, without calling AI', async () => {
     const { api, job, complete, deps } = await unscoredJob();
     await api.saveSettings({ dailyTokenBudget: 1_000, monthlyTokenBudget: 1_000 });

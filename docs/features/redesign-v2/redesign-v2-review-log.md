@@ -2,6 +2,8 @@
 
 One entry per PR: how it was reviewed (`/review-pr` passes against its spec) and what was found. Kept in the repo so the evidence outlives a session.
 
+## Per PR
+
 | PR | Review | Findings → fix |
 |---|---|---|
 | #78 job state card | `/review-pr`, 2 rounds | Backend "draft score" message (AC-7) → fixed in the PR. Spec lacked Known risks and per-MNB test lines → fixed. |
@@ -9,17 +11,37 @@ One entry per PR: how it was reviewed (`/review-pr` passes against its spec) and
 | #80 matches | `/review-pr`, 2 rounds | Saved skip's row reappeared; draft bar change lost on quick leave (LOGIC-004) → fixed. **Missed then, found later:** a job with open questions was also listed here → #87. |
 | #81 inbox 4a | `/review-pr`, 2 rounds | Dead `queueState` export (LOGIC-007) → removed. ~1,020 changed lines (guide ~1,000), accepted. |
 | #82 inbox 4b | `/review-pr`, 1 round | Badge lagged after a held skip saved → fixed before review (AC-6). |
-| #83 get jobs | **Merged before review** (reviews were paused); reviewed afterwards | Tabs unmounted each other, losing a running scan (→ #86). Scan result count didn't match Matches; `/matches/new` filter stuck; stale "Review" copy (→ #87). |
-| #84 score now | **Merged before review**; reviewed afterwards | No blocking findings: quota check runs before the AI call, status must be `found`, IPC validated, tokens recorded as `score`. Note: scoring a job a scan is scoring at the same moment could spend twice (accepted; single operator, small). |
+| #83 get jobs | Merged before review (reviews were paused); full passes run afterwards (below) | Tabs unmounted each other (→ #86); scan count, sticky filter, stale copy (→ #87). |
+| #84 score now | Merged before review; full passes run afterwards (below) | Concurrent double-score spent twice (STRESS-005) → this PR. |
 | #85 paste dedup | `/review-pr`, 2 rounds | Duplicate preview showed the raw channel id and a fake route (LOGIC-002) → `describeRoute`. |
-| #86 keep scan | Gate 0 + checks (found by the #83 review) | Test failed before the fix. |
-| #87 scan counts | Gate 0 + checks (found by the #80/#83 review and browser run) | See its spec. |
+| #86 keep scan | Gate 0 + full passes (below) | Found by the #83 review; test failed before the fix. |
+| #87 scan counts | Gate 0 + full passes (below) | Found by the #80/#83 review and the browser run. |
+| score-now double submit | Gate 0 + full passes (below) | Found by the #84 review. |
+
+## Full passes run after the fact
+
+Rule cards from the review-pr skill (Pass 0 acceptance, 1 logic, 2 stress, 3 security, 4 data, 5 deployment). `n/a` = the diff doesn't touch the card's trigger.
+
+| PR | Acc | Logic | Stress | Security | Data | Deploy |
+|---|---|---|---|---|---|---|
+| #83 | 4/4 AC, 3/3 MNB met | LOGIC-005 callers: repo-wide grep clean for `/find-jobs`, `/add-job`. **FAIL** LOGIC-001: result count ignored drafted/asked (→ #87). **FAIL** LOGIC-004: tab switch lost scan state (→ #86). | ok | ok (no new input; post text unchanged) | n/a | DEPLOY-001 unverified (CI off); local check green |
+| #84 | 5/5 AC, 2/2 MNB met | ok: shared `scoreIds`; quota check before the AI call; status must be `found`; failure surfaces its note (LOGIC-003) | **FAIL** STRESS-005: two concurrent calls both passed the status check and both spent tokens (→ this PR) | ok: id validated by `z.tuple([id])`; fact ids checked by the existing scorer | ok: score + summaries + move saved together by `saveMatch` | unverified (CI off) |
+| #86 | 2/2 AC met | ok (hidden panels stay mounted; assistive tech skips `hidden`) | ok (two small extra reads on open, in Known risks) | n/a | n/a | unverified (CI off) |
+| #87 | 5/5 AC met | ok (`waiting` clamped at 0; `key` resets Matches' local state when the link changes, intended) | ok (one extra cheap read) | n/a | n/a | unverified (CI off) |
+| this PR | 3/3 AC met | ok (set cleared in `finally`, so a failed score can be retried) | ok | n/a | n/a | unverified (CI off) |
 
 ## Verified in a browser (Chrome against the mock API, `npm run dev:web`)
 Get jobs (redirect from `/find-jobs`, cost line, scan result survives a tab round-trip, "Open the 2 new matches" → `/matches/new` with the filter on and a working empty state), Matches, and the Inbox (ArrowDown, S → Skipped + Undo, next job opens on the right tab).
 
+## Verified against the real backend (scratch Electron harness, not committed)
+`createBackend` on a **copy** of the operator DB, real Claude Code engine and profile, no network sources, no sending. The real `~/Applio` DB and folders were checked untouched afterwards (same size and timestamp, no new files).
+- **Free duplicate check:** a job already in the DB, pasted as "Title at Company": returned as a duplicate with the real channel label and route, `tokensUsed` 0, token delta 0 (no AI call).
+- **Score now:** one scored job flipped back to `found` in the copy, then `scoreJob` with real Claude: status `scored`, score 15, 4,577 tokens recorded, role summary saved.
+- **Refusal:** scoring that job again → "Only jobs not scored yet can be scored."
+- `npm run e2e` (Electron ATS-form harness, fakes only): 13/13 pass on main.
+
 ## Not verified
-- Real-backend flows (real Claude scoring, drafting, sending). Backend behaviour is covered by `backend.test.ts` with fake engines only.
-- The mock scan finishes instantly, so a scan in progress was not seen in the browser (covered by a test).
+- Real drafting and sending through the redesigned Inbox (Approve, A key) against a real backend; the Inbox/Matches/Get jobs UI against real data in Electron (only the mock API in Chrome).
+- A scan in progress in the browser (the mock finishes instantly; a test covers it).
 - In dev-web the sidebar badge refreshes only on navigation (no status push in the mock); the real app pushes, and a test covers the push.
-- The Inbox badge leads the list by one for ~5 s while a skip is held.
+- The Inbox badge leads the list by one for ~5 s while a skip is held (accepted).
