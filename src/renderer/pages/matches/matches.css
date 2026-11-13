@@ -22,6 +22,9 @@
 .matches-sub { display: block; margin-top: var(--space-1); }
 .matches-why { color: var(--text-secondary); max-width: 360px; }
 .matches-actions { text-align: right; white-space: nowrap; }
+/* A link-style Skip beside a Draft or Score button sat flush against it. */
+.matches-actions > * + * { margin-left: var(--space-2); }
+.matches-actions > * { vertical-align: middle; }
 
 .matches-empty { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); padding: 48px var(--space-6); text-align: center; }
 .matches-empty h2 { margin: 0; font-size: var(--text-md, 16px); }

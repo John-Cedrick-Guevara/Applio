@@ -106,6 +106,8 @@ describe('Inbox flow', () => {
   it('approves with A from the list, through the same button', async () => {
     const api = await withGmail();
     const { panel } = await inboxAt('j1', api);
+    // The draft loads inside the detail region; A needs its Approve button to exist.
+    await screen.findByRole('button', { name: 'Approve & send email' });
     within(panel()).getAllByRole('link')[0]!.focus();
     await userEvent.keyboard('a');
     await waitFor(async () => expect(await api.getSend('j1')).toMatchObject({ state: 'sent' }));
@@ -113,6 +115,7 @@ describe('Inbox flow', () => {
 
   it('does nothing on A while Approve is disabled', async () => {
     const { panel, api } = await inboxAt('j1');
+    await screen.findByRole('link', { name: 'Set up Gmail to send' });
     within(panel()).getAllByRole('link')[0]!.focus();
     await userEvent.keyboard('a');
     expect(await api.getSend('j1')).toBeNull();
@@ -122,6 +125,7 @@ describe('Inbox flow', () => {
     const api = await withGmail();
     const flagged: typeof api = { ...api, getJob: async (id) => ({ ...(await api.getJob(id)), suspicious: 'The post addresses AI tools directly.' }) };
     const { panel } = await inboxAt('j1', flagged);
+    await screen.findByRole('button', { name: 'Approve & send email' });
     within(panel()).getAllByRole('link')[0]!.focus();
     await userEvent.keyboard('a');
     expect(await screen.findByRole('button', { name: 'Send anyway' })).toBeInTheDocument();
@@ -130,6 +134,7 @@ describe('Inbox flow', () => {
 
   it('skips with S from the list', async () => {
     const { panel } = await inboxAt('j1');
+    await screen.findByRole('button', { name: 'Skip job' });
     within(panel()).getAllByRole('link')[0]!.focus();
     await userEvent.keyboard('s');
     expect(await screen.findByRole('status', { name: 'Undo' })).toHaveTextContent(`Skipped ${BACKEND}`);

@@ -191,6 +191,11 @@ describe('jobSteps', () => {
     expect(states(failed).Drafted).toBe('failed');
   });
 
+  it('shows Drafted failed when the save stopped and nothing is printing', () => {
+    expect(states(job({ status: 'drafted' }), { saving: false }).Drafted).toBe('failed');
+    expect(states(job({ status: 'drafted' }), { saving: true }).Drafted).toBe('current');
+  });
+
   it('waits on the operator at Ready once the PDFs are saved', () => {
     expect(states(job({ status: 'drafted', folderPath: '/x' }))).toMatchObject({ Drafted: 'done', Ready: 'blocked', Sent: 'todo' });
   });

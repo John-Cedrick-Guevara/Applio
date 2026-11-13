@@ -503,6 +503,30 @@ describe('createBackend discovery', () => {
     await expect(backendIn().api.getJob('nope')).rejects.toThrow('Job nope not found');
   });
 
+  it('lists a scan\'s jobs as drafting until their PDFs are saved, so none reads as stalled meanwhile', async () => {
+    const { api, deps } = await searchingBackend();
+    const fact = await api.saveFact({ group: 'Acme — Engineer', text: 'Cut API latency 40%' });
+    deps.engines['claude-code'] = {
+      check: async () => ({ ready: true, message: 'ok' }),
+      complete: async ({ prompt, jobIds }) => {
+        const tools = createTools(createToolPorts(deps.db, jobIds, () => new Date()));
+        const call = (name: string, input: unknown) => tools.find((t) => t.name === name)!.call(input);
+        if (prompt.startsWith('Score')) return { text: JSON.stringify(jobIds.map((jobId) => ({ jobId, score: 90, roleSummary: 'APIs', descriptionSummary: 'Remote', strengths: [{ text: 'Fast APIs', factId: fact.id }], gaps: [] }))), inputTokens: 900, outputTokens: 100 };
+        for (const jobId of jobIds) call('save_draft', { jobId, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ group: 'Acme — Engineer', items: [{ text: 'Cut latency 40%', factId: fact.id }] }], coverLetter: 'Dear team', answers: [] });
+        return { text: 'done', inputTokens: 900, outputTokens: 100 };
+      },
+    };
+    let duringPrint: string[] = [];
+    deps.printPdf.mockImplementation(async (html: string) => {
+      duringPrint = (await api.getStatus()).drafting ?? [];
+      return new TextEncoder().encode(html);
+    });
+    await api.runDiscovery({ draft: true });
+    const [job] = await api.listJobs({ statuses: ['drafted'] });
+    expect(duringPrint).toContain(job!.id);
+    expect((await api.getStatus()).drafting ?? []).toEqual([]);
+  });
+
   it('drafts strong matches through the tools after scoring them, and sends nothing', async () => {
     const { api, deps } = await searchingBackend();
     const fact = await api.saveFact({ group: 'Acme — Engineer', text: 'Cut API latency 40%' });

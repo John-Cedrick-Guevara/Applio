@@ -339,7 +339,18 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
           return activity.addRun(summary, details);
         }),
       score: (jobIds, runId) => scoreIds(jobIds, runId),
-      draft: (jobIds, runId) => draftJobs(jobIds, { runId }, draftPorts),
+      // Listed as drafting until their PDFs are saved too, so open pages show "Saving…" (not a stalled save) meanwhile.
+      draft: async (jobIds, runId) => {
+        const startedAt = new Date().toISOString();
+        for (const id of jobIds) draftingNow.set(id, startedAt);
+        pushStatus();
+        try {
+          return await draftJobs(jobIds, { runId }, draftPorts);
+        } finally {
+          for (const id of jobIds) draftingNow.delete(id);
+          pushStatus();
+        }
+      },
       finishRun: (runId, details, drafted) => activity.updateDetails(runId, details, drafted),
       leftover: () => {
         const threshold = settings.getSettings().draftThreshold;

@@ -20,6 +20,8 @@ import { SourceCredit } from '../../components/source-credit';
 
 interface DraftPanelProps {
   jobId: string;
+  /** Whether main is working on this job right now (Claude's turn or the PDFs printing). */
+  saving: boolean;
   /** The Inbox holds a skip with Undo and opens the next job (redesign v2). */
   onSkip: (job: Job) => void;
   /** Called once a decision is final (a sent record, or marked applied), with what to tell the operator. */
@@ -73,7 +75,7 @@ interface DetailProps extends Omit<DraftPanelProps, 'jobId' | 'onJobChange'> {
   onDraft: (draft: Draft) => void;
 }
 
-function DraftDetail({ job, draft, send, onSkip, onDecided, thresholds, owner, autonomyBySource, gmailIssue, onJob, onDraft }: DetailProps) {
+function DraftDetail({ job, draft, send, saving, onSkip, onDecided, thresholds, owner, autonomyBySource, gmailIssue, onJob, onDraft }: DetailProps) {
   const api = useApi();
   const action = useAction();
   // Its own action, so a failed send's message stays on screen and never reads as a skip or edit error.
@@ -87,10 +89,10 @@ function DraftDetail({ job, draft, send, onSkip, onDecided, thresholds, owner, a
   const state = sendState(job, send);
   const waiting = job.status === 'drafted';
   const needsGmail = job.channel === 'email' ? gmailIssue : undefined;
-  const files = filesState(job);
+  const files = filesState(job, saving);
   const foundAt = job.history[0]?.at ?? job.postedAt;
   // One card for where the job stands; the rest of what applies folds under More notes.
-  const { card, notes } = draftCard({ job, draft, send, ...(waiting && sending.error ? { sendError: sending.error } : {}), ...(needsGmail ? { gmailIssue: needsGmail } : {}) });
+  const { card, notes } = draftCard({ job, draft, send, saving, ...(waiting && sending.error ? { sendError: sending.error } : {}), ...(needsGmail ? { gmailIssue: needsGmail } : {}) });
 
   /** Approves (or retries) and then re-reads the job and its send log, so what's shown is what happened, success or not. */
   const approve = async () => {
@@ -132,7 +134,7 @@ function DraftDetail({ job, draft, send, onSkip, onDecided, thresholds, owner, a
 
   return (
     <>
-      <div className="draft-steps"><Stepper label="Progress" steps={jobSteps(job, { send })} /></div>
+      <div className="draft-steps"><Stepper label="Progress" steps={jobSteps(job, { send, saving })} /></div>
       <div className="draft-head">
         <div className="draft-head-text">
           <div className="cell-sub">{job.company} · <SourceCredit job={job} /> · found {formatRelative(foundAt)}</div>

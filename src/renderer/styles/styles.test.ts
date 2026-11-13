@@ -62,10 +62,17 @@ describe('chopped UI fixes', () => {
     expect(components).toMatch(/\.step-list-dot\s*\{[^}]*width:\s*12px/);
   });
 
-  it('keeps primary buttons white inside warning and danger banners', () => {
+  it('keeps primary buttons white inside warning, danger and success banners', () => {
     // `.banner-warning a { color: inherit }` is more specific than `.btn-primary`, leaving amber text on blue.
     expect(components).toMatch(/\.banner-warning \.btn-primary[^{]*\{[^}]*color:\s*var\(--on-accent\)/);
     expect(components).toMatch(/\.banner-danger \.btn-primary[^{]*\{[^}]*color:\s*var\(--on-accent\)/);
+    // `.banner-success a` is just as specific: "Open it" in the green restored banner came out green on blue.
+    expect(components).toMatch(/\.banner-success \.btn-primary[^{]*\{[^}]*color:\s*var\(--on-accent\)/);
+  });
+
+  it('spaces the buttons in a Matches row apart', () => {
+    const matches = readFileSync(new URL('../pages/matches/matches.css', import.meta.url), 'utf8');
+    expect(matches).toMatch(/\.matches-actions\s*>\s*\*\s*\+\s*\*\s*\{[^}]*margin-left:/);
   });
 
   it('pins the activity bar flush to the top, by cancelling the page padding in its sticky offset', () => {
