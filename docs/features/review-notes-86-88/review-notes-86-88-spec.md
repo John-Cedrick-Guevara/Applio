@@ -19,7 +19,7 @@ Act on the minor notes from the independent review of #86, #87 and #88 (a review
 - AC-2: `backend.test.ts` › "lets a job whose scoring failed be scored again".
 - AC-3: read `src/main/backend.ts` near `runDiscovery`.
 - AC-4: `docs/features/redesign-v2/redesign-v2-review-log.md`.
-- MNB-1/2: `npm run check`.
+- MNB-1, MNB-2: `npm run check`.
 
 ## Out of scope
 - #87's note that `Results` assumes drafted and asked jobs don't overlap and re-reads `lastRun` from status: left as is, since the scan's own summary doesn't carry `asked`; logged below.
