@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Job } from '../../../shared/types';
 import type { SendRecord } from '../../../shared/types';
 import { formatClock } from '../../lib/format';
-import { jobSteps, queueGroups, effortLevel, gmailIssue, traceLine, modeLabel, primaryAction, queueState, sendState } from './review-model';
+import { jobSteps, inboxTabs, effortLevel, gmailIssue, traceLine, modeLabel, primaryAction, queueState, sendState } from './review-model';
 
 const job = (over: Partial<Job>): Job => ({
   id: 'x', sourceId: 's', sourceName: 'S', company: 'C', title: 'T', url: '', location: '', employmentType: 'full-time',
@@ -148,32 +148,43 @@ describe('traceLine', () => {
   });
 });
 
-describe('queueGroups', () => {
+describe('inboxTabs', () => {
   const email = job({ id: 'e', channel: 'email', score: 80 });
   const site = job({ id: 'c', channel: 'custom', score: 90 });
   const unsent = job({ id: 'u', status: 'approved', channel: 'email', score: 70 });
+  const handedOff = job({ id: 'h', status: 'approved', channel: 'platform', score: 60 });
   const flagged = job({ id: 'f', channel: 'email', score: 95, suspicious: 'The post addresses AI tools directly.' });
   const asking = job({ id: 'q', status: 'scored', score: 60 });
+  const tabs = inboxTabs([email, site, unsent, handedOff, flagged], [asking], 'score');
+  const ids = (key: string) => tabs.find((t) => t.key === key)!.jobs.map((j) => j.id);
 
-  it('orders groups by what the operator does next, leaving out empty ones', () => {
-    const groups = queueGroups([email, site, unsent, flagged], [asking], []);
-    expect(groups.map((g) => [g.key, g.jobs.map((j) => j.id)])).toEqual([
-      ['unsent', ['u']],
-      ['asking', ['q']],
-      ['send', ['f', 'e']],
-      ['handoff', ['c']],
-    ]);
+  it('files each waiting job under exactly one tab, most urgent tab first', () => {
+    expect(tabs.map((t) => t.key)).toEqual(['fix', 'answer', 'approve', 'handoff']);
+    expect([...ids('fix'), ...ids('answer'), ...ids('approve'), ...ids('handoff')].sort()).toEqual(['c', 'e', 'f', 'h', 'q', 'u']);
+    expect(ids('answer')).toEqual(['q']);
+    expect(ids('approve')).toEqual(['e']);
+    expect(ids('handoff')).toEqual(['c', 'h']);
   });
 
-  it('puts strong matches a scan left undrafted under Ready to draft, after drafting now', () => {
-    const strong = job({ id: 's', status: 'scored', score: 85 });
-    const groups = queueGroups([email], [], [], [strong]);
-    expect(groups.map((g) => [g.key, g.label])).toEqual([['todraft', 'Ready to draft'], ['send', 'Ready to send']]);
+  it('puts a suspicious post and an approved job that did not send under Fix first', () => {
+    expect(ids('fix')).toEqual(['f', 'u']);
   });
 
-  it('files each group under one filter, so the filter counts add up', () => {
-    const groups = queueGroups([email, site, unsent], [asking], []);
-    expect(groups.map((g) => g.filter)).toEqual(['attention', 'attention', 'send', 'handoff']);
+  it('leaves out a job decided on this visit, skipped or sent', () => {
+    const decided = inboxTabs([job({ id: 's', status: 'skipped' }), job({ id: 'a', status: 'applied' })], [], 'score');
+    expect(decided.flatMap((t) => t.jobs)).toEqual([]);
+  });
+
+  it('keeps every tab, even an empty one, so counts never jump around', () => {
+    expect(inboxTabs([], [], 'score').map((t) => t.jobs.length)).toEqual([0, 0, 0, 0]);
+  });
+
+  it('sorts a tab by best match or oldest', () => {
+    const old = job({ id: 'o', score: 50, history: [{ status: 'found', at: '2026-11-01T00:00:00.000Z' }] });
+    const fresh = job({ id: 'n', score: 90, history: [{ status: 'found', at: '2026-11-12T00:00:00.000Z' }] });
+    const approve = (sort: 'score' | 'oldest') => inboxTabs([old, fresh], [], sort).find((t) => t.key === 'approve')!.jobs.map((j) => j.id);
+    expect(approve('score')).toEqual(['n', 'o']);
+    expect(approve('oldest')).toEqual(['o', 'n']);
   });
 });
 
