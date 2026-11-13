@@ -38,10 +38,12 @@ Get jobs (redirect from `/find-jobs`, cost line, scan result survives a tab roun
 - **Free duplicate check:** a job already in the DB, pasted as "Title at Company": returned as a duplicate with the real channel label and route, `tokensUsed` 0, token delta 0 (no AI call).
 - **Score now:** one scored job flipped back to `found` in the copy, then `scoreJob` with real Claude: status `scored`, score 15, 4,577 tokens recorded, role summary saved.
 - **Refusal:** scoring that job again → "Only jobs not scored yet can be scored."
+- **Real draft, PDFs, Approve and the double-send guard** (second harness, same rules; output folder and DB are scratch copies, Gmail is a recording stand-in addressed to a `.invalid` address): one real Claude draft of a scored job; its PDFs printed (`cover-letter.pdf`, `resume.pdf`, `job.md`) into the scratch folder only; the real draft check reported 2 unverified lines and 1 forbidden term (so the card would not claim "every claim traced"); `approveDraft` → status `applied`, send record `sent` to the test address, exactly one message with the résumé attached; a second `approveDraft` was refused ("is not awaiting approval") and still only one message went out. Nothing was sent anywhere real.
 - `npm run e2e` (Electron ATS-form harness, fakes only): 13/13 pass on main.
+- Harness note: the scratch Electron entry needs the real app's `app.on('window-all-closed', () => {})`, or PDF printing's hidden window quits it mid-run.
 
 ## Not verified
-- Real drafting and sending through the redesigned Inbox (Approve, A key) against a real backend; the Inbox/Matches/Get jobs UI against real data in Electron (only the mock API in Chrome).
+- The Inbox/Matches/Get jobs **UI** against real data in Electron (only the mock API in Chrome); the real draft/approve flow above was exercised through the backend, not the redesigned screens.
 - A scan in progress in the browser (the mock finishes instantly; a test covers it).
 - In dev-web the sidebar badge refreshes only on navigation (no status push in the mock); the real app pushes, and a test covers the push.
 - The Inbox badge leads the list by one for ~5 s while a skip is held (accepted).
