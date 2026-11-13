@@ -292,6 +292,9 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
   let stopRequested = false;
 
   /** One scan: the chosen enabled sources (all of them by default), drafting only when asked. */
+  /** Jobs being scored on request right now, so the same job is never scored twice at once. */
+  const scoringNow = new Set<string>();
+
   /**
    * Scores jobs with Claude (SPEC F3.3), for a scan or one job on request: answers are
    * checked and saved like the MCP tool's, and every call goes through the quota guard.
@@ -719,10 +722,17 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
 
     scoreJob: async (jobId) => {
       if (getJob(jobId).status !== 'found') throw new Error('Only jobs not scored yet can be scored.');
+      // A second click while the first call runs would pay for the same job twice.
+      if (scoringNow.has(jobId)) throw new Error('Already scoring this job.');
       // Checked before the call, so a used-up budget never spends a token (SPEC F10).
       const stop = ai.budgetStop();
       if (stop) throw new Error(stop);
-      await scoreIds([jobId]);
+      scoringNow.add(jobId);
+      try {
+        await scoreIds([jobId]);
+      } finally {
+        scoringNow.delete(jobId);
+      }
       pushStatus();
       const job = getJob(jobId);
       if (job.status !== 'scored') throw new Error(job.history.findLast((e) => e.note)?.note ?? "Couldn't score this job. Try again, or let your next scan score it.");
