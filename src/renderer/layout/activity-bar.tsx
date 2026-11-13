@@ -34,7 +34,15 @@ export function ActivityBar() {
     return () => clearInterval(timer);
   }, [scanning]);
 
-  if (!state.data) return null;
+  if (!state.data) {
+    // A failed load says so in the bar's place, so running work never silently disappears.
+    return state.error ? (
+      <section className="activity-bar activity-bar-stop" aria-label="Activity">
+        <span className="activity-running">Couldn't load what Applio is doing.</span>
+        <div className="activity-actions"><Button size="sm" onClick={state.reload}>Retry</Button></div>
+      </section>
+    ) : null;
+  }
   const { status } = state.data;
   const m = activityModel(status, { autoSendThreshold: state.data.autoSendThreshold, autonomousSources: state.data.autonomousSources, now });
 

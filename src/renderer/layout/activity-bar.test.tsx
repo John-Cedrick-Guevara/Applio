@@ -83,6 +83,17 @@ describe('ActivityBar', () => {
     expect(screen.getByRole('link', { name: 'Claude needs setup' })).toHaveAttribute('href', '#/settings');
   });
 
+  it('says it could not load, with Retry, instead of vanishing', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    let fail = true;
+    const flaky = { ...api, getSettings: async () => { if (fail) throw new Error('settings unreadable'); return api.getSettings(); } };
+    renderWithApp(<ActivityBar />, flaky);
+    expect(await bar()).toHaveTextContent("Couldn't load what Applio is doing.");
+    fail = false;
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await bar()).toHaveTextContent(/Nothing running/);
+  });
+
   it('stops listening when it unmounts', async () => {
     const events = fakeEvents();
     const { unmount } = renderWithApp(<ActivityBar />);

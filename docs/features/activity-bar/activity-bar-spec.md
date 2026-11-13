@@ -9,6 +9,7 @@ One bar across the top of every page says what Applio is doing (a scan, drafts),
 - [x] AC-5: An AI engine that isn't set up shows "Claude needs setup" with a Settings link.
 - [x] AC-6: Opening the bar lists what's running with links (the scan → Find jobs, drafts → Review), the auto-send rule, and the budget line.
 - [x] AC-7: The sidebar engine card is gone.
+- [x] AC-8: If the bar can't load, it says so in its place with Retry instead of disappearing.
 
 ## Must not break
 - MNB-1: Pausing still stops only auto-sends; scans and drafts keep working.
@@ -27,6 +28,7 @@ One bar across the top of every page says what Applio is doing (a scan, drafts),
 - AC-5: `activity-model.test.ts` › "says the engine needs setup"; `activity-bar.test.tsx` › "points to Settings when the engine needs setup".
 - AC-6: `activity-bar.test.tsx` › "opens to list what is running with links".
 - AC-7: `app.test.tsx` › "shows the activity bar and no engine card".
+- AC-8: `activity-bar.test.tsx` › "says it could not load, with Retry, instead of vanishing".
 - MNB-1: `activity-bar.test.tsx` › "pauses and resumes auto-send from the bar" (copy says scans and drafts still work).
 - MNB-2: `activity-bar.test.tsx` › "stops listening when it unmounts".
 - MNB-3: `review-page.test.tsx` › "offers Find jobs to start a scan".
