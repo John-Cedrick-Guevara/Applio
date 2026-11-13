@@ -291,7 +291,6 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
   let scan: AppStatus['scan'];
   let stopRequested = false;
 
-  /** One scan: the chosen enabled sources (all of them by default), drafting only when asked. */
   /** Jobs being scored on request right now, so the same job is never scored twice at once. */
   const scoringNow = new Set<string>();
 
@@ -321,6 +320,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     return result;
   };
 
+  /** One scan: the chosen enabled sources (all of them by default), drafting only when asked. */
   const runDiscovery = ({ sourceIds, draft = false }: ScanOptions) => {
     stopRequested = false;
     const chosen = (id: string) => (sourcesRepo.get(id)?.enabled ?? false) && (!sourceIds || sourceIds.includes(id));

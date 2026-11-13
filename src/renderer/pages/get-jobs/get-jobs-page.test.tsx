@@ -10,6 +10,9 @@ afterEach(() => {
   window.location.hash = '';
 });
 
+// Hidden panels have no accessible name in Testing Library, so they're found by their label.
+const panel = (label: string) => screen.getAllByRole('tabpanel', { hidden: true }).find((p) => p.getAttribute('aria-label') === label)!;
+
 describe('GetJobsPage', () => {
   it('opens on Scan sources and switches to Paste a job', async () => {
     renderWithApp(<GetJobsPage params={{}} />);
@@ -35,7 +38,10 @@ describe('GetJobsPage', () => {
     expect(await screen.findByRole('region', { name: 'Scan in progress' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('tab', { name: 'Paste a job' }));
     await screen.findByLabelText('Job post');
+    // The scan's panel stays mounted but hidden, so assistive tech and sighted users see only the Paste tab.
+    expect(panel('Scan sources')).not.toBeVisible();
     await userEvent.click(screen.getByRole('tab', { name: 'Scan sources' }));
+    expect(panel('Paste a job')).not.toBeVisible();
     expect(await screen.findByRole('region', { name: 'Scan in progress' })).toBeInTheDocument();
     await act(async () => finish());
   });

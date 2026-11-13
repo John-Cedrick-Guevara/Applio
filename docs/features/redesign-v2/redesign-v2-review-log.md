@@ -30,6 +30,18 @@ Rule cards from the review-pr skill (Pass 0 acceptance, 1 logic, 2 stress, 3 sec
 | #87 | 5/5 AC met | ok (`waiting` clamped at 0; `key` resets Matches' local state when the link changes, intended) | ok (one extra cheap read) | n/a | n/a | unverified (CI off) |
 | this PR | 3/3 AC met | ok (set cleared in `finally`, so a failed score can be retried) | ok | n/a | n/a | unverified (CI off) |
 
+## Independent review of #86, #87 and #88
+A fresh reviewer subagent that had not written the code, read-only (no edits, no comments posted), graded each against its spec and the review-pr rule cards, and ran `npm run check` (green, 1,137 tests). Result: **#86 approved, #87 approved with notes, #88 approved with notes**; no FAILs.
+
+| Finding (severity) | What was done |
+|---|---|
+| #86: AC-2 (hidden panel) proven only indirectly (minor) | Test now asserts the inactive panel is not visible, both ways. |
+| #88: AC-2 (retry after a failed score) had no direct test (minor) | Added "lets a job whose scoring failed be scored again". |
+| #88: `scoringNow` doc comment orphaned `runDiscovery`'s comment (minor) | Moved `runDiscovery`'s comment back above it. |
+| #87: `Results` assumes drafted and asked jobs are disjoint subsets of passed-filters, and `runDiscovery`'s own return has no `asked`, so a late or failed `lastRun` re-read could show an old count (unverified, minor) | Not changed: the scan's summary and stored run come from the same code path, and a failed re-read falls back to the returned summary. Left as a known limit. |
+| #87: remount on `key` drops search/selection when the link changes (minor) | Accepted; it is the intended fix for the sticky filter. |
+| #87: AC-5 "three green runs" not reproduced by the reviewer (note) | The reviewer ran once, green. |
+
 ## Verified in a browser (Chrome against the mock API, `npm run dev:web`)
 Get jobs (redirect from `/find-jobs`, cost line, scan result survives a tab round-trip, "Open the 2 new matches" → `/matches/new` with the filter on and a working empty state), Matches, and the Inbox (ArrowDown, S → Skipped + Undo, next job opens on the right tab).
 
