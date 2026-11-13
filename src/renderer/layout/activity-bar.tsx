@@ -71,7 +71,7 @@ export function ActivityBar() {
           <h2 className="section-label">Running now</h2>
           {m.running.kind === 'scan' || status.drafting?.length ? (
             <ul className="list-plain activity-list" aria-label="Running now">
-              {status.scan ? <li><a href="#/find-jobs">{m.running.text.replace(/^Scanning/, 'Open the scan:')}</a></li> : null}
+              {status.scan ? <li><a href="#/get-jobs">{m.running.text.replace(/^Scanning/, 'Open the scan:')}</a></li> : null}
               {status.drafting?.length ? <li><a href="#/inbox">{status.drafting.length} draft{status.drafting.length === 1 ? '' : 's'} in progress, open Inbox</a></li> : null}
             </ul>
           ) : <p className="cell-sub">Nothing is running. Scans only run when you start one.</p>}

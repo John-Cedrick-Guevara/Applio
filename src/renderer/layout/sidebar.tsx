@@ -15,7 +15,6 @@ interface NavItem {
 const NAV: NavItem[] = [
   { to: '/inbox', label: 'Inbox', icon: 'review' },
   { to: '/matches', label: 'Matches', icon: 'matches' },
-  { to: '/find-jobs', label: 'Find jobs', icon: 'search' },
   { to: '/applications', label: 'Applications', icon: 'applications' },
   { to: '/profile', label: 'Profile', icon: 'profile' },
   { to: '/usage', label: 'Usage & limits', icon: 'usage' },
@@ -51,9 +50,9 @@ export function Sidebar() {
         <Logo />
         <span>Applio</span>
       </div>
-      <a className="sidebar-add" href="#/add-job" aria-current={isActive(path, '/add-job') ? 'page' : undefined}>
+      <a className="sidebar-add" href="#/get-jobs" aria-current={isActive(path, '/get-jobs') ? 'page' : undefined}>
         <Icon name="plus" />
-        Add job
+        Get jobs
       </a>
       <nav aria-label="Primary">
         {NAV.map((item) => (

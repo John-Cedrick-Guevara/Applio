@@ -7,6 +7,7 @@ import { ScoreBlock } from '../../components/score-block';
 import { useAction } from '../../hooks/use-action';
 import { useAsync } from '../../hooks/use-async';
 import { useJobsVersion } from '../../hooks/use-jobs-version';
+import { costLine } from '../../lib/cost';
 import { formatTokens } from '../../lib/format';
 import { filesState, pendingReason } from '../../lib/job-progress';
 import { REVIEW_STATUSES } from '../../lib/job-lists';
@@ -16,9 +17,12 @@ import './add-job.css';
 
 type Mode = 'text' | 'link';
 
+/** About what reading and scoring one pasted post costs. */
+const ANALYZE_TOKENS = 8_000;
+
 /**
- * Add job (prototype screen 7): paste a post or link from anywhere; Applio
- * reads it, scores it and works out how to apply before it joins the queue.
+ * Get jobs › Paste a job: paste a post or link from anywhere; Applio reads it,
+ * scores it and works out how to apply before it joins the queue.
  */
 export default function AddJobPage() {
   const api = useApi();
@@ -64,12 +68,7 @@ export default function AddJobPage() {
 
   return (
     <div className="add-job">
-      <header className="page-header">
-        <div>
-          <h1>Add a job</h1>
-          <p>Paste the whole post from anywhere: LinkedIn, a Facebook group, Discord, an email. Or paste a link to a company's own job page. Applio reads it, scores it and works out how to apply.</p>
-        </div>
-      </header>
+      <p className="muted add-job-intro">Paste the whole post from anywhere: LinkedIn, a Facebook group, Discord, an email. Or paste a link to a company's own job page. Applio reads it, scores it and works out how to apply.</p>
 
       <Stepper label="Steps" steps={steps} />
 
@@ -104,7 +103,7 @@ export default function AddJobPage() {
           ) : budgetStop ? (
             <span className="field-error">{budgetStop} <a href="#/settings">Raise budget</a></span>
           ) : (
-            <span className="cell-sub">Reading and scoring uses about 8k tokens.</span>
+            <span className="cell-sub">Reading and scoring: {status ? costLine(ANALYZE_TOKENS, status) : `≈ ${formatTokens(ANALYZE_TOKENS)} tokens`}</span>
           )}
           <Button variant="strong" busy={analyze.pending} disabled={!!budgetStop} onClick={run}>{analyze.pending ? 'Checking the match…' : 'Check the match'}</Button>
         </div>

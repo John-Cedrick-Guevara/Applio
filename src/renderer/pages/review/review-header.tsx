@@ -12,7 +12,7 @@ export function ReviewHeader({ status }: { status: AppStatus }) {
         <p role="status">{runLine(status.lastRun)}</p>
       </div>
       <div className="page-actions">
-        <a className={buttonClass('strong')} href="#/find-jobs"><Icon name="search" />Find jobs</a>
+        <a className={buttonClass('strong')} href="#/get-jobs"><Icon name="search" />Get jobs</a>
       </div>
     </header>
   );

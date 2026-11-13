@@ -25,6 +25,14 @@ describe('App routing', () => {
     expect(await screen.findByRole('heading', { name: 'Inbox' })).toBeInTheDocument();
   });
 
+  it('redirects Find jobs and Add job to Get jobs', async () => {
+    window.location.hash = '#/add-job';
+    renderWithApp(<App />);
+    await waitFor(() => expect(window.location.hash).toBe('#/get-jobs/paste'));
+    window.location.hash = '#/find-jobs';
+    await waitFor(() => expect(window.location.hash).toBe('#/get-jobs'));
+  });
+
   it('redirects old Review links to the Inbox', async () => {
     window.location.hash = '#/review/j2';
     renderWithApp(<App />);

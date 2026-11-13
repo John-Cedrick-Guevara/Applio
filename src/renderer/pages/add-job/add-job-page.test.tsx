@@ -100,6 +100,11 @@ describe('AddJobPage', () => {
     expect(screen.getByRole('button', { name: 'Check the match' })).toBeDisabled();
   });
 
+  it("states the paste's cost against today's budget", async () => {
+    renderWithApp(<AddJobPage />);
+    expect(await screen.findByText('Reading and scoring: ≈ 8k tokens · 12% of the 68k left today')).toBeInTheDocument();
+  });
+
   it('caps platform links at draft → approve', async () => {
     renderWithApp(<AddJobPage />);
     await userEvent.click(screen.getByRole('tab', { name: 'Paste link' }));
