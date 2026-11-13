@@ -16,14 +16,6 @@ export function primaryAction(job: Job): { label: string; handoff: boolean } {
   return { label: 'Open handoff', handoff: true };
 }
 
-/** Short status shown under each queue row. Only a job past Approved is called Sent. */
-export function queueState(job: Job): string {
-  if (job.status === 'skipped') return 'Skipped';
-  if (job.status === 'drafted') return sendsOnApprove(job.channel) ? 'Draft ready' : 'Ready to hand off';
-  if (job.status === 'approved') return sendsOnApprove(job.channel) ? 'Not sent' : 'Ready to hand off';
-  return 'Sent';
-}
-
 /** What automation may do with this job: its source's autonomy, capped by channel. */
 export function modeLabel(job: Job, sourceAutonomy: Autonomy): string {
   return sendsOnApprove(job.channel) ? AUTONOMY_LABEL[capAutonomy(sourceAutonomy, job.channel)] : 'Manual handoff';

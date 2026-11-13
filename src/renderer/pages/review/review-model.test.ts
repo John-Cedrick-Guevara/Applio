@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Job } from '../../../shared/types';
 import type { SendRecord } from '../../../shared/types';
 import { formatClock } from '../../lib/format';
-import { jobSteps, inboxTabs, effortLevel, gmailIssue, traceLine, modeLabel, primaryAction, queueState, sendState } from './review-model';
+import { jobSteps, inboxTabs, effortLevel, gmailIssue, traceLine, modeLabel, primaryAction, sendState } from './review-model';
 
 const job = (over: Partial<Job>): Job => ({
   id: 'x', sourceId: 's', sourceName: 'S', company: 'C', title: 'T', url: '', location: '', employmentType: 'full-time',
@@ -19,21 +19,6 @@ describe('primaryAction', () => {
   it('opens the handoff for platform and career-site jobs', () => {
     expect(primaryAction(job({ channel: 'platform' }))).toEqual({ label: 'Open handoff', handoff: true });
     expect(primaryAction(job({ channel: 'custom' })).handoff).toBe(true);
-  });
-});
-
-describe('queueState', () => {
-  it('describes where each queued job stands', () => {
-    expect(queueState(job({ channel: 'email' }))).toBe('Draft ready');
-    expect(queueState(job({ channel: 'platform' }))).toBe('Ready to hand off');
-    expect(queueState(job({ status: 'applied' }))).toBe('Sent');
-    expect(queueState(job({ status: 'skipped' }))).toBe('Skipped');
-  });
-
-  it('never calls an approved job that did not go out Sent', () => {
-    expect(queueState(job({ status: 'approved', channel: 'email' }))).toBe('Not sent');
-    expect(queueState(job({ status: 'approved', channel: 'ats' }))).toBe('Not sent');
-    expect(queueState(job({ status: 'approved', channel: 'platform' }))).toBe('Ready to hand off');
   });
 });
 
