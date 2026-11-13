@@ -1041,21 +1041,21 @@ describe('createBackend discovery', () => {
   });
 
   it('finds a pasted job Applio already has without calling AI', async () => {
-    const { api, deps } = backendIn();
-    withSeededJobs(deps);
-    const complete = vi.fn(async () => ({ text: '{}', inputTokens: 0, outputTokens: 0 }));
-    deps.engines['claude-code'] = { check: async () => ({ ready: true, message: 'ok' }), complete };
-    const preview = await api.analyzeJob({ kind: 'text', value: 'Senior Backend Engineer at Northwind Labs\nWe build billing.' });
-    expect(preview).toMatchObject({ duplicate: { jobId: 'j1', status: 'drafted' }, tokensUsed: 0, company: 'Northwind Labs', title: 'Senior Backend Engineer' });
+    const { api, deps } = await analyzingBackend();
+    const first = await api.addJob(await api.analyzeJob({ kind: 'text', value: 'post' }));
+    await vi.waitFor(async () => expect((await api.getJob(first.id)).status).toBe('drafted'));
+    const complete = vi.spyOn(deps.engines['claude-code'], 'complete');
+    const again = await api.analyzeJob({ kind: 'text', value: 'Senior TypeScript Engineer at Brightline Studio\nWe build tools.' });
+    expect(again).toMatchObject({ duplicate: { jobId: first.id, status: 'drafted' }, tokensUsed: 0, company: 'Brightline Studio' });
     expect(complete).not.toHaveBeenCalled();
+    await expect(api.addJob(again)).rejects.toThrow('Analyze the post again, then add it.');
   });
 
   it('reads a post with no clear role and company with AI as before', async () => {
-    const { api, deps } = backendIn();
-    withSeededJobs(deps);
-    const complete = vi.fn(async () => ({ text: JSON.stringify({ company: 'Acme', title: 'Engineer', score: 50 }), inputTokens: 10, outputTokens: 10 }));
-    deps.engines['claude-code'] = { check: async () => ({ ready: true, message: 'ok' }), complete };
-    expect((await api.analyzeJob({ kind: 'text', value: 'Great role, apply now!' })).duplicate).toBeUndefined();
+    const { api, deps } = await analyzingBackend();
+    const complete = vi.spyOn(deps.engines['claude-code'], 'complete');
+    const preview = await api.analyzeJob({ kind: 'text', value: 'Great role, apply now!' });
+    expect(preview.duplicate).toBeUndefined();
     expect(complete).toHaveBeenCalledTimes(1);
   });
 

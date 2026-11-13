@@ -108,7 +108,7 @@ Every PR's spec carries these must-not-break items:
 
 ## Stage 2 — Backend gaps
 
-- [ ] **PR-6 — Score one job now**  Unscored matches get a Score button instead of waiting for a scan.
+- [x] **PR-6 — Score one job now** (#84)  Unscored matches get a Score button instead of waiting for a scan.
   - _branch:_ `feat/score-now`
   - _PR title:_ `feat(triage): score a single found job on request`
   - _why:_ scans are manual, so an unscored job otherwise waits for a scan the operator may not run
@@ -117,7 +117,7 @@ Every PR's spec carries these must-not-break items:
   - [ ] Matches "Score · ≈ 2k" on unscored rows, and bulk select scores them
   - [ ] tests: quota hard stop blocks it, usage recorded, only `found` jobs accepted
 
-- [ ] **PR-7 — Duplicate check before AI on paste**  A pasted job you already have costs no tokens.
+- [x] **PR-7 — Duplicate check before AI on paste**  A pasted job you already have costs no tokens.
   - _branch:_ `feat/paste-dedup-first`
   - _PR title:_ `feat(jobs): check pasted jobs for duplicates before analysis`
   - _why:_ `analyzeJob` finds duplicates only after Claude reads the post (QA 2026-11-07 #6)
