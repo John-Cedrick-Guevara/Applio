@@ -816,7 +816,10 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     restoreJob: later((jobId) => {
       const job = getJob(jobId);
       if (job.status !== 'skipped') throw new Error('Only jobs in the Trash can be restored.');
-      return jobs.transition(jobId, { status: statusBeforeTrash(job.history), at: new Date().toISOString(), note: 'Restored from the Trash' });
+      const restored = jobs.transition(jobId, { status: statusBeforeTrash(job.history), at: new Date().toISOString(), note: 'Restored from the Trash' });
+      // Open pages (the Inbox badge, Matches) reload on a status push, so they show the job again at once.
+      pushStatus();
+      return restored;
     }),
 
     telegramPoll: async () => {

@@ -341,6 +341,14 @@ describe('createBackend discovery', () => {
     expect(restored.history.at(-1)).toMatchObject({ status: 'found', note: 'Restored from the Trash' });
   });
 
+  it('tells open pages a job was restored, so the badges update at once', async () => {
+    const { api, job, deps } = await unscoredJob();
+    await api.skipJob(job.id);
+    deps.onStatus.mockClear();
+    await api.restoreJob(job.id);
+    expect(deps.onStatus).toHaveBeenCalled();
+  });
+
   it('restores a scored job as scored, keeping its score', async () => {
     const { api, job } = await unscoredJob();
     await api.scoreJob(job.id);
