@@ -77,3 +77,36 @@ export function StepList({ label, steps }: { label: string; steps: { label: stri
     </ul>
   );
 }
+
+const CARD_CLASS: Record<Tone, string> = { busy: 'callout-info', done: 'callout-done', needs: 'callout-needs', failed: 'callout-failed', neutral: 'job-card-neutral' };
+
+/**
+ * A job's one state (redesign v2): what's true, why, the action that moves it on,
+ * then what Applio does next on its own. Other states that also apply fold under
+ * "More notes", so the most urgent one is never buried in a stack of banners.
+ */
+export function JobStateCard({ card, next, notes, children }: {
+  card: { tone: Tone; title: string; body: string };
+  next?: string;
+  notes: readonly string[];
+  children?: ReactNode;
+}) {
+  return (
+    <div className="job-card">
+      <div role={card.tone === 'failed' ? 'alert' : 'status'} className={`job-card-state ${CARD_CLASS[card.tone]}`}>
+        <div className="job-card-text">
+          <ToneMark tone={card.tone} />
+          <span><strong>{card.title}</strong> <span>{card.body}</span></span>
+        </div>
+        {children ? <div className="job-card-actions">{children}</div> : null}
+      </div>
+      {next ? <p className="job-card-next"><strong>What happens next:</strong> {next}</p> : null}
+      {notes.length ? (
+        <details className="job-card-notes">
+          <summary>{notes.length} more note{notes.length === 1 ? '' : 's'}</summary>
+          <ul aria-label="More notes">{notes.map((n) => <li key={n}>{n}</li>)}</ul>
+        </details>
+      ) : null}
+    </div>
+  );
+}

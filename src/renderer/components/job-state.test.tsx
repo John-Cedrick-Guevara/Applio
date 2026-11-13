@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { Callout, StatusChip, StepList, Stepper } from './job-state';
+import { Callout, JobStateCard, StatusChip, StepList, Stepper } from './job-state';
 import { ConfirmDialog } from './confirm-dialog';
 
 describe('StatusChip', () => {
@@ -87,5 +87,37 @@ describe('ConfirmDialog', () => {
     const { unmount } = render(<ConfirmDialog title="Skip?" confirmLabel="Skip job" onConfirm={() => {}} onCancel={() => {}}>x</ConfirmDialog>);
     unmount();
     expect(trigger).toHaveFocus();
+  });
+});
+
+describe('JobStateCard', () => {
+  it('says what is true, why, and what happens next, with its action', async () => {
+    const onRetry = vi.fn();
+    render(
+      <JobStateCard card={{ tone: 'failed', title: 'Not sent.', body: 'Gmail rejected the app password.' }} next="It stays in Review until it sends or you skip it." notes={[]}>
+        <button type="button" onClick={onRetry}>Retry send</button>
+      </JobStateCard>,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('Not sent. Gmail rejected the app password.');
+    expect(screen.getByText(/It stays in Review until it sends/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Retry send' }));
+    expect(onRetry).toHaveBeenCalled();
+  });
+
+  it('is a polite status unless something failed', () => {
+    render(<JobStateCard card={{ tone: 'done', title: 'Ready to approve.', body: 'PDFs saved.' }} notes={[]} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Ready to approve.');
+  });
+
+  it('folds the other states under More notes, with a count', async () => {
+    render(<JobStateCard card={{ tone: 'failed', title: 'Check post.', body: 'x' }} notes={['Made from an older profile.', 'Saving the PDFs.']} />);
+    const more = screen.getByText('2 more notes');
+    await userEvent.click(more);
+    expect(screen.getByRole('list', { name: 'More notes' })).toHaveTextContent('Made from an older profile.');
+  });
+
+  it('leaves More notes out when nothing else applies', () => {
+    render(<JobStateCard card={{ tone: 'done', title: 'Ready.', body: 'x' }} notes={[]} />);
+    expect(screen.queryByText(/more note/)).not.toBeInTheDocument();
   });
 });
