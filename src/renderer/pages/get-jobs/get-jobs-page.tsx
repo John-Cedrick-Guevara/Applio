@@ -24,8 +24,12 @@ export default function GetJobsPage({ params }: { params: RouteParams }) {
           </button>
         ))}
       </div>
-      <div role="tabpanel" aria-label={active === 'paste' ? 'Paste a job' : 'Scan sources'}>
-        {active === 'paste' ? <AddJobPage /> : <FindJobsPage />}
+      {/* Both stay mounted, so a running scan or a half-pasted post survives a look at the other tab. */}
+      <div role="tabpanel" aria-label="Scan sources" hidden={active !== 'scan'}>
+        <FindJobsPage />
+      </div>
+      <div role="tabpanel" aria-label="Paste a job" hidden={active !== 'paste'}>
+        <AddJobPage />
       </div>
     </div>
   );
