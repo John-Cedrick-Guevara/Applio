@@ -103,7 +103,10 @@ export default function AddJobPage() {
           ) : budgetStop ? (
             <span className="field-error">{budgetStop} <a href="#/settings">Raise budget</a></span>
           ) : (
-            <span className="cell-sub">Reading and scoring: {status ? costLine(ANALYZE_TOKENS, status) : `≈ ${formatTokens(ANALYZE_TOKENS)} tokens`}</span>
+            <span className="cell-sub add-job-cost">
+              <span>Reading and scoring: {status ? costLine(ANALYZE_TOKENS, status) : `≈ ${formatTokens(ANALYZE_TOKENS)} tokens`}</span>
+              <span>A post that names a job you already have is caught first, for free.</span>
+            </span>
           )}
           <Button variant="strong" busy={analyze.pending} disabled={!!budgetStop} onClick={run}>{analyze.pending ? 'Checking the match…' : 'Check the match'}</Button>
         </div>

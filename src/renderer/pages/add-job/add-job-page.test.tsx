@@ -103,6 +103,7 @@ describe('AddJobPage', () => {
   it("states the paste's cost against today's budget", async () => {
     renderWithApp(<AddJobPage />);
     expect(await screen.findByText('Reading and scoring: ≈ 8k tokens · 12% of the 68k left today')).toBeInTheDocument();
+    expect(screen.getByText('A post that names a job you already have is caught first, for free.')).toBeInTheDocument();
   });
 
   it('caps platform links at draft → approve', async () => {

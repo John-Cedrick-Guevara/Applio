@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { analyzePost, type AnalyzePorts } from './analyze-job';
+import { analyzePost, statedJobs, type AnalyzePorts } from './analyze-job';
 
 const answer = (over: Record<string, unknown> = {}) => JSON.stringify({
   company: 'Brightline Studio', title: 'Senior TypeScript Engineer', location: 'Remote · Worldwide', employmentType: 'contract', salary: '$60–75 / hour',
@@ -72,5 +72,31 @@ describe('analyzePost', () => {
     expect(job).toMatchObject({ location: 'Not stated', employmentType: 'contract', score: 72, applyTarget: 'Manual' });
     expect(job.tags).toHaveLength(8);
     expect(job.roleSummary).toHaveLength(400);
+  });
+});
+
+describe('statedJobs', () => {
+  it('reads "Role at Company" from the first line', () => {
+    expect(statedJobs('Senior Backend Engineer at Northwind Labs\nWe build billing.')).toContainEqual({ title: 'Senior Backend Engineer', company: 'Northwind Labs' });
+  });
+
+  it("reads an ATS page's own title", () => {
+    expect(statedJobs('Job Application for AI Engineer (LLM Agents) at Northbeam\nApply now')).toContainEqual({ title: 'AI Engineer (LLM Agents)', company: 'Northbeam' });
+  });
+
+  it('reads "Company is hiring a Role"', () => {
+    expect(statedJobs('Brightline is hiring a Senior TypeScript Engineer. Email us.')).toContainEqual({ company: 'Brightline', title: 'Senior TypeScript Engineer' });
+  });
+
+  it('tries both orders for "A — B"', () => {
+    expect(statedJobs('Northbeam — AI Engineer')).toEqual(expect.arrayContaining([{ company: 'Northbeam', title: 'AI Engineer' }, { company: 'AI Engineer', title: 'Northbeam' }]));
+  });
+
+  it('keeps a hyphen inside a title as part of it', () => {
+    expect(statedJobs('Full-Stack Developer at Fieldwork')).toContainEqual({ title: 'Full-Stack Developer', company: 'Fieldwork' });
+  });
+
+  it('reads nothing from a post that names no clear role and company', () => {
+    expect(statedJobs('Great role, apply now!\nWe move fast.')).toEqual([]);
   });
 });

@@ -1040,6 +1040,25 @@ describe('createBackend discovery', () => {
     expect((await api.getJob(job.id)).history.at(-1)?.note).toBe('Assisted fill: 5 fields filled. You check them and click Submit.');
   });
 
+  it('finds a pasted job Applio already has without calling AI', async () => {
+    const { api, deps } = await analyzingBackend();
+    const first = await api.addJob(await api.analyzeJob({ kind: 'text', value: 'post' }));
+    await vi.waitFor(async () => expect((await api.getJob(first.id)).status).toBe('drafted'));
+    const complete = vi.spyOn(deps.engines['claude-code'], 'complete');
+    const again = await api.analyzeJob({ kind: 'text', value: 'Senior TypeScript Engineer at Brightline Studio\nWe build tools.' });
+    expect(again).toMatchObject({ duplicate: { jobId: first.id, status: 'drafted' }, tokensUsed: 0, company: 'Brightline Studio', channelLabel: 'Email', route: 'Sends from your Gmail to hiring@brightline.io', score: 84 });
+    expect(complete).not.toHaveBeenCalled();
+    await expect(api.addJob(again)).rejects.toThrow('Analyze the post again, then add it.');
+  });
+
+  it('reads a post with no clear role and company with AI as before', async () => {
+    const { api, deps } = await analyzingBackend();
+    const complete = vi.spyOn(deps.engines['claude-code'], 'complete');
+    const preview = await api.analyzeJob({ kind: 'text', value: 'Great role, apply now!' });
+    expect(preview.duplicate).toBeUndefined();
+    expect(complete).toHaveBeenCalledTimes(1);
+  });
+
   it('never fills an email or ATS job by assisted fill', async () => {
     const { api, job } = await emailJob();
     await api.saveSettings({ assistedFill: { platform: true, custom: true } });

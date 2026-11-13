@@ -15,7 +15,8 @@ import { gmailImap, readInbox, type InboxClient } from '../infra/email/inbox';
 import { approveDraft, sendByAts, sendByEmail, type ApplyPorts, type AtsOutcome } from '../core/apply/send-application';
 import type { FillInput } from '../core/apply/ats-plan';
 import { folderFor, jobMarkdown } from '../core/generation/application-folder';
-import { analyzePost, type AnalyzedJob } from '../core/generation/analyze-job';
+import { describeRoute } from '../shared/apply-route';
+import { analyzePost, statedJobs, type AnalyzedJob } from '../core/generation/analyze-job';
 import { draftJobs, type DraftPorts } from '../core/generation/draft-jobs';
 import { dedupKey } from '../core/triage';
 import { discover } from '../core/jobs/discover';
@@ -741,6 +742,17 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       const text = input.kind === 'link' ? await fetchPublicPage(input.value, pageFetch) : input.value;
       const platform = input.kind === 'text' ? platformIn(text) : undefined;
       const sourceName = input.kind === 'link' ? `from ${new URL(input.value).hostname}` : platform ? `clipped from ${platform.name}` : 'pasted by you';
+      // Free duplicate check first: a post that plainly names a job Applio has costs no tokens (QA 2026-11-07 #6).
+      for (const stated of statedJobs(text)) {
+        const found = jobs.findByDedupKey(dedupKey(stated));
+        if (!found) continue;
+        const described = describeRoute(found.channel, found.applyTarget);
+        return {
+          previewId: randomUUID(), company: found.company, title: found.title, sourceName, tags: found.tags, score: found.score ?? 0, summary: found.roleSummary ?? '',
+          channel: found.channel, channelLabel: described.channelLabel, route: described.route, applyTarget: found.applyTarget, maxAutonomy: described.maxAutonomy,
+          tokensUsed: 0, duplicate: { jobId: found.id, status: found.status },
+        };
+      }
       const { preview, job } = await analyzePost({ text, sourceName, ...(platform ? { platform } : {}) }, {
         ai: (request) => ai.run(request),
         factIds: () => new Set(profile.getProfile().facts.map((f) => f.id)),
