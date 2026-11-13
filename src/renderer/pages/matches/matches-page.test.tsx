@@ -37,6 +37,13 @@ describe('MatchesPage', () => {
     await waitFor(async () => expect((await api.getSettings()).draftThreshold).toBe(70));
   });
 
+  it('saves a moved draft bar even when the page closes right away', async () => {
+    const { api, unmount } = await setup();
+    fireEvent.change(screen.getByRole('slider', { name: /Draft bar/ }), { target: { value: '72' } });
+    unmount();
+    await waitFor(async () => expect((await api.getSettings()).draftThreshold).toBe(72));
+  });
+
   it('stops the draft bar at the auto-send score and says why', async () => {
     await setup();
     expect(screen.getByRole('slider', { name: /Draft bar/ })).toHaveAttribute('max', '85');
@@ -95,6 +102,25 @@ describe('MatchesPage', () => {
     await userEvent.click(within(row(list, ORBITAL)).getByRole('button', { name: 'Skip' }));
     unmount();
     expect(skipJob).toHaveBeenCalledWith('j5');
+  });
+
+  it('keeps a skipped row hidden once the skip is saved', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const skipJob = vi.fn(api.skipJob);
+    const { list } = await setup({ skipJob, listJobs: async (f) => (await api.listJobs(f)) });
+    await userEvent.click(within(row(list, ORBITAL)).getByRole('button', { name: 'Skip' }));
+    // A second skip saves the first one at once.
+    await userEvent.click(within(row(list, FERNWOOD)).getByRole('button', { name: 'Skip' }));
+    expect(skipJob).toHaveBeenCalledWith('j5');
+    expect(within(list).queryByText(ORBITAL)).not.toBeInTheDocument();
+  });
+
+  it('brings a row back when its skip fails, saying so', async () => {
+    const { list } = await setup({ skipJob: async () => { throw new Error('database is locked'); } });
+    await userEvent.click(within(row(list, ORBITAL)).getByRole('button', { name: 'Skip' }));
+    await userEvent.click(within(row(list, FERNWOOD)).getByRole('button', { name: 'Skip' }));
+    expect(await within(list).findByText(ORBITAL)).toBeInTheDocument();
+    expect(await screen.findByText(/Couldn't skip the job/)).toBeInTheDocument();
   });
 
   it('clears filters from an empty search', async () => {

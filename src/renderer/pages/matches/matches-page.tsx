@@ -62,24 +62,39 @@ function MatchesView({ jobs, settings, status, onSettings }: ViewProps) {
   const [query, setQuery] = useState('');
   const [onlyNew, setOnlyNew] = useState(false);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  // Skipped rows stay hidden after the skip is saved, until the list reloads without them;
+  // a failed save brings its row back (the error toast says why).
+  const [gone, setGone] = useState<ReadonlySet<string>>(new Set());
+  const unhide = (ids: string[]) => setGone((prev) => new Set([...prev].filter((id) => !ids.includes(id))));
   const skips = useHeldAction(async (ids) => {
-    for (const id of ids) await action.run('skip the job', () => api.skipJob(id));
+    for (const id of ids) {
+      const done = await action.run('skip the job', () => api.skipJob(id));
+      if (!done) unhide([id]);
+    }
   });
 
-  // The slider moves freely; the draft bar is saved once it settles.
+  // The slider moves freely; the draft bar is saved once it settles, or at once if the page closes first.
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  useEffect(() => () => clearTimeout(saveTimer.current), []);
+  const unsaved = useRef<number | undefined>(undefined);
+  const saveBar = async () => {
+    clearTimeout(saveTimer.current);
+    const value = unsaved.current;
+    unsaved.current = undefined;
+    if (value === undefined) return;
+    const next = await action.run('save the draft bar', () => api.saveSettings({ draftThreshold: value }));
+    if (next) onSettings(next);
+  };
+  const saveBarRef = useRef(saveBar);
+  saveBarRef.current = saveBar;
+  useEffect(() => () => void saveBarRef.current(), []);
   const moveBar = (value: number) => {
     setBar(value);
+    unsaved.current = value;
     clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(async () => {
-      const next = await action.run('save the draft bar', () => api.saveSettings({ draftThreshold: value }));
-      if (next) onSettings(next);
-    }, SAVE_BAR_MS);
+    saveTimer.current = setTimeout(() => void saveBar(), SAVE_BAR_MS);
   };
 
-  const hidden = skips.held?.ids ?? [];
-  const visible = jobs.filter((j) => !hidden.includes(j.id));
+  const visible = jobs.filter((j) => !gone.has(j.id));
   const filters = { bar, tab, query, onlyNew, drafting: status.drafting ?? [], ...(status.lastRun ? { lastRunAt: status.lastRun.at } : {}) };
   const rows = matchRows(visible, filters);
   const counts = tabCounts(visible, filters);
@@ -94,6 +109,7 @@ function MatchesView({ jobs, settings, status, onSettings }: ViewProps) {
   });
   const skip = (picked: Job[]) => {
     setSelected(new Set());
+    setGone((prev) => new Set([...prev, ...picked.map((j) => j.id)]));
     skips.hold(picked.map((j) => j.id), picked.length === 1 ? `Skipped ${picked[0]!.title}.` : `Skipped ${picked.length} matches.`);
   };
   const draft = async (picked: Job[]) => {
@@ -196,7 +212,7 @@ function MatchesView({ jobs, settings, status, onSettings }: ViewProps) {
       {skips.held ? (
         <div className="matches-undo" role="status" aria-label="Undo">
           <span>{skips.held.message}</span>
-          <Button size="sm" variant="link" onClick={skips.undo}>Undo</Button>
+          <Button size="sm" variant="link" onClick={() => { unhide(skips.held!.ids); skips.undo(); }}>Undo</Button>
         </div>
       ) : null}
     </>

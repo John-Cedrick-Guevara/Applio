@@ -23,10 +23,10 @@ One list for jobs that have no draft yet (strong matches, jobs below the draft b
 ## Test plan
 - AC-1: `matches-model.test.ts` › "sorts best score first with unscored last", "leaves out jobs being drafted"; `matches-page.test.tsx` › "lists matches with no draft"; `sidebar.test.tsx` › "counts new matches in the nav".
 - AC-2: `matches-model.test.ts` › "buckets by the draft bar", "counts every tab", "searches role and company", "keeps jobs new since the last scan".
-- AC-3: `matches-page.test.tsx` › "moves the draft bar, recounts and saves it", "stops the draft bar at the auto-send score and says why".
+- AC-3: `matches-page.test.tsx` › "moves the draft bar, recounts and saves it", "saves a moved draft bar even when the page closes right away", "stops the draft bar at the auto-send score and says why".
 - AC-4: `matches-page.test.tsx` › "drafts one match, showing its cost", "says an unscored job waits for a scan".
 - AC-5: `matches-model.test.ts` › "estimates a selection against what's left today", "refuses a selection over budget", "leaves unscored jobs out of the draft count"; `matches-page.test.tsx` › "drafts a selection", "disables Draft n over budget with the reason".
-- AC-6: `use-held-action.test.tsx` › "commits after the delay", "undo cancels the commit", "commits a held action on unmount"; `matches-page.test.tsx` › "skips with undo, then for good".
+- AC-6: `use-held-action.test.tsx` › "commits after the delay", "undo cancels the commit", "commits a held action on unmount"; `matches-page.test.tsx` › "skips with undo, then for good once the page closes", "keeps a skipped row hidden once the skip is saved", "brings a row back when its skip fails, saying so".
 - AC-7: `matches-page.test.tsx` › "clears filters from an empty search", "says no matches yet".
 - MNB-1: `matches-page.test.tsx` › "drafts one match, showing its cost" (draftJob only on click).
 - MNB-2: existing `review-page.test.tsx` below-bar, ready-to-draft and waiting tests unchanged.
