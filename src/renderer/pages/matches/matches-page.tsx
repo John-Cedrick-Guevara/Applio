@@ -173,7 +173,7 @@ function MatchesView({ jobs, settings, status, onSettings }: ViewProps) {
                       <td><input type="checkbox" aria-label={`Select ${j.title} at ${j.company}`} checked={selected.has(j.id)} onChange={() => toggle(j.id)} /></td>
                       <td className="mono">{j.score ?? '—'}</td>
                       <td>
-                        <a href={`#/review/${j.id}`} className="matches-role">{j.title}</a>
+                        <a href={`#/inbox/${j.id}`} className="matches-role">{j.title}</a>
                         <span className="cell-sub matches-sub">{j.company} · {j.sourceName} · {CHANNEL_LABEL[j.channel]}</span>
                       </td>
                       <td className="matches-why">

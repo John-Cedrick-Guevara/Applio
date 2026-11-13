@@ -5,6 +5,15 @@ import { renderWithApp } from '../../test/render';
 import { Sidebar } from './sidebar';
 
 describe('Sidebar', () => {
+  it('badges the Inbox with exactly its decisions', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const decisions = (await api.listJobs({ statuses: ['drafted', 'approved'] })).length + (await api.listQuestions()).length;
+    renderWithApp(<Sidebar />, api);
+    const link = await screen.findByRole('link', { name: /Inbox/ });
+    expect(link).toHaveAttribute('href', '#/inbox');
+    expect(await within(link).findByLabelText(`${decisions} need a decision`)).toHaveTextContent(String(decisions));
+  });
+
   it('counts new matches in the nav', async () => {
     const api = createMockApi({ latencyMs: 0 });
     const lastRun = { at: '2000-01-01T00:00:00.000Z', found: 2, newAfterDedup: 2, passedFilters: 2, drafted: 0 };

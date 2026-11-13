@@ -50,7 +50,7 @@ function Handoff({ job, draft, assisted, onJob }: { job: Job; draft: Draft | nul
   return (
     <>
       <header>
-        <a href={`#/review/${job.id}`} className="back-link">← Review</a>
+        <a href={`#/inbox/${job.id}`} className="back-link">← Inbox</a>
         <h1 className="handoff-title">Apply to {job.company} on {platform}</h1>
         <p className="muted handoff-lede">
           {assisted
@@ -60,7 +60,7 @@ function Handoff({ job, draft, assisted, onJob }: { job: Job; draft: Draft | nul
         {draft?.check?.stale ? (
           <div className="banner banner-warning" role="status">
             <span>
-              <strong>Made from an older profile.</strong> Your facts, contact details or notes changed since this was drafted. Redraft it in <a href={`#/review/${job.id}`}>Review</a> before you copy it.
+              <strong>Made from an older profile.</strong> Your facts, contact details or notes changed since this was drafted. Redraft it in the <a href={`#/inbox/${job.id}`}>Inbox</a> before you copy it.
             </span>
           </div>
         ) : null}

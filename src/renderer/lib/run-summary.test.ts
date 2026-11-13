@@ -31,7 +31,7 @@ describe('runResult', () => {
     expect(runResult({ at, found: 62, newAfterDedup: 47, passedFilters: 9, drafted: 4 })).toBe('Scan finished: 9 jobs passed your filters, 4 drafted.');
   });
   it('counts the jobs waiting on the operator\'s answers', () => {
-    expect(runResult({ at, found: 62, newAfterDedup: 47, passedFilters: 9, drafted: 3, asked: 1 })).toBe('Scan finished: 9 jobs passed your filters, 3 drafted. 1 needs your answers in Review.');
+    expect(runResult({ at, found: 62, newAfterDedup: 47, passedFilters: 9, drafted: 3, asked: 1 })).toBe('Scan finished: 9 jobs passed your filters, 3 drafted. 1 needs your answers in the Inbox.');
   });
 
   it('says plainly when nothing passed', () => {

@@ -18,16 +18,28 @@ describe('App shell', () => {
 });
 
 describe('App routing', () => {
-  it('keeps a page mounted when only its route params change', async () => {
-    window.location.hash = '#/review';
+  it('opens on the Inbox', async () => {
+    window.location.hash = '';
     renderWithApp(<App />);
+    await waitFor(() => expect(window.location.hash).toBe('#/inbox'));
+    expect(await screen.findByRole('heading', { name: 'Inbox' })).toBeInTheDocument();
+  });
+
+  it('redirects old Review links to the Inbox', async () => {
+    window.location.hash = '#/review/j2';
+    renderWithApp(<App />);
+    await waitFor(() => expect(window.location.hash).toBe('#/inbox/j2'));
+  });
+
+  it('keeps a page mounted when only its route params change', async () => {
+    window.location.hash = '#/inbox';
+    renderWithApp(<App />);
+    // The sort is page state: a remount (the bug) would reset it to Best match first.
+    await userEvent.selectOptions(await screen.findByLabelText('Sort'), 'oldest');
     await userEvent.click(await screen.findByRole('button', { name: 'Skip job' }));
     await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Skip job' }));
-    await waitFor(() => expect(window.location.hash).toBe('#/review/j2'));
-    await new Promise((r) => setTimeout(r, 50)); // let a remount (the bug) happen if it's going to
-    // The skipped draft stays in the live queue, marked Skipped, instead of the page reloading.
-    const queue = await screen.findByRole('region', { name: 'Queue' });
-    expect(within(queue).getAllByRole('listitem')).toHaveLength(4);
-    expect(within(queue).getByText('Skipped')).toBeInTheDocument();
+    await waitFor(() => expect(window.location.hash).toMatch(/^#\/inbox\/j\d$/));
+    await new Promise((r) => setTimeout(r, 50)); // let a remount happen if it's going to
+    expect(screen.getByLabelText('Sort')).toHaveValue('oldest');
   });
 });

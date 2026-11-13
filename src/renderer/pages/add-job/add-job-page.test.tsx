@@ -39,7 +39,7 @@ describe('AddJobPage', () => {
     expect((await api.listJobs()).some((j) => j.company === 'Brightline Studio')).toBe(false);
     await userEvent.click(screen.getByRole('button', { name: 'Add and draft' }));
     const added = (await api.listJobs({ statuses: ['drafted'] })).find((j) => j.company === 'Brightline Studio')!;
-    expect(await screen.findByRole('link', { name: 'Review and approve' })).toHaveAttribute('href', `#/review/${added.id}`);
+    expect(await screen.findByRole('link', { name: 'Review and approve' })).toHaveAttribute('href', `#/inbox/${added.id}`);
     expect(within(screen.getByRole('list', { name: 'Steps' })).getByRole('listitem', { name: 'Ready: needs you' })).toBeInTheDocument();
   });
 
@@ -74,7 +74,7 @@ describe('AddJobPage', () => {
     expect(progress).toHaveTextContent(/0:[23]\d elapsed/);
     ready = true;
     await push({ drafting: [], draftingSince: {}, jobsVersion: 2 });
-    expect(await within(progress).findByRole('link', { name: 'Review and approve' })).toHaveAttribute('href', `#/review/${id}`);
+    expect(await within(progress).findByRole('link', { name: 'Review and approve' })).toHaveAttribute('href', `#/inbox/${id}`);
   });
 
   it('offers Open existing instead of an Add button bound to fail when the job is already in Applio', async () => {
@@ -88,7 +88,7 @@ describe('AddJobPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Check the match' }));
     const result = await screen.findByRole('region', { name: 'Parsed job' });
     expect(within(result).getByRole('status')).toHaveTextContent('You already have this job in Applio (Drafted).');
-    expect(within(result).getByRole('link', { name: 'Open existing' })).toHaveAttribute('href', `#/review/${added.id}`);
+    expect(within(result).getByRole('link', { name: 'Open existing' })).toHaveAttribute('href', `#/inbox/${added.id}`);
     expect(within(result).queryByRole('button', { name: 'Add and draft' })).not.toBeInTheDocument();
   });
 

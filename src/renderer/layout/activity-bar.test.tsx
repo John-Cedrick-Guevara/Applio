@@ -72,7 +72,7 @@ describe('ActivityBar', () => {
     await userEvent.click(screen.getByText(/Scanning ·/));
     const panel = screen.getByRole('list', { name: 'Running now' });
     expect(within(panel).getByRole('link', { name: /scan/i })).toHaveAttribute('href', '#/find-jobs');
-    expect(within(panel).getByRole('link', { name: /2 drafts/ })).toHaveAttribute('href', '#/review');
+    expect(within(panel).getByRole('link', { name: /2 drafts/ })).toHaveAttribute('href', '#/inbox');
   });
 
   it('points to Settings when the engine needs setup', async () => {

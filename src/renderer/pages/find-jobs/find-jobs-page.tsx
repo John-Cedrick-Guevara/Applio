@@ -101,7 +101,7 @@ function Scan({ budgetStop, atLimit, sources }: { budgetStop?: string; atLimit: 
               <input type="checkbox" checked={draft} onChange={(e) => setDraft(e.target.checked)} />
               <span>
                 <span className="strong">Also draft strong matches right away</span>
-                <span className="cell-sub find-jobs-hint">Off saves tokens: strong matches wait in Review, one click from a draft.</span>
+                <span className="cell-sub find-jobs-hint">Off saves tokens: strong matches wait in Matches, one click from a draft.</span>
               </span>
             </label>
           </div>
@@ -160,7 +160,7 @@ function Running({ phase, draft, stopping, onStop }: { phase?: ScanPhase; draft:
         <Button disabled={stopping} onClick={onStop}>Stop scan</Button>
       </div>
       <StepList label="Scan steps" steps={steps} />
-      <p className="cell-sub" role="status">{stopping ? 'Stopping after this step. Everything found so far is kept.' : 'You can leave this page. Results land in Review.'}</p>
+      <p className="cell-sub" role="status">{stopping ? 'Stopping after this step. Everything found so far is kept.' : 'You can leave this page. Results land in Matches.'}</p>
     </section>
   );
 }
@@ -182,7 +182,7 @@ function Results({ run, onAgain }: { run: RunSummary; onAgain: () => void }) {
       </div>
       <div className="find-jobs-foot find-jobs-actions">
         <Button onClick={onAgain}>Scan again</Button>
-        <a className="btn btn-primary" href="#/review">Open Review</a>
+        <a className="btn btn-primary" href="#/matches">Open Matches</a>
       </div>
     </section>
   );

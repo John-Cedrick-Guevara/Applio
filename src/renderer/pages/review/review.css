@@ -1,148 +1,51 @@
-/* Review: queue (left) + draft detail (right). */
-.review-queue {
-  flex: 1 1 300px;
-  max-width: 380px;
-  /* Stays in view beside a long draft; its list scrolls inside (.queue-scroll). */
+/* Inbox: tabbed list (left) + job detail (right). */
+.inbox-queue {
+  flex: 0 0 384px;
+  max-width: 100%;
+  /* Stays in view beside a long draft, below the sticky activity bar; its list scrolls inside. */
   position: sticky;
-  top: var(--space-4);
+  top: 64px;
   align-self: flex-start;
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 2 * var(--space-4));
+  max-height: calc(100vh - 64px - var(--space-4));
 }
 
-.queue-head {
-  display: grid;
-  gap: var(--space-3);
+.inbox-tabs { display: flex; border-bottom: 1px solid var(--border); padding: 0 var(--space-1); }
+.inbox-tab {
+  display: flex; align-items: center; gap: 6px;
+  flex: 1 1 auto; justify-content: center; white-space: nowrap;
+  min-height: 44px; padding: 0 6px; margin-bottom: -1px;
+  border: 0; border-bottom: 2px solid transparent; background: transparent;
+  color: var(--text-secondary); font: inherit; font-weight: 500; cursor: pointer;
 }
+.inbox-tab[aria-selected='true'] { border-bottom-color: var(--accent); color: var(--text); font-weight: 600; }
+.inbox-tab-count { min-width: 18px; padding: 0 5px; border-radius: 10px; background: var(--track); color: var(--text-secondary); font-size: var(--text-xs, 12px); line-height: 20px; text-align: center; }
+.inbox-tab-urgent .inbox-tab-count { background: var(--danger); color: var(--on-accent); }
 
-.queue-count {
-  margin-left: var(--space-1);
-  color: var(--text-muted);
-  font-weight: 500;
-}
+.inbox-tools { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border-soft); }
+.inbox-tools .cell-sub { flex: 1; font-size: var(--text-xs, 12px); line-height: 1.4; }
+.inbox-sort { width: auto; min-height: 32px; padding: 0 var(--space-2); font-size: var(--text-sm); }
 
-/* Segmented filter: one pill per group of work, each with its count. */
-.queue-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-}
-
-.queue-filter {
-  padding: 3px 10px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--text-body);
-  font: inherit;
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-
-.queue-filter[aria-pressed='true'] {
-  border-color: var(--text);
-  background: var(--text);
-  color: var(--surface);
-}
-
-.queue-filter-count {
-  opacity: 0.7;
-}
-
-.queue-hint {
-  margin: 0;
-  padding: var(--space-2) var(--space-4);
-  background: var(--warning-soft);
-  color: var(--warning-text);
-  font-size: var(--text-sm);
-}
-
-.queue-hint a {
-  color: inherit;
-  font-weight: 500;
-}
-
-.queue-scroll {
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.queue-empty {
-  padding: var(--space-4);
-}
-
-.queue-title {
-  font-size: var(--text-md);
-}
-
-.queue-row {
-  display: block;
-  padding: 10px var(--space-4);
+.inbox-scroll { min-height: 0; overflow-y: auto; }
+.inbox-row {
+  display: flex; align-items: center; gap: var(--space-3);
+  min-height: 44px; padding: 0 var(--space-3);
   border-bottom: 1px solid var(--border-soft);
-  color: var(--text);
-  text-decoration: none;
+  color: var(--text); text-decoration: none;
 }
+.inbox-row:hover { color: var(--text); background: var(--surface-subtle); }
+.inbox-row[aria-current='true'] { background: var(--surface-selected); box-shadow: inset 3px 0 0 var(--accent); }
+.inbox-row-score { flex: none; width: 28px; color: var(--text-secondary); }
+.inbox-row-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); }
+.inbox-row-role { color: var(--text); font-weight: 500; }
+.inbox-row-age { flex: none; }
+.inbox-empty { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: var(--space-5) var(--space-4); }
+.inbox-empty p { margin: 0; }
 
-.queue-row:hover {
-  color: var(--text);
-  background: var(--surface-subtle);
-}
-
-.queue-row[aria-current='true'] {
-  background: var(--surface-selected);
-}
-
-.queue-row-skipped {
-  opacity: 0.55;
-}
-
-.queue-row-top {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
-}
-
-.queue-role {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  font-weight: 600;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.queue-row-sub {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-  margin-top: 2px;
-}
-
-.queue-row-where {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.queue-row-sub .badge {
-  flex: none;
-}
-
-.queue-score {
-  font-size: var(--text-md);
-  font-weight: 500;
-}
-
-.queue-footer {
-  padding: var(--space-2) var(--space-4);
-  border-top: 1px solid var(--border-soft);
-  color: var(--text-muted);
-  font-size: var(--text-sm);
-}
+.inbox-drafting { padding: var(--space-3) var(--space-3) var(--space-2); border-top: 1px solid var(--border); }
+.inbox-drafting-row { display: flex; align-items: center; gap: var(--space-2); min-height: 36px; color: var(--text); text-decoration: none; }
+.inbox-drafting-row[aria-current='true'] { font-weight: 600; }
 
 .draft-panel,
 .review-empty {
@@ -326,35 +229,6 @@
   color: var(--warning-text);
 }
 
-/* "Show them": a link-looking button, since it toggles a list rather than going anywhere. */
-
-.below-list {
-  margin-top: var(--space-2);
-}
-
-.below-row {
-  display: flex;
-  gap: var(--space-3);
-  align-items: baseline;
-  padding: var(--space-1) 0;
-  color: var(--text);
-  text-decoration: none;
-}
-
-.below-row:hover {
-  text-decoration: underline;
-}
-
-.waiting-reason {
-  display: block;
-}
-
-.queue-footer-action {
-  display: inline-flex;
-  padding: 0;
-  min-height: 0;
-}
-
 /* clip, not hidden: still rounds the corners but isn't a scroll box, so the footer can stick. */
 .draft-panel {
   overflow: clip;
@@ -369,13 +243,6 @@
 .tag-warning {
   background: var(--warning-soft);
   color: var(--warning-text);
-}
-
-.queue-group-label {
-  padding: var(--space-3) var(--space-4) var(--space-1);
-  color: var(--text-muted);
-  font-size: var(--text-sm);
-  font-weight: 600;
 }
 
 .questions-panel {

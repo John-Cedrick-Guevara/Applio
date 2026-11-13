@@ -10,12 +10,12 @@ export interface RouteDef {
  * Route table. Views are lazy-loaded so startup only parses the shell and the
  * first page; each page module default-exports its view. Page PRs add entries.
  */
-// One view shared by both review routes, so selecting a draft only changes params.
-const ReviewView = lazy(() => import('./pages/review/review-page'));
+// One view shared by both inbox routes, so selecting a job only changes params.
+const InboxView = lazy(() => import('./pages/review/review-page'));
 
 export const ROUTES: RouteDef[] = [
-  { pattern: '/review', view: ReviewView },
-  { pattern: '/review/:id', view: ReviewView },
+  { pattern: '/inbox', view: InboxView },
+  { pattern: '/inbox/:id', view: InboxView },
   { pattern: '/matches', view: lazy(() => import('./pages/matches/matches-page')) },
   { pattern: '/handoff/:id', view: lazy(() => import('./pages/handoff/handoff-page')) },
   { pattern: '/applications', view: lazy(() => import('./pages/applications/applications-page')) },
@@ -26,4 +26,7 @@ export const ROUTES: RouteDef[] = [
   { pattern: '/find-jobs', view: lazy(() => import('./pages/find-jobs/find-jobs-page')) },
 ];
 
-export const DEFAULT_PATH = '/review';
+export const DEFAULT_PATH = '/inbox';
+
+/** Old paths that moved: links from before the Inbox (bookmarks, notifications) keep working. */
+export const REDIRECTS: [from: string, to: string][] = [['/review', '/inbox']];

@@ -53,7 +53,7 @@ export function QuestionsPanel({ job, questions, sections, onAnswered }: Props) 
     if (!next) return;
     toast.show(next.status === 'drafted' ? `Drafted ${job.title} with your answers` : `Answers saved. ${job.title} wasn't drafted yet; see its timeline.`, next.status === 'drafted' ? 'success' : 'info');
     onAnswered();
-    navigate(`/review/${job.id}`);
+    navigate(`/inbox/${job.id}`);
   };
 
   const skip = async () => {

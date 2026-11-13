@@ -10,14 +10,29 @@ import ReviewPage from './review-page';
 const open = (id?: string) => renderWithApp(<ReviewPage params={id ? { id } : {}} />);
 
 describe('ReviewPage', () => {
-  it('lists drafts waiting on the operator, best match first', async () => {
+  it('opens on the most urgent tab with jobs, best match first', async () => {
     open();
     const queue = await screen.findByRole('region', { name: 'Queue' });
-    const rows = within(queue).getAllByRole('listitem');
-    expect(rows).toHaveLength(4);
-    const first = within(rows[0]!).getByRole('link');
-    expect(first).toHaveTextContent('Senior Backend Engineer');
-    expect(first).toHaveAttribute('aria-current', 'true');
+    expect(within(queue).getByRole('tab', { name: /Approve/ })).toHaveAttribute('aria-selected', 'true');
+    const rows = within(within(queue).getByRole('tabpanel')).getAllByRole('link');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent('Senior Backend Engineer');
+    expect(rows[0]).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('says nothing needs a decision when the Inbox is empty', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const empty = { ...api, listJobs: async (f?: Parameters<typeof api.listJobs>[0]) => (f?.statuses?.some((st) => st === 'drafted' || st === 'approved') ? [] : api.listJobs(f)) };
+    renderWithApp(<ReviewPage params={{}} />, empty);
+    expect(await screen.findByText('Nothing needs a decision')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open Matches' })).toHaveAttribute('href', '#/matches');
+  });
+
+  it('has no undrafted or below-bar footers: those live in Matches', async () => {
+    open();
+    const queue = await screen.findByRole('region', { name: 'Queue' });
+    expect(within(queue).queryByText(/not scored yet|below your draft bar/)).not.toBeInTheDocument();
+    expect(within(queue).queryByRole('button', { name: /Show/ })).not.toBeInTheDocument();
   });
 
   it('shows the selected draft with fit, gaps and the cover letter', async () => {
@@ -194,7 +209,7 @@ describe('ReviewPage', () => {
     expect(screen.getByText("Gmail isn't set up, so approving can't send this email.")).toBeInTheDocument();
   });
 
-  it('keeps a refused send in Review as Not sent with the reason and Retry, never as Sent', async () => {
+  it('keeps a refused send in the Inbox as Not sent with the reason and Retry, never as Sent', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     let refuse: string | undefined = 'Gmail rejected the app password.';
     const api = await withGmail(createMockApi({ latencyMs: 0, sendFailure: () => refuse }));
@@ -204,9 +219,11 @@ describe('ReviewPage', () => {
     const detail = screen.getByRole('region', { name: 'Draft detail' });
     expect(await within(detail).findByRole('alert')).toHaveTextContent('Not sent. Gmail rejected the app password.');
     expect(within(detail).queryByText(/Sent to/)).not.toBeInTheDocument();
-    const unsent = screen.getByRole('list', { name: 'Approved, not sent' });
-    expect(within(unsent).getByText('Senior Backend Engineer')).toBeInTheDocument();
-    expect(within(unsent).getByText('Not sent')).toBeInTheDocument();
+    const queue = screen.getByRole('region', { name: 'Queue' });
+    await waitFor(() => expect(within(queue).getByRole('tab', { name: /Fix first/ })).toHaveAttribute('aria-selected', 'true'));
+    const fix = within(queue).getByRole('tabpanel');
+    expect(within(fix).getByText('Senior Backend Engineer')).toBeInTheDocument();
+    expect(within(fix).getByText('Not sent')).toBeInTheDocument();
 
     refuse = undefined;
     await userEvent.click(within(detail).getByRole('button', { name: 'Retry send' }));
@@ -219,9 +236,10 @@ describe('ReviewPage', () => {
     const api = await withGmail(createMockApi({ latencyMs: 0, sendFailure: () => 'Network down' }));
     await api.approveDraft('j1').catch(() => {});
     renderWithApp(<ReviewPage params={{}} />, api);
-    const unsent = await screen.findByRole('list', { name: 'Approved, not sent' });
-    expect(within(unsent).getByText('Senior Backend Engineer')).toBeInTheDocument();
-    expect(screen.getByText('Approved, not sent (1)')).toBeInTheDocument();
+    const queue = await screen.findByRole('region', { name: 'Queue' });
+    expect(within(queue).getByRole('tab', { name: /Fix first/ })).toHaveTextContent('1');
+    expect(within(queue).getByRole('tab', { name: /Fix first/ })).toHaveAttribute('aria-selected', 'true');
+    expect(within(within(queue).getByRole('tabpanel')).getByText('Senior Backend Engineer')).toBeInTheDocument();
   });
 
   it('routes platform jobs to the manual handoff', async () => {
@@ -275,17 +293,7 @@ describe('ReviewPage', () => {
     expect(screen.queryByRole('button', { name: 'Pause auto-send' })).not.toBeInTheDocument();
   });
 
-  it('lists the jobs scored below the draft threshold when asked, each opening its detail', async () => {
-    open();
-    const queue = await screen.findByRole('region', { name: 'Queue' });
-    expect(within(queue).queryByText('Senior Software Engineer, Platform')).not.toBeInTheDocument();
-    await userEvent.click(within(queue).getByRole('button', { name: 'Show them' }));
-    const link = within(queue).getByRole('link', { name: /Senior Software Engineer, Platform/ });
-    expect(link).toHaveTextContent('67');
-    expect(link).toHaveAttribute('href', '#/review/j5');
-  });
-
-  it("shows a below-threshold job's fit and post, and drafts it on request", async () => {
+  it("opens a job from Matches in the detail: its fit and post, and Draft this one", async () => {
     const { api } = open('j5');
     const detail = await screen.findByRole('region', { name: 'Job detail' });
     expect(within(detail).getByRole('heading', { name: 'Senior Software Engineer, Platform' })).toBeInTheDocument();
@@ -311,28 +319,15 @@ describe('ReviewPage', () => {
     const detail = await screen.findByRole('region', { name: 'Job detail' });
     await userEvent.click(within(detail).getByRole('button', { name: 'Skip job' }));
     await waitFor(async () => expect((await api.getJob('j5')).status).toBe('skipped'));
-    // The queue reloads after the dismiss; wait for it rather than racing it.
-    await waitFor(() => expect(screen.queryByText(/more scored below your draft bar/)).not.toBeInTheDocument());
   });
 
-  it('lists strong matches a scan left undrafted under Ready to draft, one click from a draft', async () => {
+  it('opens a strong match a scan left undrafted, one click from a draft', async () => {
     const api = createMockApi({ latencyMs: 0 });
     await api.saveSettings({ draftThreshold: 60 });
     renderWithApp(<ReviewPage params={{ id: 'j5' }} />, api);
-    const queue = await screen.findByRole('region', { name: 'Queue' });
-    expect(within(queue).getByRole('list', { name: 'Ready to draft' })).toHaveTextContent('Senior Software Engineer, Platform');
-    const detail = screen.getByRole('region', { name: 'Job detail' });
+    const detail = await screen.findByRole('region', { name: 'Job detail' });
     expect(detail).toHaveTextContent('Strong match, not drafted yet. Its match score (67) is at or above your draft bar (60). Scans only draft when you ask.');
     expect(within(detail).getByRole('button', { name: 'Draft this one' })).toBeEnabled();
-  });
-
-  it('lists jobs still waiting to be scored or drafted, with the reason, so none go missing', async () => {
-    open();
-    const queue = await screen.findByRole('region', { name: 'Queue' });
-    expect(within(queue).getByText(/1 not scored yet; your next scan scores it\./)).toBeInTheDocument();
-    await userEvent.click(within(queue).getByRole('button', { name: 'Show waiting jobs' }));
-    const link = within(queue).getByRole('link', { name: /Frontend Developer/ });
-    expect(link).toHaveTextContent('Not scored yet');
   });
 
   it('shows the effort level and the keywords the operator can claim, with gaps', async () => {
@@ -346,13 +341,14 @@ describe('ReviewPage', () => {
     expect(screen.getByRole('list', { name: 'Keyword gaps' })).toHaveTextContent('Kafka');
   });
 
-  it('lists the jobs waiting on answers in the queue', async () => {
+  it('lists the jobs waiting on answers under the Answer tab', async () => {
     const api = createMockApi({ latencyMs: 0 });
     vi.spyOn(api, 'listQuestions').mockResolvedValue([{ jobId: 'j5', questions: ['Have you worked with healthcare or HIPAA-regulated data?', 'Can you start within two weeks?'], askedAt: '2026-11-07T08:00:00.000Z' }]);
     renderWithApp(<ReviewPage params={{}} />, api);
     const queue = await screen.findByRole('region', { name: 'Queue' });
-    const asking = within(queue).getByRole('list', { name: 'Needs your answers' });
-    expect(asking).toHaveTextContent('Senior Software Engineer, Platform');
+    expect(within(queue).getByRole('tab', { name: /Answer/ })).toHaveTextContent('1');
+    await userEvent.click(within(queue).getByRole('tab', { name: /Answer/ }));
+    expect(within(queue).getByRole('tabpanel')).toHaveTextContent('Senior Software Engineer, Platform');
   });
 
   it('asks the operator each question and drafts with the answers', async () => {

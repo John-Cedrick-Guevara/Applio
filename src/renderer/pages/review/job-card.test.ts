@@ -108,7 +108,7 @@ describe('nextLine', () => {
 
   it('says what follows a send, a failed send and a skip', () => {
     expect(nextLine(job({ status: 'applied' }), sent)).toMatch(/watches your inbox for a reply/);
-    expect(nextLine(job({ status: 'approved' }), null)).toBe('It stays in Review until it sends or you skip it.');
+    expect(nextLine(job({ status: 'approved' }), null)).toBe('It stays in the Inbox until it sends or you skip it.');
     expect(nextLine(job({ status: 'skipped' }), null)).toMatch(/stays out of your queue/);
   });
 });

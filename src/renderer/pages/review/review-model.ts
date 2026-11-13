@@ -16,14 +16,6 @@ export function primaryAction(job: Job): { label: string; handoff: boolean } {
   return { label: 'Open handoff', handoff: true };
 }
 
-/** Short status shown under each queue row. Only a job past Approved is called Sent. */
-export function queueState(job: Job): string {
-  if (job.status === 'skipped') return 'Skipped';
-  if (job.status === 'drafted') return sendsOnApprove(job.channel) ? 'Draft ready' : 'Ready to hand off';
-  if (job.status === 'approved') return sendsOnApprove(job.channel) ? 'Not sent' : 'Ready to hand off';
-  return 'Sent';
-}
-
 /** What automation may do with this job: its source's autonomy, capped by channel. */
 export function modeLabel(job: Job, sourceAutonomy: Autonomy): string {
   return sendsOnApprove(job.channel) ? AUTONOMY_LABEL[capAutonomy(sourceAutonomy, job.channel)] : 'Manual handoff';
@@ -98,34 +90,37 @@ export function traceLine(draft: Pick<Draft, 'edited' | 'check'>, factsUsed: num
   return { text: `Every claim traced to your fact bank · ${factsUsed} facts used`, ok: true };
 }
 
-/** Which of the queue's filters a group sits under. */
-export type QueueFilter = 'attention' | 'send' | 'handoff';
+export type InboxTabKey = 'fix' | 'answer' | 'approve' | 'handoff';
+export type InboxSort = 'score' | 'oldest';
 
-export interface QueueGroup {
-  key: 'unsent' | 'asking' | 'drafting' | 'todraft' | 'send' | 'handoff';
+export interface InboxTab {
+  key: InboxTabKey;
   label: string;
-  filter: QueueFilter;
+  /** One line under the tabs saying what's in this one. */
+  hint: string;
   jobs: Job[];
 }
 
+/** When a job first reached Applio, for "oldest first". */
+const foundAt = (job: Job) => job.history[0]?.at ?? job.postedAt;
+
 /**
- * The Review queue grouped by what the operator does next, most urgent first:
- * approved but not sent, Claude's questions, drafting now, strong matches a scan
- * left undrafted, then drafts to send and drafts to hand off. Each group is best
- * match first; empty groups are left out.
+ * The Inbox (redesign v2): only jobs waiting on a decision, each in exactly one
+ * tab, most urgent tab first. Fix first holds approved jobs that didn't send and
+ * suspicious posts; Approve holds drafts that send on approval; Hand off holds the
+ * ones the operator applies to. Every tab is kept, even empty, so counts don't jump.
  */
-export function queueGroups(queue: readonly Job[], asking: readonly Job[], drafting: readonly Job[], toDraft: readonly Job[] = []): QueueGroup[] {
-  const best = (jobs: readonly Job[]) => [...jobs].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-  const drafted = queue.filter((j) => j.status !== 'approved');
-  const groups: QueueGroup[] = [
-    { key: 'unsent', label: 'Approved, not sent', filter: 'attention', jobs: best(queue.filter((j) => j.status === 'approved')) },
-    { key: 'asking', label: 'Needs your answers', filter: 'attention', jobs: best(asking) },
-    { key: 'drafting', label: 'Drafting now', filter: 'attention', jobs: best(drafting) },
-    { key: 'todraft', label: 'Ready to draft', filter: 'attention', jobs: best(toDraft) },
-    { key: 'send', label: 'Ready to send', filter: 'send', jobs: best(drafted.filter((j) => sendsOnApprove(j.channel))) },
-    { key: 'handoff', label: 'To hand off', filter: 'handoff', jobs: best(drafted.filter((j) => !sendsOnApprove(j.channel))) },
+export function inboxTabs(queue: readonly Job[], asking: readonly Job[], sort: InboxSort): InboxTab[] {
+  const order = (jobs: Job[]) => jobs.sort(sort === 'oldest' ? (a, b) => foundAt(a).localeCompare(foundAt(b)) : (a, b) => (b.score ?? 0) - (a.score ?? 0));
+  const fix = (j: Job) => !!j.suspicious || (j.status === 'approved' && sendsOnApprove(j.channel));
+  // A job skipped or sent on this visit stays in the page's data until it reloads; it's no longer a decision.
+  queue = queue.filter((j) => j.status === 'drafted' || j.status === 'approved');
+  return [
+    { key: 'fix', label: 'Fix first', hint: 'Sends that failed and posts to check. Handle these first.', jobs: order(queue.filter(fix)) },
+    { key: 'answer', label: 'Answer', hint: "Claude asked before drafting. Answers are saved for every job.", jobs: order([...asking]) },
+    { key: 'approve', label: 'Approve', hint: 'Drafts ready to send. Nothing here goes out without your click.', jobs: order(queue.filter((j) => !fix(j) && sendsOnApprove(j.channel))) },
+    { key: 'handoff', label: 'Hand off', hint: 'Sites you apply on yourself, with everything to copy.', jobs: order(queue.filter((j) => !fix(j) && !sendsOnApprove(j.channel))) },
   ];
-  return groups.filter((g) => g.jobs.length > 0);
 }
 
 export type StepState = 'done' | 'current' | 'blocked' | 'failed' | 'todo';

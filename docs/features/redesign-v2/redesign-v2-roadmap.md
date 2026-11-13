@@ -60,7 +60,7 @@ Every PR's spec carries these must-not-break items:
   - [ ] remove `EngineCard` and the Review header pause button
   - [ ] tests: each of the 7 states from a status fixture; Stop calls `stopScan`; pause round-trip
 
-- [ ] **PR-3 — Matches**  One list for jobs with no draft yet, with the draft bar beside it.
+- [x] **PR-3 — Matches** (#80)  One list for jobs with no draft yet, with the draft bar beside it.
   - _branch:_ `feat/matches`
   - _PR title:_ `feat(ui): add matches list with draft bar and bulk draft`
   - _why:_ undrafted, below-bar and unscored jobs hide in Review footers; sorting them needs its own list
@@ -90,7 +90,7 @@ Every PR's spec carries these must-not-break items:
   - [ ] sidebar badge = Inbox count exactly; tab-empty state points to the next non-empty tab
   - [ ] remove Review's undrafted / below-bar / not-scored footers (now in Matches)
   - [ ] tests: tab membership per job state, badge equals list, auto-advance order, A blocked on handoff, approve has no undo, no job in neither Inbox nor Matches nor Applications
-  - [ ] if this passes ~1,000 changed lines: split into 4a (route, tabs, rows, badge) and 4b (approve-and-next, keys, undo)
+  - [ ] split up front: 4a `feat/inbox` (route, tabs, rows, badge, drafting list) and 4b `feat/inbox-flow` (approve-and-next, keys, undo), each reviewed and merged on its own
 
 - [ ] **PR-5 — Get jobs**  One place to bring jobs in: scan sources or paste a post.
   - _branch:_ `feat/get-jobs`
