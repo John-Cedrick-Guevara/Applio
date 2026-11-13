@@ -8,6 +8,15 @@ afterEach(() => {
   window.location.hash = '';
 });
 
+describe('App shell', () => {
+  it('shows the activity bar and no engine card', async () => {
+    window.location.hash = '#/applications';
+    renderWithApp(<App />);
+    expect(await screen.findByRole('region', { name: 'Activity' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Engine status')).not.toBeInTheDocument();
+  });
+});
+
 describe('App routing', () => {
   it('keeps a page mounted when only its route params change', async () => {
     window.location.hash = '#/review';

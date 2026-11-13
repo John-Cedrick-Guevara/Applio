@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { AppStatus, Autonomy, Job } from '../../../shared/types';
+import type { Autonomy, Job } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { AsyncView } from '../../components/async-view';
 import { buttonClass } from '../../components/button';
@@ -63,7 +63,6 @@ export default function ReviewPage({ params }: { params: RouteParams }) {
 
   /** Swaps an updated job into the queue (approved, skipped, edited). */
   const updateJob = (job: Job) => state.setData((d) => ({ ...d, queue: d.queue.map((j) => (j.id === job.id ? job : j)) }));
-  const updateStatus = (status: AppStatus) => state.setData((d) => ({ ...d, status }));
 
   return (
     <AsyncView state={state} what="the review queue" rows={6}>
@@ -72,7 +71,6 @@ export default function ReviewPage({ params }: { params: RouteParams }) {
           data={data}
           selectedId={params.id}
           onJobChange={updateJob}
-          onStatusChange={updateStatus}
           onRunComplete={state.reload}
         />
       )}
@@ -84,11 +82,10 @@ interface LayoutProps {
   data: Awaited<ReturnType<typeof loadReview>>;
   selectedId?: string;
   onJobChange: (job: Job) => void;
-  onStatusChange: (status: AppStatus) => void;
   onRunComplete: () => void;
 }
 
-function ReviewLayout({ data, selectedId, onJobChange, onStatusChange, onRunComplete }: LayoutProps) {
+function ReviewLayout({ data, selectedId, onJobChange, onRunComplete }: LayoutProps) {
   // Which jobs Claude is drafting right now, kept live from main's status pushes.
   const [draftingIds, setDraftingIds] = useState<string[]>(data.status.drafting ?? []);
   const [draftingSince, setDraftingSince] = useState(data.status.draftingSince ?? {});
@@ -106,7 +103,7 @@ function ReviewLayout({ data, selectedId, onJobChange, onStatusChange, onRunComp
 
   return (
     <>
-      <ReviewHeader status={data.status} onStatusChange={onStatusChange} />
+      <ReviewHeader status={data.status} />
       <div className="split">
         <ReviewQueue
           jobs={data.queue}

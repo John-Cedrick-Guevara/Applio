@@ -1,4 +1,5 @@
 import { Suspense, useEffect } from 'react';
+import { ActivityBar } from './layout/activity-bar';
 import { Sidebar } from './layout/sidebar';
 import { matchRoute, navigate, usePath } from './lib/router';
 import { DEFAULT_PATH, ROUTES } from './routes';
@@ -18,7 +19,7 @@ function resolve(path: string) {
  */
 const pageKey = (pattern: string) => pattern.replace(/\/:.*$/, '');
 
-/** App frame: sidebar + the routed page. Unknown paths redirect to the pipeline. */
+/** App frame: sidebar, the activity bar, then the routed page. Unknown paths redirect to the pipeline. */
 export function App() {
   const path = usePath();
   const match = resolve(path);
@@ -31,6 +32,7 @@ export function App() {
     <div className="app">
       <Sidebar />
       <main className="app-main">
+        <ActivityBar />
         <div className="app-content">
           {match ? (
             <Suspense fallback={<p className="muted">Loading…</p>}>

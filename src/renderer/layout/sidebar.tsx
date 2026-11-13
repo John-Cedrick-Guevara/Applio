@@ -1,5 +1,4 @@
 import { useApi } from '../api/api-context';
-import { EngineCard } from './engine-card';
 import { Icon, Logo, type IconName } from '../components/icons';
 import { useAsync } from '../hooks/use-async';
 import { usePath } from '../lib/router';
@@ -55,7 +54,6 @@ export function Sidebar() {
           </a>
         ))}
       </nav>
-      <EngineCard />
     </aside>
   );
 }
