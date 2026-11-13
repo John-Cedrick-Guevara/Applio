@@ -181,22 +181,22 @@ describe('jobSteps', () => {
   const states = (...args: Parameters<typeof jobSteps>) => Object.fromEntries(jobSteps(...args).map((s) => [s.label, s.state]));
   const sent: SendRecord = { state: 'sent', channel: 'email', to: 'a@b.c', subject: 's', body: 'b', attachments: [], at: '2026-11-08T09:14:00.000Z' };
 
-  it('waits on the operator at Drafted until a draft starts (a click or answers)', () => {
-    expect(states(job({ status: 'scored' }))).toEqual({ Found: 'done', Scored: 'done', Drafted: 'blocked', 'PDFs saved': 'todo', Sent: 'todo' });
+  it('uses the five lifecycle words and waits on the operator at Drafted until a draft starts', () => {
+    expect(states(job({ status: 'scored' }))).toEqual({ New: 'done', Matched: 'done', Drafted: 'blocked', Ready: 'todo', Sent: 'todo' });
   });
 
   it('shows Drafted in progress while Claude drafts', () => {
     expect(states(job({ status: 'scored' }), { drafting: true }).Drafted).toBe('current');
   });
 
-  it('shows the PDFs saving, then failed with the saved note', () => {
-    expect(states(job({ status: 'drafted' }))['PDFs saved']).toBe('current');
+  it('keeps Drafted in progress while the PDFs save, then failed with the saved note', () => {
+    expect(states(job({ status: 'drafted' }))).toMatchObject({ Drafted: 'current', Ready: 'todo' });
     const failed = job({ status: 'drafted', history: [{ status: 'drafted', at: '', note: "Couldn't save the files: printing took longer than 60 s" }] });
-    expect(states(failed)['PDFs saved']).toBe('failed');
+    expect(states(failed).Drafted).toBe('failed');
   });
 
-  it('waits on the operator to approve once the PDFs are saved', () => {
-    expect(states(job({ status: 'drafted', folderPath: '/x' }))).toMatchObject({ 'PDFs saved': 'done', Sent: 'blocked' });
+  it('waits on the operator at Ready once the PDFs are saved', () => {
+    expect(states(job({ status: 'drafted', folderPath: '/x' }))).toMatchObject({ Drafted: 'done', Ready: 'blocked', Sent: 'todo' });
   });
 
   it('calls a job sent only when a sent record exists', () => {

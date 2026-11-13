@@ -44,7 +44,7 @@ export function parseGuardrails(d: GuardrailsDraft): { ok: true; value: Guardrai
 
   if (Number.isNaN(draft) || draft > 100) errors.draft = 'Enter a score between 0 and 100.';
   if (Number.isNaN(auto) || auto > 100) errors.auto = 'Enter a score between 0 and 100.';
-  else if (!errors.draft && auto < draft) errors.auto = 'Auto-send must be at least the draft score.';
+  else if (!errors.draft && auto < draft) errors.auto = 'Auto-send must be at least the draft bar.';
   if (Number.isNaN(perDay)) errors.perDay = 'Enter a whole number, 0 or more.';
   if (Number.isNaN(tokens) || tokens < 1) errors.tokens = 'Enter a token budget above 0.';
   if (Number.isNaN(monthTokens) || monthTokens < 1) errors.monthTokens = 'Enter a token budget above 0.';

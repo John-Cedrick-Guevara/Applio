@@ -112,6 +112,19 @@ describe('ReviewPage', () => {
     await waitFor(async () => expect((await api.getDraft('j1'))?.check?.stale).toBe(false));
   });
 
+  it('shows one state card and folds the rest into More notes', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    await api.saveFact({ group: 'Northwind Labs — Senior Engineer', text: 'Led the billing rewrite' });
+    const flagged: typeof api = { ...api, getJob: async (id) => ({ ...(await api.getJob(id)), suspicious: 'The post addresses AI tools directly.' }) };
+    renderWithApp(<ReviewPage params={{ id: 'j1' }} />, flagged);
+    const detail = await screen.findByRole('region', { name: 'Draft detail' });
+    expect(await within(detail).findByRole('alert')).toHaveTextContent(/trying to manipulate automated tools/);
+    expect(within(detail).queryByText('Made from an older profile.', { selector: 'strong' })).not.toBeInTheDocument();
+    await userEvent.click(within(detail).getByText(/more note/));
+    expect(within(detail).getByRole('list', { name: 'More notes' })).toHaveTextContent('Made from an older profile.');
+    expect(within(detail).getByText(/What happens next:/).parentElement).toHaveTextContent('Never sends on its own because the post looks suspicious.');
+  });
+
   it('claims every line traced only when the check says so', async () => {
     const api = createMockApi({ latencyMs: 0 });
     const plain = { ...api, getDraft: async (id: string) => ({ ...(await api.getDraft(id))!, check: { stale: false, unverified: [{ line: 'I am based in Marikina City.', terms: ['Marikina'] }], forbidden: [], placeholders: [] } }) };
@@ -130,7 +143,7 @@ describe('ReviewPage', () => {
     expect(await within(detail).findByText(/Saving the résumé and letter PDFs/)).toBeInTheDocument();
     expect(within(detail).getByRole('button', { name: 'Approve & send email' })).toBeDisabled();
     expect(within(detail).getByText('Approve turns on once the PDFs are saved.')).toBeInTheDocument();
-    expect(within(within(detail).getByRole('list', { name: 'Progress' })).getByRole('listitem', { name: 'PDFs saved: in progress' })).toHaveAttribute('aria-current', 'step');
+    expect(within(within(detail).getByRole('list', { name: 'Progress' })).getByRole('listitem', { name: 'Drafted: in progress' })).toHaveAttribute('aria-current', 'step');
   });
 
   it('retries saving the PDFs without drafting again, after a failed save', async () => {
@@ -277,7 +290,8 @@ describe('ReviewPage', () => {
     const { api } = open('j5');
     const detail = await screen.findByRole('region', { name: 'Job detail' });
     expect(within(detail).getByRole('heading', { name: 'Senior Software Engineer, Platform' })).toBeInTheDocument();
-    expect(within(detail).getByText(/below your draft score \(75\)/)).toBeInTheDocument();
+    expect(within(detail).getByText(/below your draft bar \(75\)/)).toBeInTheDocument();
+    expect(within(within(detail).getByRole('list', { name: 'Progress' })).getByRole('listitem', { name: 'Drafted: needs you' })).toHaveAttribute('aria-current', 'step');
     expect(within(detail).getByRole('link', { name: 'Original post' })).toHaveAttribute('href', 'https://example.com/jobs/j5');
     await userEvent.click(within(detail).getByRole('button', { name: /Draft this one/ }));
     await waitFor(async () => expect((await api.getJob('j5')).status).toBe('drafted'));
@@ -293,13 +307,13 @@ describe('ReviewPage', () => {
     expect(within(detail).getByText("Today's Claude token budget is used up.")).toBeInTheDocument();
   });
 
-  it('dismisses a below-threshold job, which leaves the list for good', async () => {
+  it('skips a below-bar job, which leaves the list for good', async () => {
     const { api } = open('j5');
     const detail = await screen.findByRole('region', { name: 'Job detail' });
-    await userEvent.click(within(detail).getByRole('button', { name: 'Dismiss' }));
+    await userEvent.click(within(detail).getByRole('button', { name: 'Skip job' }));
     await waitFor(async () => expect((await api.getJob('j5')).status).toBe('skipped'));
     // The queue reloads after the dismiss; wait for it rather than racing it.
-    await waitFor(() => expect(screen.queryByText(/more scored below your draft threshold/)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText(/more scored below your draft bar/)).not.toBeInTheDocument());
   });
 
   it('lists strong matches a scan left undrafted under Ready to draft, one click from a draft', async () => {
@@ -309,7 +323,7 @@ describe('ReviewPage', () => {
     const queue = await screen.findByRole('region', { name: 'Queue' });
     expect(within(queue).getByRole('list', { name: 'Ready to draft' })).toHaveTextContent('Senior Software Engineer, Platform');
     const detail = screen.getByRole('region', { name: 'Job detail' });
-    expect(detail).toHaveTextContent('Strong match (67, your draft score is 60). Not drafted yet: scans only draft when you ask.');
+    expect(detail).toHaveTextContent('Strong match, not drafted yet. Its match score (67) is at or above your draft bar (60). Scans only draft when you ask.');
     expect(within(detail).getByRole('button', { name: 'Draft this one' })).toBeEnabled();
   });
 

@@ -10,7 +10,7 @@ import { useJobsVersion } from '../../hooks/use-jobs-version';
 import { formatTokens } from '../../lib/format';
 import { filesState, pendingReason } from '../../lib/job-progress';
 import { REVIEW_STATUSES } from '../../lib/job-lists';
-import { AUTONOMY_LABEL, STATUS_LABEL } from '../../lib/labels';
+import { AUTONOMY_LABEL, LIFECYCLE, STATUS_LABEL } from '../../lib/labels';
 import { EXAMPLES, inputError } from './add-job-model';
 import './add-job.css';
 
@@ -53,12 +53,13 @@ export default function AddJobPage() {
     setValues({ text: '', link: '' });
   };
 
-  // Paste → Check the match → Draft → Ready in Review; the draft's own state comes from DraftProgress.
+  // The same five stages as everywhere else: New (pasted) → Matched (checked) → Drafted → Ready → Sent.
+  // The draft's own state comes from DraftProgress; a checked match and a ready draft wait on the operator.
   const [draftDone, setDraftDone] = useState(false);
-  const stage = added ? (draftDone ? 4 : 2) : preview ? 1 : analyze.pending ? 1 : 0;
-  const steps = ['Paste', 'Check the match', 'Draft', 'Ready in Review'].map((label, i): { label: string; state: StepState } => ({
+  const stage = added ? (draftDone ? 3 : 2) : preview || analyze.pending ? 1 : 0;
+  const steps = LIFECYCLE.map((label, i): { label: string; state: StepState } => ({
     label,
-    state: i < stage ? 'done' : i > stage ? 'todo' : preview && !added ? 'blocked' : 'current',
+    state: i < stage ? 'done' : i > stage ? 'todo' : (preview && !added) || draftDone ? 'blocked' : 'current',
   }));
 
   return (
@@ -172,7 +173,7 @@ function PreviewCard({ preview, draftThreshold, added, onAdded, onEdit, onDiscar
           <h2 className="preview-title">{preview.title}</h2>
           {preview.tags.length ? <p className="preview-tags-line">{preview.tags.join(' · ')}</p> : null}
         </div>
-        <ScoreBlock score={preview.score} note={above ? `Above draft threshold (${draftThreshold})` : `Below draft threshold (${draftThreshold})`} />
+        <ScoreBlock score={preview.score} note={above ? `At or above your draft bar (${draftThreshold})` : `Below your draft bar (${draftThreshold})`} />
       </div>
       <p className="preview-summary body-text">{preview.summary}</p>
       <dl className="preview-facts">

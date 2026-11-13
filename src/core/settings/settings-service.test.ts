@@ -62,7 +62,7 @@ describe('settings service', () => {
 
   it('refuses an auto-send threshold below the draft threshold', () => {
     const service = createSettingsService(fakes().ports);
-    expect(() => service.saveSettings({ autoSendThreshold: 60 })).toThrow('Auto-send must be at least the draft score (75).');
+    expect(() => service.saveSettings({ autoSendThreshold: 60 })).toThrow('Auto-send must be at least the draft bar (75).');
     expect(service.getSettings().autoSendThreshold).toBe(85);
   });
 

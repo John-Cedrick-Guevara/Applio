@@ -40,7 +40,7 @@ describe('AddJobPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add and draft' }));
     const added = (await api.listJobs({ statuses: ['drafted'] })).find((j) => j.company === 'Brightline Studio')!;
     expect(await screen.findByRole('link', { name: 'Review and approve' })).toHaveAttribute('href', `#/review/${added.id}`);
-    expect(within(screen.getByRole('list', { name: 'Steps' })).getByRole('listitem', { name: 'Ready in Review: done' })).toBeInTheDocument();
+    expect(within(screen.getByRole('list', { name: 'Steps' })).getByRole('listitem', { name: 'Ready: needs you' })).toBeInTheDocument();
   });
 
   it('keeps the pasted post when going back to edit it', async () => {

@@ -9,7 +9,7 @@ import { queueGroups, queueState, sendsOnApprove, type QueueFilter, type QueueGr
 interface ReviewQueueProps {
   jobs: Job[];
   currentId?: string;
-  /** Jobs scored below the draft threshold, best first: shown on request, never drafted. */
+  /** Jobs scored below the draft bar, best first: shown on request, never drafted unless asked. */
   below: Job[];
   /** Jobs not scored yet; the next scan scores them. */
   waiting: Job[];
@@ -29,7 +29,7 @@ const FILTERS: { id: QueueFilter | 'all'; label: string }[] = [
   { id: 'handoff', label: 'Hand off' },
 ];
 
-/** At or past this many drafts with a low draft score, the queue suggests raising the score. */
+/** At or past this many drafts with a low draft bar, the queue suggests raising it. */
 const CROWDED = 12;
 const LOW_DRAFT_SCORE = 50;
 
@@ -74,7 +74,7 @@ export function ReviewQueue({ jobs, currentId, below, waiting, asking, drafting,
 
       {drafted >= CROWDED && draftThreshold < LOW_DRAFT_SCORE ? (
         <p className="queue-hint">
-          Your draft score is {draftThreshold}, so almost every match gets a draft. <a href="#/settings">Raise it in Settings</a> to see only strong matches.
+          Your draft bar is {draftThreshold}, so almost every match gets a draft. <a href="#/settings">Raise it in Settings</a> to see only strong matches.
         </p>
       ) : null}
 
@@ -103,7 +103,7 @@ export function ReviewQueue({ jobs, currentId, below, waiting, asking, drafting,
         ) : null}
         {filter === 'all' && below.length > 0 ? (
           <div className="queue-footer">
-            {below.length} more scored below your draft threshold ({draftThreshold}).{' '}
+            {below.length} more scored below your draft bar ({draftThreshold}).{' '}
             <button type="button" className={buttonClass('link', 'sm', 'queue-footer-action')} aria-expanded={showBelow} onClick={() => setShowBelow((s) => !s)}>
               {showBelow ? 'Hide them' : 'Show them'}
             </button>
