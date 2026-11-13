@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Job } from '../../../shared/types';
-import { draftEstimate, matchRows, tabCounts } from './matches-model';
+import { bucketOf, draftEstimate, matchRows, tabCounts } from './matches-model';
 
 const LAST = '2026-11-13T08:00:00.000Z';
 const job = (id: string, score: number | undefined, over: Partial<Job> = {}): Job => ({
@@ -48,8 +48,8 @@ describe('matchRows', () => {
 
 describe('tabCounts', () => {
   it('counts every tab under the same search and new filter', () => {
-    expect(tabCounts(jobs, base)).toEqual({ strong: 3, below: 1, unscored: 1, all: 5 });
-    expect(tabCounts(jobs, { ...base, onlyNew: true })).toEqual({ strong: 1, below: 0, unscored: 1, all: 2 });
+    expect(tabCounts(jobs, base)).toEqual({ strong: 3, below: 1, unscored: 1, all: 5, trash: 0 });
+    expect(tabCounts(jobs, { ...base, onlyNew: true })).toEqual({ strong: 1, below: 0, unscored: 1, all: 2, trash: 0 });
   });
 });
 
@@ -71,5 +71,29 @@ describe('draftEstimate', () => {
 
   it('leaves unscored jobs out of the draft count', () => {
     expect(draftEstimate([jobs[0]!, jobs[2]!], status)).toMatchObject({ draftable: 1, leftOut: 1, cost: 30_000 });
+  });
+});
+
+describe('the Trash', () => {
+  const trashed = (id: string, over: Partial<Job> = {}) => job(id, 70, { status: 'skipped', ...over });
+  const mixed = [job('a', 82), trashed('t1'), trashed('t2')];
+
+  it('lists skipped jobs only under the Trash tab, and keeps them out of every other tab', () => {
+    expect(matchRows(mixed, { ...base, tab: 'trash' }).map((j) => j.id).sort()).toEqual(['t1', 't2']);
+    for (const tab of ['all', 'strong', 'below', 'unscored'] as const) {
+      expect(matchRows(mixed, { ...base, tab }).map((j) => j.id)).not.toContain('t1');
+    }
+  });
+
+  it('counts the Trash on its own, leaving the other counts alone', () => {
+    expect(tabCounts(mixed, base)).toEqual({ strong: 1, below: 0, unscored: 0, all: 1, trash: 2 });
+  });
+
+  it('files a skipped job under trash, whatever its score', () => {
+    expect(bucketOf(trashed('t', { score: 99 }), 60)).toBe('trash');
+  });
+
+  it('lets the new and search filters apply inside the Trash too', () => {
+    expect(matchRows(mixed, { ...base, tab: 'trash', query: 'role t2' }).map((j) => j.id)).toEqual(['t2']);
   });
 });

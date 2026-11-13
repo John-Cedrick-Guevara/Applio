@@ -153,6 +153,80 @@ describe('MatchesPage', () => {
     expect(within(list).queryByText(ORBITAL)).not.toBeInTheDocument();
   });
 
+  /** A mock where Orbital (j5) was skipped before the page opened, so it sits in the Trash. */
+  async function withTrash(over: Partial<ReturnType<typeof createMockApi>> = {}) {
+    const api = createMockApi({ latencyMs: 0 });
+    await api.skipJob('j5');
+    renderWithApp(<MatchesPage />, { ...api, ...over });
+    const list = await screen.findByRole('region', { name: 'Match list' });
+    await within(list).findByText(FERNWOOD);
+    return { api, list };
+  }
+
+  it('keeps skipped jobs out of All and lists them under the Trash, with their count', async () => {
+    const { list } = await withTrash();
+    expect(within(list).queryByText(ORBITAL)).not.toBeInTheDocument();
+    // The mock already has one skipped job (Bergmann), so Orbital makes two.
+    expect(screen.getByRole('button', { name: /^Trash/ })).toHaveTextContent('2');
+    await userEvent.click(screen.getByRole('button', { name: /^Trash/ }));
+    expect(within(list).getByText(ORBITAL)).toBeInTheDocument();
+    expect(within(list).getByText('Backend Engineer (Java)')).toBeInTheDocument();
+    expect(within(list).queryByText(FERNWOOD)).not.toBeInTheDocument();
+    expect(row(list, ORBITAL)).toHaveTextContent('In the Trash.');
+    expect(within(row(list, ORBITAL)).queryByRole('button', { name: /Draft|Score|Skip/ })).not.toBeInTheDocument();
+  });
+
+  it('restores a trashed job, which leaves the Trash and returns to its tab', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    await api.skipJob('j5');
+    const restore = vi.fn(api.restoreJob);
+    renderWithApp(<MatchesPage />, { ...api, restoreJob: restore });
+    const list = await screen.findByRole('region', { name: 'Match list' });
+    await userEvent.click(await screen.findByRole('button', { name: /^Trash/ }));
+    await userEvent.click(within(row(list, ORBITAL)).getByRole('button', { name: 'Restore' }));
+    expect(restore).toHaveBeenCalledWith('j5');
+    await waitFor(() => expect(screen.getByRole('button', { name: /^Trash/ })).toHaveTextContent('1'));
+    await userEvent.click(screen.getByRole('button', { name: /^All/ }));
+    expect(within(list).getByText(ORBITAL)).toBeInTheDocument();
+  });
+
+  it('restores a selection from the Trash', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    await api.skipJob('j5');
+    await api.skipJob('j6');
+    const restore = vi.fn(api.restoreJob);
+    renderWithApp(<MatchesPage />, { ...api, restoreJob: restore });
+    const list = await screen.findByRole('region', { name: 'Match list' });
+    await userEvent.click(await screen.findByRole('button', { name: /^Trash/ }));
+    await userEvent.click(within(row(list, ORBITAL)).getByRole('checkbox'));
+    await userEvent.click(within(row(list, FERNWOOD)).getByRole('checkbox'));
+    const selected = screen.getByRole('region', { name: 'Selected' });
+    expect(within(selected).queryByRole('button', { name: /Draft|Score|Skip/ })).not.toBeInTheDocument();
+    await userEvent.click(within(selected).getByRole('button', { name: 'Restore 2' }));
+    expect(restore).toHaveBeenCalledTimes(2);
+  });
+
+  it('puts a skip in the Trash once it is saved', async () => {
+    const { list } = await setup();
+    await userEvent.click(within(row(list, ORBITAL)).getByRole('button', { name: 'Skip' }));
+    // A second skip saves the first at once.
+    await userEvent.click(within(row(list, FERNWOOD)).getByRole('button', { name: 'Skip' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Trash/ }));
+    expect(await within(list).findByText(ORBITAL)).toBeInTheDocument();
+  });
+
+  it('says the Trash is empty, not that filters hide things', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    await api.saveSettings({ draftThreshold: 60 });
+    const noTrash = { ...api, listJobs: async (f?: Parameters<typeof api.listJobs>[0]) => (await api.listJobs(f)).filter((j) => j.status !== 'skipped') };
+    renderWithApp(<MatchesPage />, noTrash);
+    const list = await screen.findByRole('region', { name: 'Match list' });
+    await within(list).findByText(ORBITAL);
+    await userEvent.click(screen.getByRole('button', { name: /^Trash/ }));
+    expect(within(list).getByText('The Trash is empty')).toBeInTheDocument();
+    expect(within(list).getByText(/Jobs you skip or clean up wait here until you restore them/)).toBeInTheDocument();
+  });
+
   it('clears filters from an empty search', async () => {
     const { list } = await setup();
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search matches' }), 'zzz');

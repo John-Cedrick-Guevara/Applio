@@ -25,3 +25,12 @@ export function nextStatuses(status: JobStatus): JobStatus[] {
 
 /** Every job status, from the transition table, so a new status can't be missed by lists that must cover them all. */
 export const JOB_STATUSES = Object.keys(TRANSITIONS) as JobStatus[];
+
+/**
+ * The status a skipped job had before it went to the Trash: the last event that
+ * isn't "skipped" (notes added while trashed carry the skipped status too).
+ * A job with no earlier event comes back as found.
+ */
+export function statusBeforeTrash(history: readonly { status: JobStatus }[]): JobStatus {
+  return history.findLast((e) => e.status !== 'skipped')?.status ?? 'found';
+}
