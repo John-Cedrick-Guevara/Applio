@@ -1046,7 +1046,7 @@ describe('createBackend discovery', () => {
     await vi.waitFor(async () => expect((await api.getJob(first.id)).status).toBe('drafted'));
     const complete = vi.spyOn(deps.engines['claude-code'], 'complete');
     const again = await api.analyzeJob({ kind: 'text', value: 'Senior TypeScript Engineer at Brightline Studio\nWe build tools.' });
-    expect(again).toMatchObject({ duplicate: { jobId: first.id, status: 'drafted' }, tokensUsed: 0, company: 'Brightline Studio' });
+    expect(again).toMatchObject({ duplicate: { jobId: first.id, status: 'drafted' }, tokensUsed: 0, company: 'Brightline Studio', channelLabel: 'Email', route: 'Sends from your Gmail to hiring@brightline.io', score: 84 });
     expect(complete).not.toHaveBeenCalled();
     await expect(api.addJob(again)).rejects.toThrow('Analyze the post again, then add it.');
   });
