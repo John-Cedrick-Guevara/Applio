@@ -125,3 +125,9 @@ Every PR's spec carries these must-not-break items:
   - [ ] cheap company + title extraction (page metadata or the post's first lines) → `findByDedupKey` before the AI call
   - [ ] duplicate returns without an AI call; Get jobs copy says "checked for free"
   - [ ] tests: duplicate post makes zero AI calls; an unreadable post falls through to analysis
+
+## Follow-ups (after the first run on real data, 2026-11-13)
+
+- [x] **PR-A — Fix the chopped UI** `fix/chopped-ui`  Step-list rows, banner buttons, Inbox row truncation, duplicate header button, activity-bar offset.
+- [ ] **PR-B — Trash and Restore** `feat/trash`  Skipped jobs were in no list and a skip couldn't be undone; add a Trash tab in Matches, a `restoreJob` call, and a duplicate banner that says "You moved this to the Trash" with Restore.
+- [ ] **PR-C — Clean up** `feat/clean-up`  Manual "Clean up" in Matches with a preview: matches older than N days, matches below the draft bar, and Trash older than N days (collapsed). Cleaned jobs go to the Trash, restorable; nothing is permanently deleted.

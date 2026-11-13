@@ -131,7 +131,7 @@ function InboxRow({ job, current }: { job: Job; current: boolean }) {
     <li>
       <a href={`#/inbox/${job.id}`} className="inbox-row" aria-current={current ? 'true' : undefined} title={text}>
         <span className="inbox-row-score mono">{job.score ?? '—'}</span>
-        <span className="inbox-row-text"><span className="inbox-row-role">{job.title}</span> · {job.company}</span>
+        <span className="inbox-row-text"><span className="inbox-row-role">{job.title}</span><span className="inbox-row-co"> · {job.company}</span></span>
         {label ? <span className="badge badge-danger">{label}</span> : null}
         <span className="inbox-row-age cell-sub">{formatRelative(job.history[0]?.at ?? job.postedAt)}</span>
       </a>

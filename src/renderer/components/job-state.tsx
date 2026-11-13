@@ -69,7 +69,7 @@ export function StepList({ label, steps }: { label: string; steps: { label: stri
     <ul className="step-list" aria-label={label}>
       {steps.map((s) => (
         <li key={s.label} className={`step-list-row step-list-${s.state}`}>
-          {s.state === 'done' ? <Icon name="check" size={18} strokeWidth={2.2} aria-hidden="true" /> : s.state === 'active' ? <span className="spinner" aria-hidden="true" /> : <span className="step-list-pending" aria-hidden="true" />}
+          {s.state === 'done' ? <Icon name="check" size={18} strokeWidth={2.2} aria-hidden="true" /> : s.state === 'active' ? <span className="spinner" aria-hidden="true" /> : <span className="step-list-dot" aria-hidden="true" />}
           <span className="step-list-label">{s.label}</span>
           <span className="step-list-note">{s.note ?? (s.state === 'done' ? 'Done' : '')}</span>
         </li>

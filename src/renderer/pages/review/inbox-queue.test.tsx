@@ -51,6 +51,14 @@ describe('InboxQueue', () => {
     expect(screen.getByRole('link', { name: /Full-Stack Engineer/ })).toHaveAttribute('title', 'Full-Stack Engineer (Backend Leaning) - Payments Engineering · Co a');
   });
 
+  it('truncates the role and the company separately, keeping the full text in the tooltip', () => {
+    queue([job('a', { title: 'Software Engineer – AI-Assisted Development Platform Team', company: 'Kraus Hamdani Aerospace' })]);
+    const row = screen.getByRole('link', { name: /Software Engineer/ });
+    expect(row.querySelector('.inbox-row-role')).toHaveTextContent('Software Engineer – AI-Assisted Development Platform Team');
+    expect(row.querySelector('.inbox-row-co')).toHaveTextContent('Kraus Hamdani Aerospace');
+    expect(row).toHaveAttribute('title', 'Software Engineer – AI-Assisted Development Platform Team · Kraus Hamdani Aerospace');
+  });
+
   it('sorts by best match or oldest', async () => {
     const onSort = vi.fn();
     queue([job('a')], { onSort });
