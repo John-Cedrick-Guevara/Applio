@@ -170,6 +170,8 @@ function Running({ phase, draft, stopping, onStop }: { phase?: ScanPhase; draft:
 }
 
 function Results({ run, onAgain }: { run: RunSummary; onAgain: () => void }) {
+  // Drafted jobs and ones Claude asked about wait in the Inbox; only the rest are listed in Matches.
+  const waiting = Math.max(0, run.passedFilters - run.drafted - (run.asked ?? 0));
   const counts = [
     [run.found, 'posts fetched'],
     [run.newAfterDedup, 'new'],
@@ -186,8 +188,10 @@ function Results({ run, onAgain }: { run: RunSummary; onAgain: () => void }) {
       </div>
       <div className="find-jobs-foot find-jobs-actions">
         <Button onClick={onAgain}>Scan again</Button>
-        {run.passedFilters ? (
-          <a className="btn btn-primary" href="#/matches/new">Open the {run.passedFilters} new match{run.passedFilters === 1 ? '' : 'es'}</a>
+        {waiting > 0 ? (
+          <a className="btn btn-primary" href="#/matches/new">Open the {waiting} new match{waiting === 1 ? '' : 'es'}</a>
+        ) : run.drafted + (run.asked ?? 0) > 0 ? (
+          <a className="btn btn-primary" href="#/inbox">Open the Inbox</a>
         ) : <a className="btn btn-primary" href="#/matches">Open Matches</a>}
       </div>
     </section>

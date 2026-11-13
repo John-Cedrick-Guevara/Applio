@@ -22,6 +22,22 @@ describe('FindJobsPage', () => {
     expect(within(results).getByRole('link', { name: 'Open the 2 new matches' })).toHaveAttribute('href', '#/matches/new');
   });
 
+  it("counts only the matches that wait in Matches, and sends drafted or asked jobs to the Inbox", async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    // The page reads the stored run from status once the scan ends, so the fake serves it from both places.
+    const run = (over: object) => {
+      const summary = { at: new Date().toISOString(), found: 9, newAfterDedup: 6, passedFilters: 5, drafted: 0, ...over };
+      return { ...api, runDiscovery: async () => summary, getStatus: async () => ({ ...(await api.getStatus()), lastRun: summary }) };
+    };
+    const { unmount } = renderWithApp(<FindJobsPage />, run({ drafted: 2, asked: 1 }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Start scan' }));
+    expect(await screen.findByRole('link', { name: 'Open the 2 new matches' })).toHaveAttribute('href', '#/matches/new');
+    unmount();
+    renderWithApp(<FindJobsPage />, run({ passedFilters: 3, drafted: 3 }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Start scan' }));
+    expect(await screen.findByRole('link', { name: 'Open the Inbox' })).toHaveAttribute('href', '#/inbox');
+  });
+
   it('scans only the sources left ticked, and drafts only when asked', async () => {
     const api = createMockApi({ latencyMs: 0 });
     const run = vi.spyOn(api, 'runDiscovery');

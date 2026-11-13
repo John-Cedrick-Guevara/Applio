@@ -247,7 +247,7 @@ function DraftProgress({ job, onDone, onAnother }: { job: Job; onDone: (done: bo
       ) : ready ? (
         <Callout tone="done" title="Ready to review.">The résumé and letter are saved and wait for your approval.</Callout>
       ) : files?.kind === 'failed' ? (
-        <Callout tone="failed" title="PDFs didn't save.">Retry from Review; it costs no tokens.</Callout>
+        <Callout tone="failed" title="PDFs didn't save.">Retry from the Inbox; it costs no tokens.</Callout>
       ) : files?.kind === 'saving' ? (
         <Callout tone="busy" title="Saving the résumé and letter PDFs." />
       ) : shown.status === 'scored' ? (

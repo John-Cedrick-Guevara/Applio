@@ -10,7 +10,7 @@ export function runResult(run: RunSummary): string {
   return `Scan finished: ${run.passedFilters} job${run.passedFilters === 1 ? '' : 's'} passed your filters, ${run.drafted} drafted.${asked}`;
 }
 
-/** One-line summary of the last scan, for the Review header. */
+/** One-line summary of the last scan, for the Inbox header. */
 export function runLine(run: RunSummary | undefined): string {
   if (!run) return 'No scans yet. Find jobs to fill the queue.';
   const when = `Last scan ${formatClock(run.at)}`;
