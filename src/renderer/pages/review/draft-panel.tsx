@@ -3,7 +3,6 @@ import type { Autonomy, Draft, Job, SendRecord } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { AsyncView } from '../../components/async-view';
 import { Button, buttonClass } from '../../components/button';
-import { ConfirmDialog } from '../../components/confirm-dialog';
 import { Icon } from '../../components/icons';
 import { JobStateCard, Stepper } from '../../components/job-state';
 import { ScoreBlock } from '../../components/score-block';
@@ -12,7 +11,6 @@ import { useAsync } from '../../hooks/use-async';
 import { useJobsVersion } from '../../hooks/use-jobs-version';
 import { formatRelative, formatTokens } from '../../lib/format';
 import { CHANNEL_LABEL } from '../../lib/labels';
-import { navigate } from '../../lib/router';
 import type { DocumentOwner } from '../../../shared/templates/application-documents';
 import { DraftDocument, type DocTab } from './draft-document';
 import { filesState } from '../../lib/job-progress';
@@ -22,7 +20,10 @@ import { SourceCredit } from '../../components/source-credit';
 
 interface DraftPanelProps {
   jobId: string;
-  nextId?: string;
+  /** The Inbox holds a skip with Undo and opens the next job (redesign v2). */
+  onSkip: (job: Job) => void;
+  /** Called once a decision is final (a sent record, or marked applied), with what to tell the operator. */
+  onDecided: (job: Job, message: string) => void;
   thresholds: { draft: number; auto: number };
   /** Whose name and email go on the documents. */
   owner: DocumentOwner;
@@ -72,7 +73,7 @@ interface DetailProps extends Omit<DraftPanelProps, 'jobId' | 'onJobChange'> {
   onDraft: (draft: Draft) => void;
 }
 
-function DraftDetail({ job, draft, send, nextId, thresholds, owner, autonomyBySource, gmailIssue, onJob, onDraft }: DetailProps) {
+function DraftDetail({ job, draft, send, onSkip, onDecided, thresholds, owner, autonomyBySource, gmailIssue, onJob, onDraft }: DetailProps) {
   const api = useApi();
   const action = useAction();
   // Its own action, so a failed send's message stays on screen and never reads as a skip or edit error.
@@ -81,7 +82,6 @@ function DraftDetail({ job, draft, send, nextId, thresholds, owner, autonomyBySo
   const [editing, setEditing] = useState(false);
   // A suspicious post needs a second, explicit click to send (QA 2026-11-07 #7).
   const [confirming, setConfirming] = useState(false);
-  const [askingSkip, setAskingSkip] = useState(false);
   const blockId = useId();
   const primary = primaryAction(job);
   const state = sendState(job, send);
@@ -98,6 +98,9 @@ function DraftDetail({ job, draft, send, nextId, thresholds, owner, autonomyBySo
     try {
       const [next, nextSend] = await Promise.all([api.getJob(job.id), api.getSend(job.id)]);
       onJob(next, nextSend);
+      // Only a sent record is a decision that moves on; a refused send stays here with Retry.
+      const result = sendState(next, nextSend);
+      if (result.kind === 'sent') onDecided(next, result.line);
     } catch (err) {
       // The send's own result is already on screen; a failed re-read only leaves the old view, so it's logged, not shown.
       console.error('[review] failed to reload the job after sending', err);
@@ -105,16 +108,10 @@ function DraftDetail({ job, draft, send, nextId, thresholds, owner, autonomyBySo
   };
 
   const markApplied = async () => {
-    const next = await action.run('mark it applied', () => api.markApplied(job.id), 'Marked as applied');
-    if (next) onJob(next, send);
-  };
-
-  const skip = async () => {
-    setAskingSkip(false);
-    const next = await action.run('skip the job', () => api.skipJob(job.id), `Skipped ${job.title} at ${job.company}`);
+    const next = await action.run('mark it applied', () => api.markApplied(job.id));
     if (!next) return;
     onJob(next, send);
-    if (nextId) navigate(`/inbox/${nextId}`);
+    onDecided(next, 'Marked as applied.');
   };
 
   // Reprints only: the draft is already saved, so this costs no tokens.
@@ -158,7 +155,7 @@ function DraftDetail({ job, draft, send, nextId, thresholds, owner, autonomyBySo
           onRedraft={redraft}
           onEditLetter={() => { setTab('letter'); setEditing(true); }}
           onMarkApplied={markApplied}
-          onSkip={skip}
+          onSkip={() => onSkip(job)}
           onOpenFolder={() => action.run('open the folder', () => api.openJobFolder(job.id))}
         />
       </JobStateCard>
@@ -231,23 +228,18 @@ function DraftDetail({ job, draft, send, nextId, thresholds, owner, autonomyBySo
         {waiting && approveBlock && !primary.handoff && !needsGmail ? <span id={blockId} className="cell-sub draft-block">{approveBlock}</span> : null}
         {waiting ? (
           <div className="row">
-            <Button busy={action.pending || sending.pending} onClick={() => setAskingSkip(true)}>Skip job</Button>
+            <Button busy={action.pending || sending.pending} onClick={() => onSkip(job)}>Skip job</Button>
             <Button disabled={!draft} onClick={() => { setTab('letter'); setEditing(true); }}>Edit</Button>
             {primary.handoff ? (
               <a className={buttonClass('primary')} href={`#/handoff/${job.id}`}>{primary.label}</a>
             ) : needsGmail ? (
               <a className={buttonClass('primary')} href="#/settings">{needsGmail.action}</a>
             ) : (
-              <Button variant="primary" busy={sending.pending} disabled={!!approveBlock} aria-describedby={approveBlock ? blockId : undefined} onClick={job.suspicious && !confirming ? () => setConfirming(true) : approve}>{sending.pending ? (job.channel === 'email' ? 'Sending…' : 'Submitting…') : primary.label}</Button>
+              <Button id="approve-primary" variant="primary" busy={sending.pending} disabled={!!approveBlock} aria-describedby={approveBlock ? blockId : undefined} onClick={job.suspicious && !confirming ? () => setConfirming(true) : approve}>{sending.pending ? (job.channel === 'email' ? 'Sending…' : 'Submitting…') : primary.label}</Button>
             )}
           </div>
         ) : null}
       </div>
-      {askingSkip ? (
-        <ConfirmDialog title={`Skip job "${job.title}" at ${job.company}?`} confirmLabel="Skip job" onConfirm={skip} onCancel={() => setAskingSkip(false)}>
-          It leaves your queue and nothing is sent.
-        </ConfirmDialog>
-      ) : null}
     </>
   );
 }

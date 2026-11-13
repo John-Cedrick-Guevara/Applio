@@ -75,7 +75,7 @@ Every PR's spec carries these must-not-break items:
   - [ ] nav entry with "n new"; Review keeps its footers until PR-4 so nothing is unreachable in between
   - [ ] tests: bucket per score vs bar, budget cap blocks bulk draft, undo cancels the skip call, new-since-scan filter
 
-- [ ] **PR-4 — Inbox**  Only decisions, one tab at a time, worked through in order.
+- [x] **PR-4 — Inbox** (4a #81)  Only decisions, one tab at a time, worked through in order.
   - _branch:_ `feat/inbox`
   - _PR title:_ `feat(ui): turn review into an inbox of decisions`
   - _why:_ Review mixes decisions with sorting and gets cluttered at volume; the badge disagrees with the list

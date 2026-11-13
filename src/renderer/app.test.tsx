@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import { renderWithApp } from '../test/render';
@@ -37,7 +37,6 @@ describe('App routing', () => {
     // The sort is page state: a remount (the bug) would reset it to Best match first.
     await userEvent.selectOptions(await screen.findByLabelText('Sort'), 'oldest');
     await userEvent.click(await screen.findByRole('button', { name: 'Skip job' }));
-    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Skip job' }));
     await waitFor(() => expect(window.location.hash).toMatch(/^#\/inbox\/j\d$/));
     await new Promise((r) => setTimeout(r, 50)); // let a remount happen if it's going to
     expect(screen.getByLabelText('Sort')).toHaveValue('oldest');

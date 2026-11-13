@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Autonomy, Job } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { AsyncView } from '../../components/async-view';
-import { buttonClass } from '../../components/button';
+import { Button, buttonClass } from '../../components/button';
+import { useToast } from '../../components/toast';
+import { useAction } from '../../hooks/use-action';
+import { useHeldAction } from '../../hooks/use-held-action';
 import { useAsync } from '../../hooks/use-async';
 import { useJobsVersion } from '../../hooks/use-jobs-version';
-import type { RouteParams } from '../../lib/router';
+import { navigate, type RouteParams } from '../../lib/router';
 import { DraftPanel } from './draft-panel';
 import { DraftingPanel } from './drafting-panel';
 import { JobPanel } from './job-panel';
@@ -90,21 +93,69 @@ function ReviewLayout({ data, selectedId, onJobChange, onRunComplete }: LayoutPr
   }), []);
   const drafting = data.undrafted.filter((j) => draftingIds.includes(j.id));
   const isDrafting = (id: string) => draftingIds.includes(id);
+  const api = useApi();
+  const action = useAction();
+  const toast = useToast();
   const [sort, setSort] = useState<InboxSort>('score');
-  const tabs = inboxTabs(data.queue, data.asking.filter((j) => !isDrafting(j.id)), sort);
+  const [autoNext, setAutoNext] = useState(true);
+  // Skipped jobs leave the list at once; the skip is held with Undo, and a failed save brings the job back.
+  const [gone, setGone] = useState<ReadonlySet<string>>(new Set());
+  const unhide = (ids: string[]) => setGone((prev) => new Set([...prev].filter((id) => !ids.includes(id))));
+  const skips = useHeldAction(async (ids) => {
+    for (const id of ids) if (!(await action.run('skip the job', () => api.skipJob(id)))) unhide([id]);
+  });
+
+  const tabs = inboxTabs(data.queue.filter((j) => !gone.has(j.id)), data.asking.filter((j) => !isDrafting(j.id) && !gone.has(j.id)), sort);
   // In tab order, so "next" after a decision is the next job in the same tab, then the next tab.
   const ordered = tabs.flatMap((t) => t.jobs);
   const currentId = selectedId ?? ordered[0]?.id;
-  const nextId = useMemo(() => {
-    const i = ordered.findIndex((j) => j.id === currentId);
-    return ordered.slice(i + 1).find((j) => j.status === 'drafted')?.id;
-  }, [ordered, currentId]);
+  const current = ordered.find((j) => j.id === currentId);
+  /** The job after this one in tab order, else the one before it. */
+  const nextAfter = (id: string) => {
+    const i = ordered.findIndex((j) => j.id === id);
+    return (ordered[i + 1] ?? ordered[i - 1])?.id;
+  };
+  const open = (id?: string) => navigate(id ? `/inbox/${id}` : '/inbox');
+
+  const skip = (job: Job) => {
+    const next = nextAfter(job.id);
+    setGone((prev) => new Set([...prev, job.id]));
+    skips.hold([job.id], `Skipped ${job.title} at ${job.company}.`);
+    open(next);
+  };
+  const undo = () => {
+    const ids = skips.held?.ids ?? [];
+    unhide(ids);
+    skips.undo();
+    open(ids[0]);
+  };
+  /** A final decision (sent, or marked applied): say what happened and, if asked, open the next job. */
+  const decided = (job: Job, message: string) => {
+    if (!autoNext) return;
+    toast.show(message, 'success');
+    open(nextAfter(job.id));
+  };
+  // A presses the open job's own Approve button, so every rule on it (disabled reason, suspicious confirm) still applies.
+  const approveKey = () => {
+    const button = document.getElementById('approve-primary');
+    if (button instanceof HTMLButtonElement && !button.disabled) button.click();
+  };
 
   return (
     <>
       <ReviewHeader status={data.status} />
       <div className="split">
-        <InboxQueue tabs={tabs} drafting={drafting} {...(currentId ? { currentId } : {})} sort={sort} onSort={setSort} />
+        <InboxQueue
+          tabs={tabs}
+          drafting={drafting}
+          {...(currentId ? { currentId } : {})}
+          sort={sort}
+          onSort={setSort}
+          autoNext={autoNext}
+          onAutoNext={setAutoNext}
+          onApproveKey={approveKey}
+          onSkipKey={() => current && skip(current)}
+        />
         {currentId && isDrafting(currentId) && !data.queue.some((j) => j.id === currentId) ? (
           <DraftingPanel job={drafting.find((j) => j.id === currentId)} since={draftingSince[currentId]} />
         ) : currentId && data.questions.has(currentId) ? (
@@ -127,7 +178,8 @@ function ReviewLayout({ data, selectedId, onJobChange, onRunComplete }: LayoutPr
           <DraftPanel
             key={currentId}
             jobId={currentId}
-            nextId={nextId}
+            onSkip={skip}
+            onDecided={decided}
             thresholds={data.thresholds}
             owner={data.owner}
             autonomyBySource={data.autonomyBySource}
@@ -145,6 +197,12 @@ function ReviewLayout({ data, selectedId, onJobChange, onRunComplete }: LayoutPr
           </section>
         )}
       </div>
+      {skips.held ? (
+        <div className="undo-bar" role="status" aria-label="Undo">
+          <span>{skips.held.message}</span>
+          <Button size="sm" variant="link" onClick={undo}>Undo</Button>
+        </div>
+      ) : null}
     </>
   );
 }

@@ -1,10 +1,29 @@
-import { screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { act, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
+import type { AppStatus } from '../../shared/types';
 import { createMockApi } from '../../shared/mock/mock-api';
 import { renderWithApp } from '../../test/render';
 import { Sidebar } from './sidebar';
 
+afterEach(() => {
+  delete window.applioEvents;
+});
+
 describe('Sidebar', () => {
+  it('updates the Inbox badge when main reports a job changed, without navigation', async () => {
+    const listeners = new Set<(s: AppStatus) => void>();
+    window.applioEvents = { onStatus: (l) => { listeners.add(l); return () => listeners.delete(l); } };
+    const api = createMockApi({ latencyMs: 0 });
+    renderWithApp(<Sidebar />, api);
+    const link = await screen.findByRole('link', { name: /Inbox/ });
+    const before = Number(within(link).getByLabelText(/need a decision/).textContent);
+    const status = await api.getStatus();
+    act(() => listeners.forEach((l) => l({ ...status, jobsVersion: 1 })));
+    await api.skipJob('j1');
+    act(() => listeners.forEach((l) => l({ ...status, jobsVersion: 2 })));
+    await waitFor(() => expect(within(link).getByLabelText(/need a decision/)).toHaveTextContent(String(before - 1)));
+  });
+
   it('badges the Inbox with exactly its decisions', async () => {
     const api = createMockApi({ latencyMs: 0 });
     const decisions = (await api.listJobs({ statuses: ['drafted', 'approved'] })).length + (await api.listQuestions()).length;

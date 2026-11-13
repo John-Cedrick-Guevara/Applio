@@ -210,7 +210,7 @@ function MatchesView({ jobs, settings, status, onSettings }: ViewProps) {
       </section>
 
       {skips.held ? (
-        <div className="matches-undo" role="status" aria-label="Undo">
+        <div className="undo-bar" role="status" aria-label="Undo">
           <span>{skips.held.message}</span>
           <Button size="sm" variant="link" onClick={() => { unhide(skips.held!.ids); skips.undo(); }}>Undo</Button>
         </div>

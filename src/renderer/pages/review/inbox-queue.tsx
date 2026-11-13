@@ -13,6 +13,12 @@ interface InboxQueueProps {
   currentId?: string;
   sort: InboxSort;
   onSort: (sort: InboxSort) => void;
+  /** Whether a final decision opens the next job. */
+  autoNext: boolean;
+  onAutoNext: (on: boolean) => void;
+  /** A and S on the list: approve and skip the open job. */
+  onApproveKey: () => void;
+  onSkipKey: () => void;
 }
 
 /** ↑ and ↓ move between rows and open the one they land on, like a mail list. */
@@ -36,7 +42,7 @@ const tabFor = (tabs: InboxTab[], id?: string): InboxTabKey =>
  * one-line rows, and a label only when something is off the normal path. The
  * list scrolls inside its frame, so the detail never scrolls out of view.
  */
-export function InboxQueue({ tabs, drafting, currentId, sort, onSort }: InboxQueueProps) {
+export function InboxQueue({ tabs, drafting, currentId, sort, onSort, autoNext, onAutoNext, onApproveKey, onSkipKey }: InboxQueueProps) {
   const [active, setActive] = useState<InboxTabKey>(() => tabFor(tabs, currentId));
   // Follow the selected job into its tab: one opened from a link, or one that moved (a refused send → Fix first).
   const owner = tabs.find((t) => t.jobs.some((j) => j.id === currentId))?.key;
@@ -75,7 +81,12 @@ export function InboxQueue({ tabs, drafting, currentId, sort, onSort }: InboxQue
         </select>
       </div>
 
-      <div id="inbox-panel" role="tabpanel" aria-labelledby={`inbox-tab-${active}`} className="inbox-scroll" onKeyDown={moveSelection}>
+      <div id="inbox-panel" role="tabpanel" aria-labelledby={`inbox-tab-${active}`} className="inbox-scroll" onKeyDown={(e) => {
+        if (e.metaKey || e.ctrlKey || e.altKey) return;
+        if (e.key === 'a' || e.key === 'A') onApproveKey();
+        else if (e.key === 's' || e.key === 'S') onSkipKey();
+        else moveSelection(e);
+      }}>
         {tab.jobs.length ? (
           <ul className="list-plain">
             {tab.jobs.map((job) => <InboxRow key={job.id} job={job} current={job.id === currentId} />)}
@@ -86,6 +97,11 @@ export function InboxQueue({ tabs, drafting, currentId, sort, onSort }: InboxQue
             {next ? <Button size="sm" onClick={() => setActive(next.key)}>Go to {next.label}</Button> : null}
           </div>
         )}
+      </div>
+
+      <div className="inbox-foot">
+        <span className="cell-sub">↑ ↓ move · A approve · S skip</span>
+        <label className="inbox-next"><input type="checkbox" checked={autoNext} onChange={(e) => onAutoNext(e.target.checked)} />Open the next job after each decision</label>
       </div>
 
       {drafting.length ? (

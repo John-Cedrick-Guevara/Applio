@@ -2,7 +2,6 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { Callout, JobStateCard, StatusChip, StepList, Stepper } from './job-state';
-import { ConfirmDialog } from './confirm-dialog';
 
 describe('StatusChip', () => {
   it('says the state in words, never by color alone', () => {
@@ -43,50 +42,6 @@ describe('StepList', () => {
     render(<StepList label="Drafting steps" steps={[{ label: 'Claude drafting', state: 'done' }, { label: 'Saving PDFs', state: 'active', note: '0:42' }]} />);
     const list = screen.getByRole('list', { name: 'Drafting steps' });
     expect(within(list).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Claude draftingDone', 'Saving PDFs0:42']);
-  });
-});
-
-describe('ConfirmDialog', () => {
-  const open = () => {
-    const onConfirm = vi.fn();
-    const onCancel = vi.fn();
-    render(<ConfirmDialog title='Skip job "Platform Engineer" at Ledgerly?' confirmLabel="Skip job" onConfirm={onConfirm} onCancel={onCancel}>It leaves your queue.</ConfirmDialog>);
-    return { onConfirm, onCancel, dialog: screen.getByRole('dialog', { name: 'Skip job "Platform Engineer" at Ledgerly?' }) };
-  };
-
-  it('starts on Cancel, so Enter never confirms by accident', () => {
-    open();
-    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
-  });
-
-  it('cancels on Escape without confirming', async () => {
-    const { onConfirm, onCancel } = open();
-    await userEvent.keyboard('{Escape}');
-    expect(onCancel).toHaveBeenCalled();
-    expect(onConfirm).not.toHaveBeenCalled();
-  });
-
-  it('keeps Tab inside the dialog', async () => {
-    open();
-    await userEvent.tab();
-    expect(screen.getByRole('button', { name: 'Skip job' })).toHaveFocus();
-    await userEvent.tab();
-    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
-  });
-
-  it('confirms with the named action', async () => {
-    const { onConfirm, dialog } = open();
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Skip job' }));
-    expect(onConfirm).toHaveBeenCalled();
-  });
-
-  it('gives focus back to what opened it once closed', () => {
-    render(<button type="button">Skip job</button>);
-    const trigger = screen.getByRole('button', { name: 'Skip job' });
-    trigger.focus();
-    const { unmount } = render(<ConfirmDialog title="Skip?" confirmLabel="Skip job" onConfirm={() => {}} onCancel={() => {}}>x</ConfirmDialog>);
-    unmount();
-    expect(trigger).toHaveFocus();
   });
 });
 
