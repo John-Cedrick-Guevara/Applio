@@ -291,6 +291,32 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
   let stopRequested = false;
 
   /** One scan: the chosen enabled sources (all of them by default), drafting only when asked. */
+  /**
+   * Scores jobs with Claude (SPEC F3.3), for a scan or one job on request: answers are
+   * checked and saved like the MCP tool's, and every call goes through the quota guard.
+   */
+  const scoreIds = async (jobIds: readonly string[], runId?: number) => {
+    const result = await scoreJobs(jobIds, { ...(runId !== undefined ? { runId } : {}), draftThreshold: settings.getSettings().draftThreshold }, {
+      ai: (request) => ai.run(request),
+      prefix: () => scoringPrefix(profile.getProfile()),
+      cards: (ids) => ids.flatMap((id) => {
+        const job = jobs.get(id);
+        return job ? [jobCard(job)] : [];
+      }),
+      factIds: () => new Set(profile.getProfile().facts.map((f) => f.id)),
+      // The same save as the MCP tool: score, summaries and the found → scored move, together.
+      save: (id, match) => createToolPorts(db, [id], () => new Date()).saveMatch(id, match),
+      score: (id) => jobs.get(id)?.score,
+      note,
+    });
+    // Strong matches from Notify-only sources are never drafted, so this message is all the operator gets.
+    for (const id of result.toDraft) {
+      const job = jobs.get(id);
+      if (job && sourcesRepo.get(job.sourceId)?.autonomy === 'notify') tell(`match:${id}`, newMatch(job));
+    }
+    return result;
+  };
+
   const runDiscovery = ({ sourceIds, draft = false }: ScanOptions) => {
     stopRequested = false;
     const chosen = (id: string) => (sourcesRepo.get(id)?.enabled ?? false) && (!sourceIds || sourceIds.includes(id));
@@ -308,27 +334,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
           for (const { job, dedupKey } of found) jobs.insert(job, { dedupKey, createdAt: summary.at });
           return activity.addRun(summary, details);
         }),
-      score: async (jobIds, runId) => {
-        const result = await scoreJobs(jobIds, { runId, draftThreshold: settings.getSettings().draftThreshold }, {
-          ai: (request) => ai.run(request),
-          prefix: () => scoringPrefix(profile.getProfile()),
-          cards: (ids) => ids.flatMap((id) => {
-            const job = jobs.get(id);
-            return job ? [jobCard(job)] : [];
-          }),
-          factIds: () => new Set(profile.getProfile().facts.map((f) => f.id)),
-          // The same save as the MCP tool: score, summaries and the found → scored move, together.
-          save: (id, match) => createToolPorts(db, [id], () => new Date()).saveMatch(id, match),
-          score: (id) => jobs.get(id)?.score,
-          note,
-        });
-        // Strong matches from Notify-only sources are never drafted, so this message is all the operator gets.
-        for (const id of result.toDraft) {
-          const job = jobs.get(id);
-          if (job && sourcesRepo.get(job.sourceId)?.autonomy === 'notify') tell(`match:${id}`, newMatch(job));
-        }
-        return result;
-      },
+      score: (jobIds, runId) => scoreIds(jobIds, runId),
       draft: (jobIds, runId) => draftJobs(jobIds, { runId }, draftPorts),
       finishRun: (runId, details, drafted) => activity.updateDetails(runId, details, drafted),
       leftover: () => {
@@ -709,6 +715,18 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     },
 
     approveDraft: (jobId) => approveDraft(jobId, applyPorts),
+
+    scoreJob: async (jobId) => {
+      if (getJob(jobId).status !== 'found') throw new Error('Only jobs not scored yet can be scored.');
+      // Checked before the call, so a used-up budget never spends a token (SPEC F10).
+      const stop = ai.budgetStop();
+      if (stop) throw new Error(stop);
+      await scoreIds([jobId]);
+      pushStatus();
+      const job = getJob(jobId);
+      if (job.status !== 'scored') throw new Error(job.history.findLast((e) => e.note)?.note ?? "Couldn't score this job. Try again, or let your next scan score it.");
+      return job;
+    },
 
     draftJob: later((jobId) => {
       if (getJob(jobId).status !== 'scored') throw new Error('Only scored jobs can be drafted. This one is already drafted, sent or dismissed.');

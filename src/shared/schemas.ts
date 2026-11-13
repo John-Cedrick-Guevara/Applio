@@ -104,6 +104,7 @@ export const API_ARGS = {
   updateCoverLetter: z.tuple([id, long]),
   approveDraft: z.tuple([id]),
   draftJob: z.tuple([id]),
+  scoreJob: z.tuple([id]),
   redraft: z.tuple([id]),
   saveDraftFiles: z.tuple([id]),
   skipJob: z.tuple([id]),

@@ -7,6 +7,9 @@ export type MatchTab = 'strong' | 'below' | 'unscored' | 'all';
 /** A typical draft's tokens: an estimate for the operator, not a cap (main's quota guard enforces the stop). */
 export const DRAFT_TOKENS = 30_000;
 
+/** A typical score for one job, also an estimate. */
+export const SCORE_TOKENS = 2_000;
+
 interface Filters {
   bar: number;
   tab: MatchTab;

@@ -300,6 +300,40 @@ describe('createBackend discovery', () => {
     expect(await b.api.listJobs({ statuses: ['scored'] })).toHaveLength(1);
   });
 
+  /** A scan that leaves its job unscored (no AI yet), then an AI that scores whatever it's given. */
+  const unscoredJob = async () => {
+    const b = await searchingBackend();
+    await b.api.runDiscovery();
+    const [job] = await b.api.listJobs({ statuses: ['found'] });
+    const fact = await b.api.saveFact({ group: 'Acme', text: 'Shipped APIs' });
+    const complete = vi.fn(async ({ jobIds }: { jobIds: readonly string[] }) => ({ text: JSON.stringify(jobIds.map((jobId) => ({ jobId, score: 81, roleSummary: 'r', descriptionSummary: 'd', strengths: [{ text: 'APIs', factId: fact.id }], gaps: [] }))), inputTokens: 900, outputTokens: 100 }));
+    b.deps.engines['claude-code'] = { check: async () => ({ ready: true, message: 'ok' }), complete };
+    return { ...b, job: job!, complete };
+  };
+
+  it('scores one job on request, recording its tokens as scoring', async () => {
+    const { api, job, complete } = await unscoredJob();
+    expect(await api.scoreJob(job.id)).toMatchObject({ id: job.id, status: 'scored', score: 81 });
+    expect(complete).toHaveBeenCalledTimes(1);
+    expect((await api.getUsage('today')).tokensByStep.find((st) => st.step === 'score')?.tokens).toBe(1000);
+  });
+
+  it('scores only jobs not scored yet', async () => {
+    const { api, job } = await unscoredJob();
+    await api.scoreJob(job.id);
+    await expect(api.scoreJob(job.id)).rejects.toThrow('Only jobs not scored yet can be scored.');
+  });
+
+  it('refuses to score once the token budget is used, without calling AI', async () => {
+    const { api, job, complete, deps } = await unscoredJob();
+    await api.saveSettings({ dailyTokenBudget: 1_000, monthlyTokenBudget: 1_000 });
+    deps.db.prepare('INSERT INTO usage_records (at, step, tokens, input_tokens, output_tokens, cache_read_tokens, job_id, run_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(new Date().toISOString(), 'draft', 1_200, 1_000, 200, 0, null, null);
+    await expect(api.scoreJob(job.id)).rejects.toThrow(/budget/i);
+    expect(complete).not.toHaveBeenCalled();
+    expect((await api.getJob(job.id)).status).toBe('found');
+  });
+
   it('polls only the sources chosen for this scan', async () => {
     const { api } = await searchingBackend();
     vi.mocked(fakeBoard.fetchJobs).mockClear();

@@ -11,7 +11,7 @@ import { useJobsVersion } from '../../hooks/use-jobs-version';
 import { formatTokens } from '../../lib/format';
 import type { RouteParams } from '../../lib/router';
 import { CHANNEL_LABEL } from '../../lib/labels';
-import { DRAFT_TOKENS, bucketOf, draftEstimate, matchRows, tabCounts, type MatchTab } from './matches-model';
+import { DRAFT_TOKENS, SCORE_TOKENS, bucketOf, draftEstimate, matchRows, tabCounts, type MatchTab } from './matches-model';
 import './matches.css';
 
 /** How long after the last slider move the draft bar is saved. */
@@ -42,7 +42,16 @@ export default function MatchesPage({ params = {} }: { params?: RouteParams }) {
     <div className="matches">
       <PageHeader title="Matches" description="Jobs that passed your filters but have no draft yet. Draft the ones worth it; drafts go to Review when ready." />
       <AsyncView state={state} what="your matches" rows={6}>
-        {(data) => <MatchesView onlyNewAtStart={params.view === 'new'} jobs={data.jobs} settings={data.settings} status={data.status} onSettings={(settings) => state.setData((d) => ({ ...d, settings }))} />}
+        {(data) => (
+          <MatchesView
+            onlyNewAtStart={params.view === 'new'}
+            jobs={data.jobs}
+            settings={data.settings}
+            status={data.status}
+            onSettings={(settings) => state.setData((d) => ({ ...d, settings }))}
+            onJob={(job) => state.setData((d) => ({ ...d, jobs: d.jobs.map((j) => (j.id === job.id ? job : j)) }))}
+          />
+        )}
       </AsyncView>
     </div>
   );
@@ -55,9 +64,11 @@ interface ViewProps {
   settings: Settings;
   status: AppStatus;
   onSettings: (settings: Settings) => void;
+  /** Swaps in a job the page changed (scored on request). */
+  onJob: (job: Job) => void;
 }
 
-function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings }: ViewProps) {
+function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings, onJob }: ViewProps) {
   const api = useApi();
   const action = useAction();
   const [bar, setBar] = useState(settings.draftThreshold);
@@ -120,6 +131,14 @@ function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings }: Vie
     const scored = picked.filter((j) => j.status === 'scored');
     for (const j of scored) await action.run('start the draft', () => api.draftJob(j.id));
   };
+  // Scoring one job is its own small AI call, through main's quota guard.
+  const score = async (picked: Job[]) => {
+    setSelected(new Set());
+    for (const j of picked.filter((p) => p.status === 'found')) {
+      const next = await action.run('score the job', () => api.scoreJob(j.id));
+      if (next) onJob(next);
+    }
+  };
   const clearFilters = () => {
     setQuery('');
     setOnlyNew(false);
@@ -157,6 +176,7 @@ function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings }: Vie
             <span className="matches-selected-actions">
               {estimate.block ? <span id="draft-block" className="field-error">{estimate.block}</span> : null}
               <Button size="sm" onClick={() => skip(chosen)}>Skip {chosen.length}</Button>
+              {estimate.leftOut ? <Button size="sm" busy={action.pending} disabled={!!status.budgetStop} onClick={() => score(chosen)}>Score {estimate.leftOut}</Button> : null}
               <Button size="sm" variant="primary" busy={action.pending} disabled={!!estimate.block || estimate.draftable === 0} aria-describedby={estimate.block ? 'draft-block' : undefined} onClick={() => draft(chosen)}>Draft {estimate.draftable}</Button>
             </span>
           </div>
@@ -180,12 +200,15 @@ function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings }: Vie
                         <span className="cell-sub matches-sub">{j.company} · {j.sourceName} · {CHANNEL_LABEL[j.channel]}</span>
                       </td>
                       <td className="matches-why">
-                        {bucket === 'unscored' ? 'Not scored yet. Your next scan scores it.'
+                        {bucket === 'unscored' ? 'Not scored yet. Score it now, or your next scan will.'
                           : bucket === 'strong' ? `At or above your draft bar (${bar}).`
                           : `Below your draft bar (${bar}).`}
                       </td>
                       <td className="matches-actions">
                         <Button size="sm" variant="link" onClick={() => skip([j])}>Skip</Button>
+                        {bucket === 'unscored' ? (
+                          <Button size="sm" busy={action.pending} disabled={!!status.budgetStop} title={status.budgetStop} onClick={() => score([j])}>Score · ≈ {formatTokens(SCORE_TOKENS)}</Button>
+                        ) : null}
                         {bucket !== 'unscored' ? (
                           <Button size="sm" variant={bucket === 'strong' ? 'primary' : 'secondary'} busy={action.pending} disabled={!!status.budgetStop} title={status.budgetStop} onClick={() => draft([j])}>Draft · ≈ {formatTokens(DRAFT_TOKENS)}</Button>
                         ) : null}
