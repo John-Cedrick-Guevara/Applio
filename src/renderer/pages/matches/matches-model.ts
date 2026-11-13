@@ -2,7 +2,7 @@ import type { AppStatus, Job } from '../../../shared/types';
 import { formatTokens } from '../../lib/format';
 import { isNew } from '../../lib/job-lists';
 
-export type MatchTab = 'strong' | 'below' | 'unscored' | 'all';
+export type MatchTab = 'strong' | 'below' | 'unscored' | 'trash' | 'all';
 
 /** A typical draft's tokens: an estimate for the operator, not a cap (main's quota guard enforces the stop). */
 export const DRAFT_TOKENS = 30_000;
@@ -21,8 +21,9 @@ interface Filters {
   drafting: readonly string[];
 }
 
-/** Which tab a job sits under: at or above the draft bar, below it, or not scored yet. */
+/** Which tab a job sits under: the Trash (skipped), at or above the draft bar, below it, or not scored yet. */
 export function bucketOf(job: Job, bar: number): Exclude<MatchTab, 'all'> {
+  if (job.status === 'skipped') return 'trash';
   if (job.status !== 'scored' || job.score === undefined) return 'unscored';
   return job.score >= bar ? 'strong' : 'below';
 }
@@ -39,7 +40,8 @@ function filtered(jobs: readonly Job[], f: Omit<Filters, 'tab'>): Job[] {
 /** The rows for the current tab, best score first and unscored last. */
 export function matchRows(jobs: readonly Job[], f: Filters): Job[] {
   return filtered(jobs, f)
-    .filter((j) => f.tab === 'all' || bucketOf(j, f.bar) === f.tab)
+    // "All" means every live match; the Trash is its own tab.
+    .filter((j) => (f.tab === 'all' ? bucketOf(j, f.bar) !== 'trash' : bucketOf(j, f.bar) === f.tab))
     .sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
 }
 
@@ -47,7 +49,8 @@ export function matchRows(jobs: readonly Job[], f: Filters): Job[] {
 export function tabCounts(jobs: readonly Job[], f: Filters): Record<MatchTab, number> {
   const rows = filtered(jobs, f);
   const count = (tab: Exclude<MatchTab, 'all'>) => rows.filter((j) => bucketOf(j, f.bar) === tab).length;
-  return { strong: count('strong'), below: count('below'), unscored: count('unscored'), all: rows.length };
+  const trash = count('trash');
+  return { strong: count('strong'), below: count('below'), unscored: count('unscored'), trash, all: rows.length - trash };
 }
 
 /**

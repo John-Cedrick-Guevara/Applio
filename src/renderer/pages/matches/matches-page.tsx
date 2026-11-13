@@ -22,6 +22,7 @@ const TABS: { id: MatchTab; label: string }[] = [
   { id: 'strong', label: 'At or above bar' },
   { id: 'below', label: 'Below bar' },
   { id: 'unscored', label: 'Not scored' },
+  { id: 'trash', label: 'Trash' },
 ];
 
 /**
@@ -32,7 +33,7 @@ export default function MatchesPage({ params = {} }: { params?: RouteParams }) {
   const api = useApi();
   const jobsChanges = useJobsVersion();
   const state = useAsync(async () => {
-    const [scoredOrFound, settings, status, questions] = await Promise.all([api.listJobs({ statuses: ['scored', 'found'] }), api.getSettings(), api.getStatus(), api.listQuestions()]);
+    const [scoredOrFound, settings, status, questions] = await Promise.all([api.listJobs({ statuses: ['scored', 'found', 'skipped'] }), api.getSettings(), api.getStatus(), api.listQuestions()]);
     // Jobs Claude asked about wait in the Inbox's Answer tab, so they aren't listed twice.
     const asking = new Set(questions.map((q) => q.jobId));
     return { jobs: scoredOrFound.filter((j) => !asking.has(j.id)), settings, status };
@@ -87,7 +88,9 @@ function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings, onJob
   const skips = useHeldAction(async (ids) => {
     for (const id of ids) {
       const done = await action.run('skip the job', () => api.skipJob(id));
-      if (!done) unhide([id]);
+      // A saved skip lands in the Trash; a failed one brings the row back. Either way the hold is over.
+      if (done) onJob(done);
+      unhide([id]);
     }
   });
 
@@ -135,6 +138,15 @@ function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings, onJob
     const scored = picked.filter((j) => j.status === 'scored');
     for (const j of scored) await action.run('start the draft', () => api.draftJob(j.id));
   };
+  // Restoring takes jobs out of the Trash, back to the status they had before the skip.
+  const restore = async (picked: Job[]) => {
+    setSelected(new Set());
+    for (const j of picked.filter((p) => p.status === 'skipped')) {
+      const next = await action.run('restore the job', () => api.restoreJob(j.id), `Restored ${j.title} at ${j.company}.`);
+      if (next) onJob(next);
+    }
+  };
+
   // Scoring one job is its own small AI call, through main's quota guard.
   const score = async (picked: Job[]) => {
     setSelected(new Set());
@@ -172,7 +184,14 @@ function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings, onJob
           <label className="matches-new"><input type="checkbox" checked={onlyNew} onChange={(e) => setOnlyNew(e.target.checked)} />New since last scan</label>
         </div>
 
-        {chosen.length ? (
+        {chosen.length && tab === 'trash' ? (
+          <div className="matches-selected" role="region" aria-label="Selected">
+            <strong>{chosen.length} selected</strong>
+            <span className="matches-selected-actions">
+              <Button size="sm" variant="primary" busy={action.pending} onClick={() => restore(chosen)}>Restore {chosen.length}</Button>
+            </span>
+          </div>
+        ) : chosen.length ? (
           <div className="matches-selected" role="region" aria-label="Selected">
             <strong>{chosen.length} selected</strong>
             <span>≈ {formatTokens(estimate.cost)} tokens · {formatTokens(estimate.left)} left today</span>
@@ -204,16 +223,17 @@ function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings, onJob
                         <span className="cell-sub matches-sub">{j.company} · {j.sourceName} · {CHANNEL_LABEL[j.channel]}</span>
                       </td>
                       <td className="matches-why">
-                        {bucket === 'unscored' ? 'Not scored yet. Score it now, or your next scan will.'
+                        {bucket === 'trash' ? 'In the Trash. Restore it to see it in Matches or the Inbox again.'
+                          : bucket === 'unscored' ? 'Not scored yet. Score it now, or your next scan will.'
                           : bucket === 'strong' ? `At or above your draft bar (${bar}).`
                           : `Below your draft bar (${bar}).`}
                       </td>
                       <td className="matches-actions">
-                        <Button size="sm" variant="link" onClick={() => skip([j])}>Skip</Button>
+                        {bucket === 'trash' ? <Button size="sm" busy={action.pending} onClick={() => restore([j])}>Restore</Button> : <Button size="sm" variant="link" onClick={() => skip([j])}>Skip</Button>}
                         {bucket === 'unscored' ? (
                           <Button size="sm" busy={action.pending} disabled={!!status.budgetStop} title={status.budgetStop} onClick={() => score([j])}>Score · ≈ {formatTokens(SCORE_TOKENS)}</Button>
                         ) : null}
-                        {bucket !== 'unscored' ? (
+                        {bucket !== 'unscored' && bucket !== 'trash' ? (
                           <Button size="sm" variant={bucket === 'strong' ? 'primary' : 'secondary'} busy={action.pending} disabled={!!status.budgetStop} title={status.budgetStop} onClick={() => draft([j])}>Draft · ≈ {formatTokens(DRAFT_TOKENS)}</Button>
                         ) : null}
                       </td>
@@ -222,6 +242,11 @@ function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings, onJob
                 })}
               </tbody>
             </table>
+          </div>
+        ) : tab === 'trash' && !query && !onlyNew ? (
+          <div className="matches-empty">
+            <h2>The Trash is empty</h2>
+            <p className="muted">Jobs you skip or clean up wait here until you restore them.</p>
           </div>
         ) : jobs.length ? (
           <div className="matches-empty">

@@ -332,6 +332,35 @@ describe('createBackend discovery', () => {
     expect(complete).toHaveBeenCalledTimes(1);
   });
 
+  it('restores a skipped job to where it was before the skip, noting it', async () => {
+    const { api, job } = await unscoredJob();
+    await api.skipJob(job.id);
+    expect((await api.getJob(job.id)).status).toBe('skipped');
+    const restored = await api.restoreJob(job.id);
+    expect(restored.status).toBe('found');
+    expect(restored.history.at(-1)).toMatchObject({ status: 'found', note: 'Restored from the Trash' });
+  });
+
+  it('tells open pages a job was restored, so the badges update at once', async () => {
+    const { api, job, deps } = await unscoredJob();
+    await api.skipJob(job.id);
+    deps.onStatus.mockClear();
+    await api.restoreJob(job.id);
+    expect(deps.onStatus).toHaveBeenCalled();
+  });
+
+  it('restores a scored job as scored, keeping its score', async () => {
+    const { api, job } = await unscoredJob();
+    await api.scoreJob(job.id);
+    await api.skipJob(job.id);
+    expect(await api.restoreJob(job.id)).toMatchObject({ status: 'scored', score: 81 });
+  });
+
+  it('restores only jobs in the Trash', async () => {
+    const { api, job } = await unscoredJob();
+    await expect(api.restoreJob(job.id)).rejects.toThrow('Only jobs in the Trash can be restored.');
+  });
+
   it('lets a job whose scoring failed be scored again', async () => {
     const { api, job, deps } = await unscoredJob();
     const working = deps.engines['claude-code'].complete;

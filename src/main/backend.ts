@@ -46,7 +46,7 @@ import type { SecretStore } from '../infra/secrets/secret-store';
 import type { ApplioApi } from '../shared/api';
 import type { ConnectionCheck, Draft, AiEngine as EngineKind, AppStatus, InterviewPrep, Job, QuestionAnswer, ScanOptions, Settings } from '../shared/types';
 import { AUTONOMY_LEVELS } from '../shared/autonomy';
-import { nextStatuses } from '../shared/status';
+import { nextStatuses, statusBeforeTrash } from '../shared/status';
 import { matchesFilter } from '../shared/job-filter';
 import { documentNames, letterBody, pageHtml, resumeBody } from '../shared/templates/application-documents';
 import { pdfPageCount } from '../infra/pdf/page-count';
@@ -812,6 +812,15 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     }),
 
     skipJob: later(skipJob),
+
+    restoreJob: later((jobId) => {
+      const job = getJob(jobId);
+      if (job.status !== 'skipped') throw new Error('Only jobs in the Trash can be restored.');
+      const restored = jobs.transition(jobId, { status: statusBeforeTrash(job.history), at: new Date().toISOString(), note: 'Restored from the Trash' });
+      // Open pages (the Inbox badge, Matches) reload on a status push, so they show the job again at once.
+      pushStatus();
+      return restored;
+    }),
 
     telegramPoll: async () => {
       const t = telegram();

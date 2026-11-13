@@ -15,3 +15,6 @@ export function isNew(job: Pick<Job, 'history'>, lastRunAt?: string): boolean {
 export function newCount(jobs: readonly Pick<Job, 'history'>[], lastRunAt?: string): number {
   return jobs.filter((j) => isNew(j, lastRunAt)).length;
 }
+
+/** Statuses the Trash lists: jobs the operator skipped (or cleaned up), kept so they can be restored and still count as known. */
+export const TRASH_STATUSES = ['skipped'] as const satisfies readonly JobStatus[];

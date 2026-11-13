@@ -1,7 +1,7 @@
 import type { ApplioApi } from '../api';
 import { matchesFilter } from '../job-filter';
 import { capAutonomy } from '../autonomy';
-import { nextStatuses } from '../status';
+import { nextStatuses, statusBeforeTrash } from '../status';
 import type { AppStatus, Job, JobStatus, OpenQuestions, SecretKey, SendRecord } from '../types';
 import {
   seedLastRun,
@@ -172,6 +172,13 @@ export function createMockApi({ latencyMs = 250, now = () => new Date(), sendFai
       }),
 
     skipJob: (jobId) => run(() => transition(findJob(jobId), 'skipped')),
+
+    restoreJob: (jobId) =>
+      run(() => {
+        const job = findJob(jobId);
+        if (job.status !== 'skipped') throw new Error('Only jobs in the Trash can be restored.');
+        return transition(job, statusBeforeTrash(job.history), 'Restored from the Trash');
+      }),
 
     redraft: (jobId) =>
       run(() => {

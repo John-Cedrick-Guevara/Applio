@@ -161,6 +161,13 @@ function PreviewCard({ preview, draftThreshold, added, onAdded, onEdit, onDiscar
   const api = useApi();
   const action = useAction();
   const above = preview.score >= draftThreshold;
+  const [restored, setRestored] = useState<Job | null>(null);
+
+  /** Takes the duplicate out of the Trash, so it shows up again where it left off. */
+  const restore = async () => {
+    const job = await action.run('restore the job', () => api.restoreJob(preview.duplicate!.jobId));
+    if (job) setRestored(job);
+  };
 
   const add = async () => {
     const job = await action.run('add the job', () => api.addJob(preview));
@@ -189,6 +196,24 @@ function PreviewCard({ preview, draftThreshold, added, onAdded, onEdit, onDiscar
       </dl>
       {added ? (
         <DraftProgress job={added} onDone={onDraftDone} onAnother={onDiscard} />
+      ) : preview.duplicate?.status === 'skipped' ? (
+        restored ? (
+          <div className="banner banner-success preview-done" role="status">
+            <span>Restored. {restored.title} at {restored.company} is back in Applio.</span>
+            <span className="row">
+              <Button size="sm" onClick={onDiscard}>Add another job</Button>
+              <a className={buttonClass('primary', 'sm')} href={existingHref({ jobId: restored.id, status: restored.status })}>Open it</a>
+            </span>
+          </div>
+        ) : (
+          <div className="banner banner-warning preview-done" role="status">
+            <span>You moved this job to the Trash. Restore it to see it in Applio again.</span>
+            <span className="row">
+              <Button size="sm" onClick={onDiscard}>Discard</Button>
+              <Button size="sm" variant="primary" busy={action.pending} onClick={restore}>Restore</Button>
+            </span>
+          </div>
+        )
       ) : preview.duplicate ? (
         <div className="banner banner-warning preview-done" role="status">
           <span>You already have this job in Applio ({STATUS_LABEL[preview.duplicate.status]}). Adding it again would make a second application.</span>

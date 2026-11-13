@@ -100,6 +100,26 @@ describe('AddJobPage', () => {
     expect(screen.getByRole('button', { name: 'Check the match' })).toBeDisabled();
   });
 
+  it('offers Restore for a duplicate that is in the Trash, and says where it went', async () => {
+    const { api } = renderWithApp(<AddJobPage />);
+    await userEvent.click(screen.getByRole('button', { name: 'Use an example' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Check the match' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Add and draft' }));
+    const added = (await api.listJobs()).find((j) => j.company === 'Brightline Studio')!;
+    await userEvent.click(await screen.findByRole('button', { name: 'Add another job' }));
+    await api.skipJob(added.id);
+    await userEvent.click(screen.getByRole('button', { name: 'Use an example' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Check the match' }));
+    const result = await screen.findByRole('region', { name: 'Parsed job' });
+    expect(within(result).getByRole('status')).toHaveTextContent('You moved this job to the Trash. Restore it to see it in Applio again.');
+    expect(within(result).queryByRole('link', { name: 'Open existing' })).not.toBeInTheDocument();
+    expect(within(result).queryByText(/second application/)).not.toBeInTheDocument();
+    await userEvent.click(within(result).getByRole('button', { name: 'Restore' }));
+    expect(await within(result).findByText(/Restored\./)).toBeInTheDocument();
+    expect((await api.getJob(added.id)).status).toBe('drafted');
+    expect(within(result).getByRole('link', { name: 'Open it' })).toHaveAttribute('href', `#/inbox/${added.id}`);
+  });
+
   it("states the paste's cost against today's budget", async () => {
     renderWithApp(<AddJobPage />);
     expect(await screen.findByText('Reading and scoring: ≈ 8k tokens · 12% of the 68k left today')).toBeInTheDocument();

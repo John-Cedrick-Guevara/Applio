@@ -59,6 +59,8 @@ export interface ApplioApi {
   /** Prints a draft's résumé and letter again (no AI, no tokens), after a failed save. @throws when the job has no draft or printing fails. */
   saveDraftFiles(jobId: string): Promise<Job>;
   skipJob(jobId: string): Promise<Job>;
+  /** Takes a skipped job out of the Trash, back to the status it had before the skip. @throws When the job isn't in the Trash. */
+  restoreJob(jobId: string): Promise<Job>;
   /** Logs an application the operator submitted themselves (manual handoff). */
   markApplied(jobId: string): Promise<Job>;
   setStatus(jobId: string, status: JobStatus, note?: string): Promise<Job>;
@@ -139,7 +141,7 @@ export interface ApplioApi {
  * names over IPC, so this list is the renderer's entire reach into main.
  */
 export const API_METHODS = [
-  'listJobs', 'getJob', 'getDraft', 'getSend', 'updateCoverLetter', 'approveDraft', 'draftJob', 'scoreJob', 'redraft', 'saveDraftFiles', 'skipJob', 'markApplied', 'setStatus',
+  'listJobs', 'getJob', 'getDraft', 'getSend', 'updateCoverLetter', 'approveDraft', 'draftJob', 'scoreJob', 'redraft', 'saveDraftFiles', 'skipJob', 'restoreJob', 'markApplied', 'setStatus',
   'sendFollowUp', 'getInterviewPrep',
   'getStatus', 'runDiscovery', 'stopScan', 'setAutomationPaused',
   'openExternal', 'openJobFolder', 'openDraftFile', 'assistFill', 'chooseFolder', 'openOutputFolder',
