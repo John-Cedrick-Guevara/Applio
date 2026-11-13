@@ -23,6 +23,8 @@ interface DraftCardInput {
   sendError?: string;
   /** Why an email can't send right now, from `gmailIssue`. */
   gmailIssue?: { message: string };
+  /** Whether main is working on this job now (its PDFs printing); false means a missing folder is a stalled save. Default true. */
+  saving?: boolean;
 }
 
 /**
@@ -33,10 +35,10 @@ interface DraftCardInput {
  * with the channel (Gmail not ready), then PDFs saving, then ready. After a
  * decision the send log decides (`sendState`), so Sent needs a sent record.
  */
-export function draftCard({ job, draft, send, sendError, gmailIssue }: DraftCardInput): { card: CardState<DraftCardKind>; notes: string[] } {
+export function draftCard({ job, draft, send, sendError, gmailIssue, saving = true }: DraftCardInput): { card: CardState<DraftCardKind>; notes: string[] } {
   if (job.status !== 'drafted') return { card: decidedCard(job, send), notes: [] };
 
-  const files = filesState(job);
+  const files = filesState(job, saving);
   const placeholders = draft?.check?.placeholders ?? [];
   const candidates: (CardState<DraftCardKind> | false)[] = [
     !!sendError && { kind: 'send-error', tone: 'failed', title: 'Not sent.', body: `${sendError} Nothing went out, and the draft is still here.` },

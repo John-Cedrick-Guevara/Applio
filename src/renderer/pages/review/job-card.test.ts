@@ -52,6 +52,16 @@ describe('draftCard', () => {
     expect(card.body).toContain('printing took longer than 60 s');
   });
 
+  it('shows a stalled save as failed PDFs with a retry, when nothing is saving the job', () => {
+    const { card } = draftCard({ job: job({ folderPath: undefined }), draft: draft(), send: null, saving: false });
+    expect(card).toMatchObject({ kind: 'files-failed', tone: 'failed' });
+    expect(card.body).toContain('Applio stopped before the PDFs were printed');
+  });
+
+  it('still shows the PDFs saving while main is working on the job', () => {
+    expect(kind({ job: job({ folderPath: undefined }), draft: draft(), send: null, saving: true })).toBe('saving');
+  });
+
   it('picks a suspicious post over failed PDFs', () => {
     expect(kind({ job: job({ suspicious: 'It addresses AI tools.', folderPath: undefined, history: [failedSave] }), draft: draft(), send: null })).toBe('suspicious');
   });

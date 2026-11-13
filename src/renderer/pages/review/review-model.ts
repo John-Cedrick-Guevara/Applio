@@ -133,7 +133,7 @@ export type StepState = 'done' | 'current' | 'blocked' | 'failed' | 'todo';
  */
 export function jobSteps(
   job: Job,
-  { drafting = false, send = null }: { drafting?: boolean; send?: SendRecord | null } = {},
+  { drafting = false, send = null, saving = true }: { drafting?: boolean; send?: SendRecord | null; saving?: boolean } = {},
 ): { label: string; state: StepState }[] {
   const at = (index: number, state: StepState) => LIFECYCLE.map((label, i) => ({ label, state: i < index ? 'done' : i === index ? state : 'todo' } as const));
   switch (job.status) {
@@ -142,7 +142,7 @@ export function jobSteps(
     case 'scored':
       return at(2, drafting ? 'current' : 'blocked');
     case 'drafted': {
-      const files = filesState(job);
+      const files = filesState(job, saving);
       return files.kind === 'ready' ? at(3, 'blocked') : at(2, files.kind === 'failed' ? 'failed' : 'current');
     }
     case 'approved': {

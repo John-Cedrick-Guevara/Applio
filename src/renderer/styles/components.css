@@ -261,7 +261,7 @@ a.btn-secondary:hover { color: var(--text); }
 .banner-danger { background: var(--danger-soft); color: var(--danger-text); }
 .banner-danger a, .banner-warning a { color: inherit; font-weight: 500; }
 /* A button in a banner keeps its own colours: the link rule above is more specific than .btn-primary. */
-.banner-warning .btn-primary, .banner-danger .btn-primary { color: var(--on-accent); }
+.banner-warning .btn-primary, .banner-danger .btn-primary, .banner-success .btn-primary { color: var(--on-accent); }
 
 /* Forms */
 .field {

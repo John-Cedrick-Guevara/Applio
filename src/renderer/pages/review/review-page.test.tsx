@@ -153,13 +153,28 @@ describe('ReviewPage', () => {
 
   it('waits to approve until the PDFs are saved, and says so', async () => {
     const api = await withGmail();
-    const saving = { ...api, getJob: async (id: string) => ({ ...(await api.getJob(id)), folderPath: undefined }) };
+    // Main reports it is working on the job (its PDFs are printing), so this is saving, not stalled.
+    const saving = { ...api, getStatus: async () => ({ ...(await api.getStatus()), drafting: ['j1'] }), getJob: async (id: string) => ({ ...(await api.getJob(id)), folderPath: undefined }) };
     renderWithApp(<ReviewPage params={{ id: 'j1' }} />, saving);
     const detail = await screen.findByRole('region', { name: 'Draft detail' });
     expect(await within(detail).findByText(/Saving the résumé and letter PDFs/)).toBeInTheDocument();
     expect(within(detail).getByRole('button', { name: 'Approve & send email' })).toBeDisabled();
     expect(within(detail).getByText('Approve turns on once the PDFs are saved.')).toBeInTheDocument();
     expect(within(within(detail).getByRole('list', { name: 'Progress' })).getByRole('listitem', { name: 'Drafted: in progress' })).toHaveAttribute('aria-current', 'step');
+  });
+
+  it('does not spin forever on a draft whose save stopped: it offers Save PDFs again', async () => {
+    const api = await withGmail();
+    let saved = false;
+    // The draft was marked drafted, then Applio closed before printing: no folder, no failure note, nothing running.
+    const stalled = { ...api, getJob: async (id: string) => ({ ...(await api.getJob(id)), ...(saved ? {} : { folderPath: undefined }) }), saveDraftFiles: async (id: string) => { saved = true; return api.saveDraftFiles(id); } };
+    renderWithApp(<ReviewPage params={{ id: 'j1' }} />, stalled);
+    const detail = await screen.findByRole('region', { name: 'Draft detail' });
+    const alert = await within(detail).findByRole('alert');
+    expect(alert).toHaveTextContent(/PDFs didn't save.*Applio stopped before the PDFs were printed/);
+    expect(within(detail).queryByText(/Saving the résumé and letter PDFs/)).not.toBeInTheDocument();
+    await userEvent.click(within(alert).getByRole('button', { name: 'Retry saving PDFs' }));
+    await waitFor(() => expect(within(detail).getByRole('button', { name: 'Approve & send email' })).toBeEnabled());
   });
 
   it('retries saving the PDFs without drafting again, after a failed save', async () => {
@@ -189,7 +204,8 @@ describe('ReviewPage', () => {
     const listeners = new Set<(s: AppStatus) => void>();
     window.applioEvents = { onStatus: (l) => (listeners.add(l), () => listeners.delete(l)) };
     const push = async (jobsVersion: number) => {
-      const status = { ...(await api.getStatus()), jobsVersion };
+      // While the PDFs print, main lists the job as drafting; once saved it doesn't.
+      const status = { ...(await api.getStatus()), jobsVersion, drafting: saved ? [] : ['j1'] };
       act(() => listeners.forEach((l) => l(status)));
     };
     renderWithApp(<ReviewPage params={{ id: 'j1' }} />, later);

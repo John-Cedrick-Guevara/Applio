@@ -178,6 +178,7 @@ function ReviewLayout({ data, selectedId, onJobChange, onRunComplete }: LayoutPr
           <DraftPanel
             key={currentId}
             jobId={currentId}
+            saving={isDrafting(currentId)}
             onSkip={skip}
             onDecided={decided}
             thresholds={data.thresholds}

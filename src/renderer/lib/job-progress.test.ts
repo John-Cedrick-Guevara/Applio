@@ -25,5 +25,17 @@ describe('filesState', () => {
   it('is ready once the folder exists', () => {
     expect(filesState({ folderPath: '/out/acme', history: [] })).toEqual({ kind: 'ready' });
   });
+  it('is saving only while main is working on the job', () => {
+    expect(filesState({ history: [] }, true)).toEqual({ kind: 'saving' });
+  });
+  it('says the save stopped when nothing is saving it, instead of spinning forever', () => {
+    // Applio can quit between Claude's draft and the PDFs printing; nothing records a failure then.
+    expect(filesState({ history: [] }, false)).toEqual({ kind: 'failed', reason: 'Applio stopped before the PDFs were printed' });
+  });
+  it('keeps a recorded failure over the stopped message, and never doubts a finished save', () => {
+    const note = "Couldn't save the files: printing failed";
+    expect(filesState({ history: [{ status: 'drafted' as const, at: '', note }] }, false)).toEqual({ kind: 'failed', reason: note });
+    expect(filesState({ folderPath: '/out/acme', history: [] }, false)).toEqual({ kind: 'ready' });
+  });
 });
 
