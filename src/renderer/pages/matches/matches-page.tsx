@@ -26,24 +26,28 @@ const TABS: { id: MatchTab; label: string }[] = [
 
 /**
  * Matches (redesign v2): every job with no draft yet, so sorting them happens in
- * one list with the draft bar beside it. Drafts started here go to Review.
+ * one list with the draft bar beside it. Drafts started here go to the Inbox.
  */
 export default function MatchesPage({ params = {} }: { params?: RouteParams }) {
   const api = useApi();
   const jobsChanges = useJobsVersion();
   const state = useAsync(async () => {
-    const [jobs, settings, status] = await Promise.all([api.listJobs({ statuses: ['scored', 'found'] }), api.getSettings(), api.getStatus()]);
-    return { jobs, settings, status };
+    const [scoredOrFound, settings, status, questions] = await Promise.all([api.listJobs({ statuses: ['scored', 'found'] }), api.getSettings(), api.getStatus(), api.listQuestions()]);
+    // Jobs Claude asked about wait in the Inbox's Answer tab, so they aren't listed twice.
+    const asking = new Set(questions.map((q) => q.jobId));
+    return { jobs: scoredOrFound.filter((j) => !asking.has(j.id)), settings, status };
   }, [api, jobsChanges]);
   const setStatus = (status: AppStatus) => state.setData((d) => ({ ...d, status }));
   useEffect(() => window.applioEvents?.onStatus(setStatus), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="matches">
-      <PageHeader title="Matches" description="Jobs that passed your filters but have no draft yet. Draft the ones worth it; drafts go to Review when ready." />
+      <PageHeader title="Matches" description="Jobs that passed your filters but have no draft yet. Draft the ones worth it; drafts go to the Inbox when ready." />
       <AsyncView state={state} what="your matches" rows={6}>
         {(data) => (
           <MatchesView
+            // Keyed by the link, so /matches/new and /matches each start from their own filters even though the page stays mounted.
+            key={params.view ?? 'all'}
             onlyNewAtStart={params.view === 'new'}
             jobs={data.jobs}
             settings={data.settings}

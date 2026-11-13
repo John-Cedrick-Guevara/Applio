@@ -2,6 +2,8 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { createMockApi } from '../../../shared/mock/mock-api';
+import { ApiProvider } from '../../api/api-context';
+import { ToastProvider } from '../../components/toast';
 import { renderWithApp } from '../../../test/render';
 import MatchesPage from './matches-page';
 
@@ -21,6 +23,11 @@ async function setup(over: Partial<ReturnType<typeof createMockApi>> = {}) {
 const row = (list: HTMLElement, title: string) => within(list).getByText(title).closest('tr')!;
 
 describe('MatchesPage', () => {
+  it('says drafts go to the Inbox, now that Review is the Inbox', async () => {
+    await setup();
+    expect(screen.getByText(/drafts go to the Inbox when ready/)).toBeInTheDocument();
+  });
+
   it('lists matches with no draft, best score first, unscored last', async () => {
     const { list } = await setup();
     const titles = within(list).getAllByRole('row').slice(1).map((r) => r.textContent);
@@ -137,6 +144,15 @@ describe('MatchesPage', () => {
     expect(await screen.findByText(/Couldn't skip the job/)).toBeInTheDocument();
   });
 
+  it('leaves out jobs Claude has open questions for: they belong to the Inbox', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const asking = { ...api, listQuestions: async () => [{ jobId: 'j5', questions: ['Can you start in two weeks?'], askedAt: '2026-11-07T08:00:00.000Z' }] };
+    renderWithApp(<MatchesPage />, asking);
+    const list = await screen.findByRole('region', { name: 'Match list' });
+    await within(list).findByText(FERNWOOD);
+    expect(within(list).queryByText(ORBITAL)).not.toBeInTheDocument();
+  });
+
   it('clears filters from an empty search', async () => {
     const { list } = await setup();
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search matches' }), 'zzz');
@@ -149,6 +165,14 @@ describe('MatchesPage', () => {
     const api = createMockApi({ latencyMs: 0 });
     renderWithApp(<MatchesPage params={{ view: 'new' }} />, api);
     expect(await screen.findByRole('checkbox', { name: 'New since last scan' })).toBeChecked();
+  });
+
+  it('follows the link: /matches/new filters to new, then plain /matches shows everything again', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const view = renderWithApp(<MatchesPage params={{ view: 'new' }} />, api);
+    expect(await screen.findByRole('checkbox', { name: 'New since last scan' })).toBeChecked();
+    view.rerender(<ApiProvider api={api}><ToastProvider><MatchesPage params={{}} /></ToastProvider></ApiProvider>);
+    expect(await screen.findByRole('checkbox', { name: 'New since last scan' })).not.toBeChecked();
   });
 
   it('says no matches yet, pointing to Get jobs', async () => {
