@@ -24,7 +24,7 @@ One bar across the top of every page says what Applio is doing (a scan, drafts),
 - AC-2: `activity-model.test.ts` › "names the scan phase with elapsed time", "shows drafts when no scan runs", "shows the last scan when idle", "says no scans yet"; `activity-bar.test.tsx` › "stops a scan from the bar".
 - AC-3: `activity-model.test.ts` › "says auto-send is paused", "says auto-send is off when no source is autonomous", "says auto-send is on with the score"; `activity-bar.test.tsx` › "pauses and resumes auto-send from the bar"; `review-page.test.tsx` › "offers Find jobs to start a scan".
 - AC-4: `activity-model.test.ts` › "turns the budget amber from 80%", "turns the budget red at the hard stop"; `activity-bar.test.tsx` › "offers Raise budget at the hard stop".
-- AC-5: `activity-model.test.ts` › "says the engine needs setup".
+- AC-5: `activity-model.test.ts` › "says the engine needs setup"; `activity-bar.test.tsx` › "points to Settings when the engine needs setup".
 - AC-6: `activity-bar.test.tsx` › "opens to list what is running with links".
 - AC-7: `app.test.tsx` › "shows the activity bar and no engine card".
 - MNB-1: `activity-bar.test.tsx` › "pauses and resumes auto-send from the bar" (copy says scans and drafts still work).
