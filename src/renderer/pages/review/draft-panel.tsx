@@ -114,7 +114,7 @@ function DraftDetail({ job, draft, send, nextId, thresholds, owner, autonomyBySo
     const next = await action.run('skip the job', () => api.skipJob(job.id), `Skipped ${job.title} at ${job.company}`);
     if (!next) return;
     onJob(next, send);
-    if (nextId) navigate(`/review/${nextId}`);
+    if (nextId) navigate(`/inbox/${nextId}`);
   };
 
   // Reprints only: the draft is already saved, so this costs no tokens.

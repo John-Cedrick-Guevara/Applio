@@ -171,7 +171,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
         skipJob(jobId);
         return 'Skipped.';
       },
-      open: (jobId) => showRoute(`/review/${jobId}`),
+      open: (jobId) => showRoute(`/inbox/${jobId}`),
     });
     return { api, chatId, bot };
   };

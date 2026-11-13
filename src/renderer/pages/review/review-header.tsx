@@ -8,7 +8,7 @@ export function ReviewHeader({ status }: { status: AppStatus }) {
   return (
     <header className="page-header">
       <div>
-        <h1>Review</h1>
+        <h1>Inbox</h1>
         <p role="status">{runLine(status.lastRun)}</p>
       </div>
       <div className="page-actions">

@@ -11,8 +11,8 @@ import { DraftingPanel } from './drafting-panel';
 import { JobPanel } from './job-panel';
 import { QuestionsPanel } from './questions-panel';
 import { ReviewHeader } from './review-header';
-import { ReviewQueue } from './review-queue';
-import { gmailIssue } from './review-model';
+import { InboxQueue } from './inbox-queue';
+import { gmailIssue, inboxTabs, type InboxSort } from './review-model';
 import './review.css';
 
 /** Everything Review needs, loaded together so the split view renders in one pass. Covers every status in `REVIEW_STATUSES`. */
@@ -31,18 +31,13 @@ async function loadReview(api: ReturnType<typeof useApi>) {
   ]);
   const questions = new Map(openQuestions.map((q) => [q.jobId, q.questions]));
   return {
-    queue: [...approved, ...drafted].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
-    // Strong matches with no draft: scans draft only when asked, and a failed draft lands here too.
-    toDraft: scored.filter((j) => (j.score ?? 0) >= settings.draftThreshold && !questions.has(j.id)),
-    // Not scored yet: the next scan scores them.
-    waiting: found,
+    queue: [...approved, ...drafted],
     // Claude asked before drafting these; they wait for the operator (SPEC F4).
     asking: scored.filter((j) => questions.has(j.id)),
     questions,
     sections: profile.factGroups.map((g) => g.name),
-    // Jobs without a draft yet, any of which Claude may be drafting in the background.
+    // Jobs without a draft yet: Claude may be drafting any of them, and Matches links to them here.
     undrafted: [...scored, ...found],
-    below: scored.filter((j) => (j.score ?? 0) < settings.draftThreshold && !questions.has(j.id)).sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
     thresholds: { draft: settings.draftThreshold, auto: settings.autoSendThreshold },
     gmailIssue: gmailIssue(settings),
     owner: { name: settings.fullName, email: settings.gmailAddress, contact: profile.contact, groups: profile.factGroups },
@@ -52,9 +47,9 @@ async function loadReview(api: ReturnType<typeof useApi>) {
 }
 
 /**
- * Review (prototype screen 1): drafts waiting on the operator, best match
- * first, with the selected draft beside the queue. The selection lives in the
- * URL (`#/review/:id`) so back/forward and deep links work.
+ * Inbox (redesign v2): only jobs waiting on a decision, one tab at a time, with the
+ * selected job beside the list. Undrafted jobs live in Matches but still open here.
+ * The selection lives in the URL (`#/inbox/:id`) so back/forward and deep links work.
  */
 export default function ReviewPage({ params }: { params: RouteParams }) {
   const api = useApi();
@@ -95,26 +90,21 @@ function ReviewLayout({ data, selectedId, onJobChange, onRunComplete }: LayoutPr
   }), []);
   const drafting = data.undrafted.filter((j) => draftingIds.includes(j.id));
   const isDrafting = (id: string) => draftingIds.includes(id);
-  const currentId = selectedId ?? data.queue[0]?.id;
+  const [sort, setSort] = useState<InboxSort>('score');
+  const tabs = inboxTabs(data.queue, data.asking.filter((j) => !isDrafting(j.id)), sort);
+  // In tab order, so "next" after a decision is the next job in the same tab, then the next tab.
+  const ordered = tabs.flatMap((t) => t.jobs);
+  const currentId = selectedId ?? ordered[0]?.id;
   const nextId = useMemo(() => {
-    const i = data.queue.findIndex((j) => j.id === currentId);
-    return data.queue.slice(i + 1).find((j) => j.status === 'drafted')?.id;
-  }, [data.queue, currentId]);
+    const i = ordered.findIndex((j) => j.id === currentId);
+    return ordered.slice(i + 1).find((j) => j.status === 'drafted')?.id;
+  }, [ordered, currentId]);
 
   return (
     <>
       <ReviewHeader status={data.status} />
       <div className="split">
-        <ReviewQueue
-          jobs={data.queue}
-          currentId={currentId}
-          below={data.below.filter((j) => !isDrafting(j.id))}
-          waiting={data.waiting.filter((j) => !isDrafting(j.id))}
-          asking={data.asking.filter((j) => !isDrafting(j.id))}
-          drafting={drafting}
-          toDraft={data.toDraft.filter((j) => !isDrafting(j.id))}
-          draftThreshold={data.thresholds.draft}
-        />
+        <InboxQueue tabs={tabs} drafting={drafting} {...(currentId ? { currentId } : {})} sort={sort} onSort={setSort} />
         {currentId && isDrafting(currentId) && !data.queue.some((j) => j.id === currentId) ? (
           <DraftingPanel job={drafting.find((j) => j.id === currentId)} since={draftingSince[currentId]} />
         ) : currentId && data.questions.has(currentId) ? (
@@ -146,9 +136,12 @@ function ReviewLayout({ data, selectedId, onJobChange, onRunComplete }: LayoutPr
           />
         ) : (
           <section className="card review-empty" aria-label="Draft detail">
-            <h2>Nothing waiting on you</h2>
-            <p className="muted">New drafts land here after each run. Add a job yourself any time.</p>
-            <a className={buttonClass('strong')} href="#/add-job">Add a job</a>
+            <h2>Nothing needs a decision</h2>
+            <p className="muted">Drafts land here when they're ready. Draft a match, or find new jobs.</p>
+            <div className="row">
+              <a className={buttonClass('secondary')} href="#/find-jobs">Find jobs</a>
+              <a className={buttonClass('primary')} href="#/matches">Open Matches</a>
+            </div>
           </section>
         )}
       </div>

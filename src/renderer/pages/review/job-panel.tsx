@@ -39,7 +39,7 @@ export function JobPanel({ job, draftThreshold, budgetStop, onChanged }: JobPane
   const skip = async () => {
     const next = await action.run('skip the job', () => api.skipJob(job.id), `Skipped ${job.title} at ${job.company}`);
     if (!next) return;
-    navigate('/review');
+    navigate('/inbox');
     onChanged();
   };
 

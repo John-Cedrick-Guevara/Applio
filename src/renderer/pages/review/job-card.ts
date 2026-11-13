@@ -102,7 +102,7 @@ export function nextLine(job: Job, send: SendRecord | null): string {
       case 'applied-manually':
         return 'Applio watches your inbox for a reply and lists it in Applications.';
       case 'not-sent':
-        return 'It stays in Review until it sends or you skip it.';
+        return 'It stays in the Inbox until it sends or you skip it.';
       case 'unconfirmed':
         return 'Nothing, until you say whether it went out.';
       case 'handoff':

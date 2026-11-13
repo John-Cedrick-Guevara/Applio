@@ -94,12 +94,12 @@ describe('JobStateCard', () => {
   it('says what is true, why, and what happens next, with its action', async () => {
     const onRetry = vi.fn();
     render(
-      <JobStateCard card={{ tone: 'failed', title: 'Not sent.', body: 'Gmail rejected the app password.' }} next="It stays in Review until it sends or you skip it." notes={[]}>
+      <JobStateCard card={{ tone: 'failed', title: 'Not sent.', body: 'Gmail rejected the app password.' }} next="It stays in the Inbox until it sends or you skip it." notes={[]}>
         <button type="button" onClick={onRetry}>Retry send</button>
       </JobStateCard>,
     );
     expect(screen.getByRole('alert')).toHaveTextContent('Not sent. Gmail rejected the app password.');
-    expect(screen.getByText(/It stays in Review until it sends/)).toBeInTheDocument();
+    expect(screen.getByText(/It stays in the Inbox until it sends/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Retry send' }));
     expect(onRetry).toHaveBeenCalled();
   });

@@ -152,7 +152,7 @@ interface PreviewProps {
 
 /** Where the job Applio already has lives: Review until it's out, Applications after. */
 const existingHref = ({ jobId, status }: { jobId: string; status: JobStatus }) =>
-  (REVIEW_STATUSES as readonly JobStatus[]).includes(status) ? `#/review/${jobId}` : '#/applications';
+  (REVIEW_STATUSES as readonly JobStatus[]).includes(status) ? `#/inbox/${jobId}` : '#/applications';
 
 /** What was parsed and how Applio will apply; nothing is saved until "Add to review queue". */
 function PreviewCard({ preview, draftThreshold, added, onAdded, onEdit, onDiscard, onDraftDone }: PreviewProps) {
@@ -255,7 +255,7 @@ function DraftProgress({ job, onDone, onAnother }: { job: Job; onDone: (done: bo
       )}
       <div className="row preview-progress-actions">
         <Button onClick={onAnother}>Add another job</Button>
-        <a className={buttonClass(ready ? 'primary' : 'secondary')} href={`#/review/${job.id}`}>{ready ? 'Review and approve' : 'Open in Review'}</a>
+        <a className={buttonClass(ready ? 'primary' : 'secondary')} href={`#/inbox/${job.id}`}>{ready ? 'Review and approve' : 'Open in Inbox'}</a>
       </div>
     </section>
   );

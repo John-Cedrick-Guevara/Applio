@@ -19,7 +19,7 @@ describe('FindJobsPage', () => {
     const results = await screen.findByRole('region', { name: 'Scan results' });
     expect(within(results).getByRole('list', { name: 'What the scan kept' })).toHaveTextContent(/14\s*posts fetched.*11\s*new.*2\s*passed your filters.*0\s*drafted/);
     expect(results).toHaveTextContent('Scan finished: 2 jobs passed your filters, 0 drafted.');
-    expect(within(results).getByRole('link', { name: 'Open Review' })).toHaveAttribute('href', '#/review');
+    expect(within(results).getByRole('link', { name: 'Open Matches' })).toHaveAttribute('href', '#/matches');
   });
 
   it('scans only the sources left ticked, and drafts only when asked', async () => {

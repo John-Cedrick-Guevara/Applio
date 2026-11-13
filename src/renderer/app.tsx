@@ -2,7 +2,7 @@ import { Suspense, useEffect } from 'react';
 import { ActivityBar } from './layout/activity-bar';
 import { Sidebar } from './layout/sidebar';
 import { matchRoute, navigate, usePath } from './lib/router';
-import { DEFAULT_PATH, ROUTES } from './routes';
+import { DEFAULT_PATH, REDIRECTS, ROUTES } from './routes';
 
 /** Finds the first route matching the current path. */
 function resolve(path: string) {
@@ -14,8 +14,8 @@ function resolve(path: string) {
 }
 
 /**
- * Remount key for a route: its path without params, so `/review` → `/review/j2`
- * keeps the page (and its loaded data) while `/review` → `/applications` resets it.
+ * Remount key for a route: its path without params, so `/inbox` → `/inbox/j2`
+ * keeps the page (and its loaded data) while `/inbox` → `/applications` resets it.
  */
 const pageKey = (pattern: string) => pattern.replace(/\/:.*$/, '');
 
@@ -25,8 +25,10 @@ export function App() {
   const match = resolve(path);
 
   useEffect(() => {
-    if (!match) navigate(DEFAULT_PATH);
-  }, [match]);
+    if (match) return;
+    const moved = REDIRECTS.find(([from]) => path === from || path.startsWith(`${from}/`));
+    navigate(moved ? moved[1] + path.slice(moved[0].length) : DEFAULT_PATH);
+  }, [match, path]);
 
   return (
     <div className="app">
