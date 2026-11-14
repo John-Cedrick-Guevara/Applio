@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { createMockApi } from '../../../shared/mock/mock-api';
@@ -212,7 +212,36 @@ describe('SettingsPage', () => {
     renderWithApp(<App />);
     await screen.findByRole('tab', { name: /^Sources/ });
     window.location.hash = '#/settings/conn';
-    expect(await screen.findByRole('tab', { name: /^Connections/ })).toHaveAttribute('aria-selected', 'true');
+    await waitFor(() => expect(screen.getByRole('tab', { name: /^Connections/ })).toHaveAttribute('aria-selected', 'true'));
     window.location.hash = '';
+  });
+
+  it('puts the tab in the link when it is clicked, so the same link works again afterwards', async () => {
+    window.location.hash = '#/settings/guard';
+    renderWithApp(<App />);
+    await screen.findByRole('tab', { name: /^Guardrails/ });
+    await userEvent.click(screen.getByRole('tab', { name: /^Sources/ }));
+    expect(window.location.hash).toBe('#/settings/sources');
+    // A link to Guardrails now changes the hash again, so the page follows it.
+    window.location.hash = '#/settings/guard';
+    await waitFor(() => expect(screen.getByRole('tab', { name: /^Guardrails/ })).toHaveAttribute('aria-selected', 'true'));
+    window.location.hash = '';
+  });
+
+  it('corrects an unknown tab in the link to Settings', async () => {
+    window.location.hash = '#/settings/typo';
+    renderWithApp(<App />);
+    await screen.findByRole('tab', { name: /^Sources/ });
+    await waitFor(() => expect(window.location.hash).toBe('#/settings'));
+    window.location.hash = '';
+  });
+
+  it('does not probe the connections until the Connections tab is opened', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const testConnection = vi.spyOn(api, 'testConnection');
+    renderWithApp(<SettingsPage params={{}} />, api);
+    await screen.findByRole('tab', { name: /^Sources/ });
+    expect(screen.queryByRole('radiogroup', { name: 'AI engine' })).not.toBeInTheDocument();
+    expect(testConnection).not.toHaveBeenCalled();
   });
 });

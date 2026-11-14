@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { Profile, ResumeImport } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { AsyncView } from '../../components/async-view';
@@ -52,10 +52,11 @@ function ProfileBody({ profile, onChange }: { profile: Profile; onChange: (patch
   const [imported, setImported] = useState<ResumeImport | null>(null);
   const [addedCount, setAddedCount] = useState(0);
   const counts: Partial<Record<Tab, number>> = { facts: profile.facts.length, answers: profile.answers.length };
+  const tabs = useMemo(() => TAB_LIST.map((t) => ({ ...t, count: counts[t.id] })), [profile.facts.length, profile.answers.length]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <>
       <div className="profile-tabrow">
-        <TabList label="Profile sections" idPrefix="profile" tabs={TAB_LIST.map((t) => ({ ...t, count: counts[t.id] }))} value={tab} onChange={setTab} />
+        <TabList label="Profile sections" idPrefix="profile" tabs={tabs} value={tab} onChange={setTab} />
         {(tab === 'facts' || tab === 'answers') && !adding[tab] ? (
           <Button variant="strong" onClick={() => setAddingFor(tab, true)}>{tab === 'facts' ? 'Add fact' : 'Add answer'}</Button>
         ) : null}

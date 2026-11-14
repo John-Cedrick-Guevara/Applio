@@ -7,7 +7,7 @@ Put each kind of setting on its own pill tab (Sources, Channels, Guardrails, Con
 - [ ] AC-3: A half-typed field or an open editor survives switching tabs (panels stay mounted; only the chosen one shows).
 - [ ] AC-4: The tabs are a labelled tablist: arrow keys, Home and End move and wrap; only the selected tab is in the Tab order; each panel is labelled by its tab. The same component serves Profile.
 - [ ] AC-5: Every setting saves, validates and reports errors exactly as before.
-- [ ] AC-6: `/settings/:tab` opens that tab (an unknown tab falls back to Sources), also while the page is already open. Links that point at a setting go to its tab: Raise budget and Edit limits to Guardrails, the engine alert and the Gmail links to Connections, Channel settings to Channels, and the name prompt to Files.
+- [ ] AC-6: `/settings/:tab` opens that tab, also while the page is already open; choosing a tab puts it in the link (so following a link to the tab you were on still works); an unknown tab in the link is corrected to `/settings`. A tab's panel mounts the first time its tab is opened, so nothing in an unvisited tab loads or probes a connection. Links that point at a setting go to its tab: Raise budget and Edit limits to Guardrails, the engine alert and the Gmail links to Connections, Channel settings to Channels, and the name prompt to Files.
 
 ## Must not break
 - MNB-1: Secrets still go to the keychain and are never shown again; no setting is saved that the operator did not change (SPEC non-negotiable, CLAUDE.md §3).
@@ -22,7 +22,7 @@ Put each kind of setting on its own pill tab (Sources, Channels, Guardrails, Con
 - AC-2: › the same test, plus every existing section test (each now switches to its tab first).
 - AC-3: › "keeps a half-typed guardrail while the operator looks at another tab".
 - AC-4: `tabs.test.tsx` › four tests (selection, count, arrow/Home/End with labels, tab order); `profile-page.test.tsx` › "moves between tabs with the arrow keys…".
-- AC-6: › "opens on the tab named in the link, and falls back to Sources for an unknown one", "follows a link to another settings tab from inside the app"; link targets in `activity-bar.test.tsx`, `dashboard-page.test.tsx`, `review-page.test.tsx`, `applications-page.test.tsx`.
+- AC-6: › "opens on the tab named in the link, and falls back to Sources for an unknown one", "follows a link to another settings tab from inside the app", "puts the tab in the link when it is clicked…", "corrects an unknown tab in the link to Settings", "does not probe the connections until the Connections tab is opened"; `tabs.test.tsx` › "mounts a panel only once its tab has been opened, then keeps it"; link targets in `activity-bar.test.tsx`, `dashboard-page.test.tsx`, `review-page.test.tsx`, `applications-page.test.tsx`.
 - AC-5, MNB-1, MNB-2: the existing tests in `settings-page.test.tsx`, `guardrails-model.test.ts`, `connections-model.test.ts`.
 - MNB-3: `profile-page.test.tsx` (all).
 

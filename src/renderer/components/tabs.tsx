@@ -1,4 +1,4 @@
-import type { KeyboardEvent, ReactNode } from 'react';
+import { useState, type KeyboardEvent, type ReactNode } from 'react';
 
 export interface TabDef<T extends string> {
   id: T;
@@ -19,7 +19,8 @@ export function TabList<T extends string>({ tabs, value, onChange, label, idPref
     e.preventDefault();
     const next = tabs[to]!.id;
     onChange(next);
-    document.getElementById(`${idPrefix}-tab-${next}`)?.focus();
+    // Scoped to this tablist: no lookup by document-wide id.
+    e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]')[to]?.focus();
   };
   return (
     <div className="tabs" role="tablist" aria-label={label} onKeyDown={onKeyDown}>
@@ -34,13 +35,16 @@ export function TabList<T extends string>({ tabs, value, onChange, label, idPref
 }
 
 /**
- * A tab's panel. Every panel stays mounted and only the active one shows, so an open
+ * A tab's panel. It mounts the first time its tab is opened (so nothing in an unvisited tab
+ * loads or probes anything), then stays mounted and only shows while active, so an open
  * editor or a half-typed field survives a look at another tab.
  */
 export function TabPanel({ idPrefix, id, active, children }: { idPrefix: string; id: string; active: boolean; children: ReactNode }) {
+  const [opened, setOpened] = useState(active);
+  if (active && !opened) setOpened(true);
   return (
     <div role="tabpanel" id={`${idPrefix}-${id}`} aria-labelledby={`${idPrefix}-tab-${id}`} hidden={!active} className="tab-panel">
-      {children}
+      {opened ? children : null}
     </div>
   );
 }

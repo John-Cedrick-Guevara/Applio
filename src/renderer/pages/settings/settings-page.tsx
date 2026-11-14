@@ -5,7 +5,7 @@ import { AsyncView } from '../../components/async-view';
 import { PageHeader } from '../../components/page-header';
 import { TabList, TabPanel } from '../../components/tabs';
 import { useAsync } from '../../hooks/use-async';
-import type { RouteParams } from '../../lib/router';
+import { navigate, type RouteParams } from '../../lib/router';
 import { ChannelsSection } from './channels-section';
 import { ConnectionsSection } from './connections-section';
 import { GuardrailsSection } from './guardrails-section';
@@ -31,6 +31,15 @@ export default function SettingsPage({ params }: { params: RouteParams }) {
   const linked = TAB_LIST.find((t) => t.id === params.tab)?.id ?? 'sources';
   const [tab, setTab] = useState<Tab>(linked);
   useEffect(() => setTab(linked), [linked]);
+  // An unknown tab in the link is corrected, so the address never disagrees with the page.
+  useEffect(() => {
+    if (params.tab && !TAB_LIST.some((t) => t.id === params.tab)) navigate('/settings');
+  }, [params.tab]);
+  // Choosing a tab puts it in the link, so following a link to the tab you were on still changes the address.
+  const choose = (id: Tab) => {
+    setTab(id);
+    navigate(`/settings/${id}`);
+  };
   const state = useAsync(async () => {
     const [settings, sources] = await Promise.all([api.getSettings(), api.listSources()]);
     return { settings, sources };
@@ -45,7 +54,7 @@ export default function SettingsPage({ params }: { params: RouteParams }) {
       <AsyncView state={state} what="settings" rows={6}>
         {({ settings, sources }) => (
           <>
-            <TabList label="Settings sections" idPrefix="settings" tabs={TAB_LIST} value={tab} onChange={setTab} />
+            <TabList label="Settings sections" idPrefix="settings" tabs={TAB_LIST} value={tab} onChange={choose} />
             <TabPanel idPrefix="settings" id="sources" active={tab === 'sources'}>
               <SourcesSection sources={sources} onChange={setSource} />
             </TabPanel>
