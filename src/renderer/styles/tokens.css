@@ -1,62 +1,75 @@
 /*
- * Design tokens from the Applio UI prototype (v3). Every color, size and duration
- * in the UI comes from here. Light theme only. Type sits on a 12/14/16/20/24 scale,
- * controls are at least 44px tall, and light shadows stay under 8% opacity.
+ * Design tokens from the Applio v5 style guide. Every color, size and duration
+ * in the UI comes from here. Light theme only. Type sits on a 12/13/14/17/22/28/34/44 scale,
+ * buttons are 40px (small 36px), and light shadows stay under 8% opacity.
  */
 :root {
   color-scheme: light;
 
   /* Surfaces */
-  --bg: #f5f6f8;
+  --bg: #f5f5f2;
   --surface: #ffffff;
-  --surface-subtle: #fbfbfc;
-  --surface-muted: #f1f2f5;
-  --surface-sunken: #f5f6f8;
-  --surface-selected: #eef3fc;
-  --track: #eceef2;
+  --surface-subtle: #f8f8f5;
+  --surface-muted: #f2f2ee;
+  --surface-sunken: #f5f5f2;
+  --surface-selected: #eeeffc;
+  --track: #f2f2ee;
 
   /* Borders */
-  --border: #e4e6eb;
-  --border-soft: #eceef2;
-  --border-strong: #d5d8df;
-  --border-dashed: #c9cdd5;
-  --border-focus: #b9c6e8;
+  --border: #e7e7e3;
+  --border-soft: #efefeb;
+  --border-strong: #d9d9d4;
+  --border-dashed: #b9bcd9;
+  --border-focus: #a7adf0;
 
   /* Text */
-  --text: #15171c;
-  --text-body: #2a2e36;
-  --text-secondary: #3a3f4a;
-  --text-muted: #5f6672;
-  --text-subtle: #8a9099;
-  --text-disabled: #a3a8b1;
+  --text: #141519;
+  --text-body: #33363d;
+  --text-secondary: #4a4e57;
+  --text-muted: #5e626b;
+  --text-subtle: #9a9da5;
+  --text-disabled: #9a9da5;
 
   /* Accent (blue) */
-  --accent: #2b59c3;
-  --accent-strong: #1e428f;
-  --accent-soft: #e8eefa;
-  --accent-tint: #eaf0fc;
-  --accent-muted: #7d97d6;
-  --accent-light: #9db2e3;
+  --accent: #3d43a8;
+  --accent-strong: #2e3390;
+  --accent-soft: #eeeffc;
+  --accent-tint: #eeeffc;
+  --accent-muted: #7c83e6;
+  --accent-light: #a7adf0;
   --on-accent: #ffffff;
 
+  /* v5 pastel grounds and marks. Tints fill cards; text stays ink or muted. Pale blocks never carry data that must be told apart. */
+  --lavender-tint: #eeeffc;
+  --lavender-block: #a7adf0;
+  --lavender-mark: #7c83e6;
+  --lavender-ink: #3d43a8;
+  --pink-tint: #fbeaf0;
+  --pink-mark: #e58aa8;
+  --ice-tint: #e8f0f3;
+  --ice-block: #bccbd3;
+  --urgent: #f07a6e;
+  --focus-ring-color: #5b62d6;
+
   /* Ink: dark primary buttons and toasts */
-  --ink: #15171c;
+  --ink: #141519;
+  --ink-hover: #2e3038;
   --on-ink: #ffffff;
 
   /* Status */
-  --success: #2e9b62;
-  --success-text: #1b5e3b;
-  --success-soft: #e7f4ec;
-  --warning: #c46a12;
-  --warning-icon: #b5620f;
-  --warning-text: #8a4b0c;
-  --warning-soft: #fdf1e4;
+  --success: #2f8a57;
+  --success-text: #145a37;
+  --success-soft: #e9f5ee;
+  --warning: #b4690e;
+  --warning-icon: #b4690e;
+  --warning-text: #7a4508;
+  --warning-soft: #fdf1de;
   --warning-border: #e8c9a5;
-  --danger: #b42318;
-  --danger-text: #a33a1e;
-  --danger-soft: #fbece7;
-  --neutral-soft: #eef1f5;
-  --stop: #3a3f4a;
+  --danger: #c0362c;
+  --danger-text: #8f1d14;
+  --danger-soft: #fce8e6;
+  --neutral-soft: #eef2f4;
+  --stop: #33363d;
 
   /* Spacing (4px grid) */
   --space-1: 4px;
@@ -72,28 +85,31 @@
   --radius-sm: 6px;
   --radius: 8px;
   --radius-md: 10px;
-  --radius-lg: 12px;
+  --radius-lg: 14px;
   --radius-pill: 999px;
+  --radius-card: 20px;
 
   /* Type */
-  --font: 'IBM Plex Sans', system-ui, sans-serif;
+  --font: 'Plus Jakarta Sans', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
   --text-2xs: 12px;
   --text-xs: 12px;
-  --text-sm: 12px;
+  --text-sm: 13px;
   --text-md: 14px;
   --text-base: 14px;
-  --text-lg: 16px;
-  --text-xl: 16px;
-  --text-2xl: 20px;
-  --text-3xl: 24px;
+  --text-lg: 17px;
+  --text-xl: 17px;
+  --text-2xl: 22px;
+  --text-3xl: 28px;
+  --text-4xl: 34px;
+  --text-hero: 44px;
 
   --shadow-sm: 0 1px 2px rgb(20 23 28 / 0.06);
   --shadow-toast: 0 6px 20px rgb(20 23 28 / 0.07);
-  --focus-ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent);
+  --focus-ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--focus-ring-color);
 
-  --control-h: 44px;
-  --control-h-sm: 44px;
+  --control-h: 40px;
+  --control-h-sm: 36px;
   --sidebar-width: 216px;
   --duration: 150ms;
 }
