@@ -3,6 +3,7 @@ import type { Usage, UsagePeriod } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { AsyncView } from '../../components/async-view';
 import { useAsync } from '../../hooks/use-async';
+import { shareBlocks } from '../../lib/cost';
 import { formatTokens } from '../../lib/format';
 import { DayChart, StepBars } from './token-charts';
 import { QuotaTable } from './quota-table';
@@ -18,7 +19,7 @@ export default function UsagePage() {
     <>
       <header className="page-header">
         <div>
-          <h1>Usage &amp; limits</h1>
+          <h1>Usage <strong>&amp; limits</strong></h1>
           <p>Nothing runs past a hard stop until you raise the limit.</p>
         </div>
         <div className="tabs period-toggle" role="group" aria-label="Period">
@@ -45,15 +46,17 @@ function UsageBody({ usage }: { usage: Usage }) {
   return (
     <>
       <div className="tiles">
-        <Tile label="Claude tokens" value={formatTokens(summary.tokens)} of={`/ ${formatTokens(summary.tokenBudget)}`} note={`${pct}% of ${today ? 'daily' : 'monthly'} budget`} />
+        <Tile tint="lavender" label="Claude tokens" value={formatTokens(summary.tokens)} of={`/ ${formatTokens(summary.tokenBudget)}`} note={`${pct}% of ${today ? 'daily' : 'monthly'} budget`} blocks={shareBlocks(summary.tokens / Math.max(1, summary.tokenBudget), 10)} />
         <Tile
+          tint="pink"
           label="Applications sent"
           value={String(summary.sent)}
           of={summary.sentLimit ? `/ ${summary.sentLimit}` : ''}
           note={`${b.autonomous} auto · ${b.approved} approved · ${b.manual} manual`}
         />
-        <Tile label="Avg tokens per application" value={formatTokens(summary.avgTokensPerApplication)} note={summary.avgNote} />
+        <Tile tint="ice" label="Avg tokens per application" value={formatTokens(summary.avgTokensPerApplication)} note={summary.avgNote} />
         <Tile
+          tint="amber"
           label="Saved by answer bank"
           value={`~${formatTokens(summary.savedByAnswerBank.tokens)}`}
           of="tokens, estimated"
@@ -118,14 +121,19 @@ function PrefilterCard({ prefilter, today }: { prefilter: NonNullable<Usage['pre
   );
 }
 
-function Tile({ label, value, of, note }: { label: string; value: string; of?: string; note: string }) {
+function Tile({ label, value, of, note, tint, blocks }: { label: string; value: string; of?: string; note: string; tint: 'lavender' | 'pink' | 'ice' | 'amber'; blocks?: number }) {
   return (
-    <div className="tile">
+    <div className={`tile tile-tint-${tint}`}>
       <div className="tile-label">{label}</div>
       <div className="tile-value">
         <span className="mono">{value}</span>
         {of ? <span className="tile-of">{of}</span> : null}
       </div>
+      {blocks !== undefined ? (
+        <div className="tile-meter" aria-hidden="true">
+          {Array.from({ length: 10 }, (_, i) => <span key={i} className={i < blocks ? 'on' : undefined} />)}
+        </div>
+      ) : null}
       <div className="cell-sub">{note}</div>
     </div>
   );

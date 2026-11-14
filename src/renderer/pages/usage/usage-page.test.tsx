@@ -44,4 +44,24 @@ describe('UsagePage', () => {
     renderWithApp(<UsagePage />);
     expect(await screen.findByRole('img', { name: /^Tokens per day:/ })).toBeInTheDocument();
   });
+
+  it('is headed "Usage & limits" with the light and bold title', async () => {
+    renderWithApp(<UsagePage />);
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Usage & limits' });
+    expect(heading.querySelector('strong')).toHaveTextContent('& limits');
+  });
+
+  it('shows the token budget as a ten-block meter, with any use filling at least one block', async () => {
+    const { container } = renderWithApp(<UsagePage />);
+    await screen.findByText('55% of daily budget');
+    const meter = container.querySelector('.tile-meter')!;
+    expect(meter.querySelectorAll('span')).toHaveLength(10);
+    expect(meter.querySelectorAll('span.on')).toHaveLength(6);
+  });
+
+  it('puts each summary figure on its own tinted card', async () => {
+    const { container } = renderWithApp(<UsagePage />);
+    await screen.findByText('55% of daily budget');
+    expect([...container.querySelectorAll('.tile')].map((t) => [...t.classList].find((c) => c.startsWith('tile-tint-')))).toEqual(['tile-tint-lavender', 'tile-tint-pink', 'tile-tint-ice', 'tile-tint-amber']);
+  });
 });

@@ -21,5 +21,14 @@ export function costLine(tokens: number, status: Pick<AppStatus, 'tokensToday' |
 export function costBlocks(tokens: number, status: Pick<AppStatus, 'tokensToday' | 'dailyTokenBudget' | 'budgetStop'>): number {
   const left = Math.max(0, status.dailyTokenBudget - status.tokensToday);
   if (left === 0 || status.budgetStop || tokens >= left) return 10;
-  return Math.max(1, Math.ceil((tokens / left) * 10));
+  return Math.max(1, shareBlocks(tokens / left, 10));
+}
+
+/**
+ * How many of `total` meter blocks a share fills: none for no use, at least one for any use,
+ * and the last only at the whole, so a meter never reads empty or exhausted early.
+ */
+export function shareBlocks(share: number, total: number): number {
+  if (share <= 0) return 0;
+  return share >= 1 ? total : Math.min(total - 1, Math.ceil(share * total));
 }
