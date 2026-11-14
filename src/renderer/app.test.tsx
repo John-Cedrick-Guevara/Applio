@@ -9,10 +9,12 @@ afterEach(() => {
 });
 
 describe('App shell', () => {
-  it('shows the activity bar and no engine card', async () => {
+  it('has no banner above the pages, only the rail\'s activity block', async () => {
     window.location.hash = '#/applications';
     renderWithApp(<App />);
-    expect(await screen.findByRole('region', { name: 'Activity' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /Nothing running/ })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Activity' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /auto-send/i })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Engine status')).not.toBeInTheDocument();
   });
 });

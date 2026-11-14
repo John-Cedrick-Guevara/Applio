@@ -86,4 +86,84 @@ describe('ActivityBlock', () => {
     retry.click();
     expect(await screen.findByText('Nothing running')).toBeInTheDocument();
   });
+
+  describe('what the top bar used to say', () => {
+    it('says auto-send is off, on or paused, in words', async () => {
+      const off = show({});
+      expect(await screen.findByText('Auto-send off')).toBeInTheDocument();
+      off.unmount();
+      const paused = show({ paused: true });
+      expect(await screen.findByText('Auto-send paused')).toBeInTheDocument();
+      paused.unmount();
+      const api = createMockApi({ latencyMs: 0 });
+      await api.updateSource('remotive', { enabled: true, autonomy: 'autonomous' });
+      renderWithApp(<ActivityBlock />, { ...api, getStatus: async () => ({ ...base, tokensToday: 0 }) });
+      expect(await screen.findByText(/^Auto-send on/)).toBeInTheDocument();
+    });
+
+    it('points to Settings > Guardrails to raise the budget when AI is stopped by it', async () => {
+      show({ budgetStop: 'Daily budget used', tokensToday: 100_000 });
+      const link = await screen.findByRole('link', { name: /AI paused/ });
+      expect(link).toHaveAttribute('href', '#/settings/guard');
+      expect(link).toHaveTextContent('Raise the budget in Settings');
+    });
+
+    it('points to Settings > Connections when Claude is not set up', async () => {
+      show({ engineReady: false });
+      const link = await screen.findByRole('link', { name: /Claude needs setup/ });
+      expect(link).toHaveAttribute('href', '#/settings/conn');
+    });
+
+    it('links a running scan to Get jobs, where Stop scan is', async () => {
+      show({ scan: { phase: 'fetching', startedAt: new Date().toISOString() } });
+      expect(await screen.findByRole('link', { name: /Scanning/ })).toHaveAttribute('href', '#/get-jobs');
+    });
+
+    it('stops listening when it unmounts', async () => {
+      const listeners = new Set<(s: AppStatus) => void>();
+      window.applioEvents = { onStatus: (l) => { listeners.add(l); return () => listeners.delete(l); } };
+      const view = show({});
+      await screen.findByText('Nothing running');
+      view.unmount();
+      expect(listeners.size).toBe(0);
+    });
+  
+    it('still leads with the budget stop while a scan runs, and says the scan is running', async () => {
+      show({ budgetStop: 'Daily budget used', tokensToday: 100_000, scan: { phase: 'scoring', startedAt: new Date().toISOString() } });
+      const link = await screen.findByRole('link', { name: /AI paused/ });
+      expect(link).toHaveAttribute('href', '#/settings/guard');
+      expect(link).toHaveTextContent('A scan is running');
+    });
+
+    it('leads with Claude needing setup even while a scan runs, and says so', async () => {
+      show({ engineReady: false, scan: { phase: 'fetching', startedAt: new Date().toISOString() } });
+      const link = await screen.findByRole('link', { name: /Claude needs setup/ });
+      expect(link).toHaveTextContent('A scan is running');
+    });
+
+    it('fills a block for tiny use and not all ten just below the limit', async () => {
+      const tiny = show({ tokensToday: 500, dailyTokenBudget: 150_000 });
+      await screen.findByText('Nothing running');
+      expect(tiny.container.querySelectorAll('.activity-block-tok .on')).toHaveLength(1);
+      tiny.unmount();
+      const near = show({ tokensToday: 149_400, dailyTokenBudget: 150_000 });
+      await screen.findByText('Nothing running');
+      expect(near.container.querySelectorAll('.activity-block-tok .on')).toHaveLength(9);
+    });
+
+    it('marks a paused or blocked state with a glyph, not colour alone', async () => {
+      const { container } = show({ paused: true });
+      await screen.findByText('Auto-send paused');
+      expect(container.querySelector('.activity-block-dot-warn')).toHaveTextContent('!');
+    });
+
+    it('follows a settings change on the same page without navigation', async () => {
+      const api = createMockApi({ latencyMs: 0 });
+      renderWithApp(<ActivityBlock />, { ...api, getStatus: async () => ({ ...base, tokensToday: 0 }) });
+      expect(await screen.findByText('Auto-send off')).toBeInTheDocument();
+      await api.updateSource('remotive', { enabled: true, autonomy: 'autonomous' });
+      act(() => void window.dispatchEvent(new Event('applio:settings-changed')));
+      expect(await screen.findByText(/^Auto-send on/)).toBeInTheDocument();
+    });
+  });
 });

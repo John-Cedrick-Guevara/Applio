@@ -1,5 +1,4 @@
 import { Suspense, useEffect } from 'react';
-import { ActivityBar } from './layout/activity-bar';
 import { Sidebar } from './layout/sidebar';
 import { matchRoute, navigate, usePath } from './lib/router';
 import { DEFAULT_PATH, REDIRECTS, ROUTES } from './routes';
@@ -34,7 +33,6 @@ export function App() {
     <div className="app">
       <Sidebar />
       <main className="app-main">
-        <ActivityBar />
         <div className="app-content">
           {match ? (
             <Suspense fallback={<p className="muted">Loading…</p>}>

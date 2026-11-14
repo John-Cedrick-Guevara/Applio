@@ -200,7 +200,6 @@ describe('v5 foundation', () => {
 });
 
 describe('chopped UI fixes', () => {
-  const base = readFileSync(new URL('./base.css', import.meta.url), 'utf8');
   const components = readFileSync(new URL('./components.css', import.meta.url), 'utf8');
 
   it('keeps the step-list dot rule off the row\'s state class', () => {
@@ -220,11 +219,5 @@ describe('chopped UI fixes', () => {
   it('spaces the buttons in a Matches row apart', () => {
     const matches = readFileSync(new URL('../pages/matches/matches.css', import.meta.url), 'utf8');
     expect(matches).toMatch(/\.matches-actions\s*>\s*\*\s*\+\s*\*\s*\{[^}]*margin-left:/);
-  });
-
-  it('pins the activity bar flush to the top, by cancelling the page padding in its sticky offset', () => {
-    // Chrome measures a sticky `top` from the scroll container's content edge, so `top: 0` left the bar 28px down, over the page's first lines.
-    expect(base).toMatch(/\.activity-bar\s*\{[^}]*top:\s*-28px/);
-    expect(base).toMatch(/\.activity-bar\s*\{[^}]*top:\s*calc\(-1 \* var\(--space-4\)\)/);
   });
 });
