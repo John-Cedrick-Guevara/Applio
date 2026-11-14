@@ -143,4 +143,13 @@ describe('SettingsPage', () => {
     expect(await screen.findByText('Telegram signed in')).toBeInTheDocument();
     expect(screen.getByText('Connected')).toBeInTheDocument();
   });
+
+  it('saves the weekly goal on blur', async () => {
+    const { api } = renderWithApp(<SettingsPage />);
+    const field = await screen.findByLabelText('Applications to send per week (Dashboard goal)');
+    await userEvent.clear(field);
+    await userEvent.type(field, '20');
+    await userEvent.tab();
+    await vi.waitFor(async () => expect((await api.getSettings()).weeklyGoal).toBe(20));
+  });
 });

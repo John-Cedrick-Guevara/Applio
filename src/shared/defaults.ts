@@ -12,6 +12,7 @@ export const DEFAULT_SETTINGS: Omit<Settings, 'secretsSet' | 'checks'> = {
   draftThreshold: 75,
   autoSendThreshold: 85,
   maxPerChannelPerDay: 10,
+  weeklyGoal: 15,
   dailyTokenBudget: 150_000,
   monthlyTokenBudget: 3_000_000,
   launchAtLogin: false,

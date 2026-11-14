@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { parseGuardrails, toGuardrailsDraft } from './guardrails-model';
 
-const draft = { draft: '75', auto: '85', perDay: '10', tokens: '150,000', monthTokens: '3,000,000' };
+const draft = { draft: '75', auto: '85', perDay: '10', tokens: '150,000', monthTokens: '3,000,000', weeklyGoal: '15' };
 
 describe('parseGuardrails', () => {
   it('accepts valid limits, including thousands separators', () => {
-    expect(parseGuardrails(draft)).toEqual({ ok: true, value: { draftThreshold: 75, autoSendThreshold: 85, maxPerChannelPerDay: 10, dailyTokenBudget: 150_000, monthlyTokenBudget: 3_000_000 } });
+    expect(parseGuardrails(draft)).toEqual({ ok: true, value: { draftThreshold: 75, autoSendThreshold: 85, maxPerChannelPerDay: 10, weeklyGoal: 15, dailyTokenBudget: 150_000, monthlyTokenBudget: 3_000_000 } });
   });
 
   it('keeps scores within 0–100', () => {
@@ -29,6 +29,17 @@ describe('parseGuardrails', () => {
   });
 
   it('formats stored settings for the form', () => {
-    expect(toGuardrailsDraft({ draftThreshold: 75, autoSendThreshold: 85, maxPerChannelPerDay: 10, dailyTokenBudget: 150_000, monthlyTokenBudget: 3_000_000 })).toEqual(draft);
+    expect(toGuardrailsDraft({ draftThreshold: 75, autoSendThreshold: 85, maxPerChannelPerDay: 10, weeklyGoal: 15, dailyTokenBudget: 150_000, monthlyTokenBudget: 3_000_000 })).toEqual(draft);
+  });
+});
+
+describe('weekly goal', () => {
+  it('validates the weekly goal', () => {
+    for (const weeklyGoal of ['0', '101', 'x', '']) {
+      const r = parseGuardrails({ ...draft, weeklyGoal });
+      expect(!r.ok && r.errors.weeklyGoal).toBe('Enter a whole number from 1 to 100.');
+    }
+    const ok = parseGuardrails({ ...draft, weeklyGoal: '20' });
+    expect(ok.ok && ok.value.weeklyGoal).toBe(20);
   });
 });

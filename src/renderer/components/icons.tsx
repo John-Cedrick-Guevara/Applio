@@ -21,6 +21,7 @@ const PATHS = {
   chevronLeft: <path d="M12 5l-5 5 5 5" />,
   chevronRight: <path d="m8 5 5 5-5 5" />,
   close: <path d="M5 5l10 10M15 5 5 15" />,
+  home: <path d="M3 9.5 10 4l7 5.5V16a1 1 0 0 1-1 1h-3.5v-4.5h-5V17H4a1 1 0 0 1-1-1z" />,
   doneCircle: <><circle cx="10" cy="10" r="8" /><path d="M6.5 10l2.5 2.5 4.5-5" /></>,
 } as const;
 

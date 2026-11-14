@@ -10,6 +10,7 @@ const FIELDS: { key: keyof GuardrailsDraft; label: string }[] = [
   { key: 'draft', label: 'Draft bar (match score)' },
   { key: 'auto', label: 'Auto-send at (match score)' },
   { key: 'perDay', label: 'Max applications per channel per day' },
+  { key: 'weeklyGoal', label: 'Applications to send per week (Dashboard goal)' },
   { key: 'tokens', label: 'Claude tokens per day' },
   { key: 'monthTokens', label: 'Claude tokens per month' },
 ];

@@ -33,6 +33,13 @@ describe('settings service', () => {
     expect(settings.secretsSet).toEqual({ anthropicApiKey: false, gmailAppPassword: false, telegramBotToken: false });
   });
 
+  it('defaults the weekly goal to 15 and keeps a saved one', () => {
+    const service = createSettingsService(fakes().ports);
+    expect(service.getSettings().weeklyGoal).toBe(15);
+    service.saveSettings({ weeklyGoal: 20 });
+    expect(service.getSettings().weeklyGoal).toBe(20);
+  });
+
   it('seeds the default sources once, on first launch', () => {
     const { ports } = fakes();
     createSettingsService(ports).listSources();

@@ -104,14 +104,14 @@ describe('Sidebar', () => {
     window.location.hash = '#/applications';
     renderWithApp(<Sidebar />);
     const nav = await screen.findByRole('navigation', { name: 'Primary' });
-    expect(within(nav).getAllByRole('link').map((a) => a.getAttribute('title'))).toEqual(['Inbox', 'Matches', 'Get jobs', 'Applications', 'Profile', 'Usage & limits', 'Settings']);
+    expect(within(nav).getAllByRole('link').map((a) => a.getAttribute('title'))).toEqual(['Dashboard', 'Inbox', 'Matches', 'Get jobs', 'Applications', 'Profile', 'Usage & limits', 'Settings']);
     expect(within(nav).getByRole('link', { name: 'Applications' })).toHaveAttribute('aria-current', 'page');
     window.location.hash = '';
   });
 
   it('links the logo home', async () => {
     renderWithApp(<Sidebar />);
-    expect(await screen.findByRole('link', { name: 'Applio, home' })).toHaveAttribute('href', '#/inbox');
+    expect(await screen.findByRole('link', { name: 'Applio, home' })).toHaveAttribute('href', '#/dashboard');
   });
 
   it('names the counts for screen readers, open or collapsed', async () => {
