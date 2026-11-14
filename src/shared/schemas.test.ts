@@ -108,6 +108,11 @@ describe('API argument schemas', () => {
       expect(rejects('saveSettings', [{ maxPerChannelPerDay: 2.5 }])).toThrow(InvalidRequestError);
     });
 
+    it('rejects a weekly goal outside 1–100', () => {
+      expect(parseApiArgs('saveSettings', [{ weeklyGoal: 15 }])).toHaveLength(1);
+      for (const weeklyGoal of [0, 101, 2.5]) expect(rejects('saveSettings', [{ weeklyGoal }])).toThrow(InvalidRequestError);
+    });
+
     it('accepts exactly the email addresses the Settings field accepts', () => {
       expect(parseApiArgs('saveSettings', [{ gmailAddress: 'me@x.c' }])).toHaveLength(1);
       expect(parseApiArgs('saveSettings', [{ gmailAddress: '' }])).toHaveLength(1);

@@ -348,6 +348,8 @@ export interface Settings {
   /** Autonomous sources send on their own at or above this. */
   autoSendThreshold: number;
   maxPerChannelPerDay: number;
+  /** Applications to send per calendar week; the Dashboard shows progress against it. */
+  weeklyGoal: number;
   dailyTokenBudget: number;
   /** AI stops at this many tokens in a calendar month (SPEC F10). */
   monthlyTokenBudget: number;

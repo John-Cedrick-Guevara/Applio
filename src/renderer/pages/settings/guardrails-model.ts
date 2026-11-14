@@ -1,12 +1,13 @@
 import type { Settings } from '../../../shared/types';
 
-export type GuardrailValues = Pick<Settings, 'draftThreshold' | 'autoSendThreshold' | 'maxPerChannelPerDay' | 'dailyTokenBudget' | 'monthlyTokenBudget'>;
+export type GuardrailValues = Pick<Settings, 'draftThreshold' | 'autoSendThreshold' | 'maxPerChannelPerDay' | 'weeklyGoal' | 'dailyTokenBudget' | 'monthlyTokenBudget'>;
 
 /** Guardrail inputs as typed by the operator. */
 export interface GuardrailsDraft {
   draft: string;
   auto: string;
   perDay: string;
+  weeklyGoal: string;
   tokens: string;
   monthTokens: string;
 }
@@ -25,6 +26,7 @@ export function toGuardrailsDraft(v: GuardrailValues): GuardrailsDraft {
     draft: String(v.draftThreshold),
     auto: String(v.autoSendThreshold),
     perDay: String(v.maxPerChannelPerDay),
+    weeklyGoal: String(v.weeklyGoal),
     tokens: v.dailyTokenBudget.toLocaleString('en-US'),
     monthTokens: v.monthlyTokenBudget.toLocaleString('en-US'),
   };
@@ -39,6 +41,7 @@ export function parseGuardrails(d: GuardrailsDraft): { ok: true; value: Guardrai
   const draft = whole(d.draft);
   const auto = whole(d.auto);
   const perDay = whole(d.perDay);
+  const weeklyGoal = whole(d.weeklyGoal);
   const tokens = whole(d.tokens);
   const monthTokens = whole(d.monthTokens);
 
@@ -46,10 +49,11 @@ export function parseGuardrails(d: GuardrailsDraft): { ok: true; value: Guardrai
   if (Number.isNaN(auto) || auto > 100) errors.auto = 'Enter a score between 0 and 100.';
   else if (!errors.draft && auto < draft) errors.auto = 'Auto-send must be at least the draft bar.';
   if (Number.isNaN(perDay)) errors.perDay = 'Enter a whole number, 0 or more.';
+  if (Number.isNaN(weeklyGoal) || weeklyGoal < 1 || weeklyGoal > 100) errors.weeklyGoal = 'Enter a whole number from 1 to 100.';
   if (Number.isNaN(tokens) || tokens < 1) errors.tokens = 'Enter a token budget above 0.';
   if (Number.isNaN(monthTokens) || monthTokens < 1) errors.monthTokens = 'Enter a token budget above 0.';
   else if (!errors.tokens && monthTokens < tokens) errors.monthTokens = 'The monthly budget must be at least the daily one.';
 
   if (Object.keys(errors).length > 0) return { ok: false, errors };
-  return { ok: true, value: { draftThreshold: draft, autoSendThreshold: auto, maxPerChannelPerDay: perDay, dailyTokenBudget: tokens, monthlyTokenBudget: monthTokens } };
+  return { ok: true, value: { draftThreshold: draft, autoSendThreshold: auto, maxPerChannelPerDay: perDay, weeklyGoal, dailyTokenBudget: tokens, monthlyTokenBudget: monthTokens } };
 }
