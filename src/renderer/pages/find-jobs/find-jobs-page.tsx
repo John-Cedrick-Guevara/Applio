@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { AppStatus, RunSummary, ScanPhase } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { AsyncView } from '../../components/async-view';
+import { Blocks } from '../../components/blocks';
 import { Button } from '../../components/button';
 import { Callout, StepList } from '../../components/job-state';
 import { useAction } from '../../hooks/use-action';
@@ -117,9 +118,7 @@ function Scan({ status, sources }: { status: AppStatus; sources: { id: string; n
             </div>
           ) : null}
           <div className="find-jobs-foot">
-            <div className="find-jobs-meter" aria-hidden="true">
-              {Array.from({ length: 10 }, (_, i) => <span key={i} className={i < filled ? 'on' : undefined} />)}
-            </div>
+            <Blocks filled={filled} total={10} tone="ice" gap={6} className="find-jobs-meter" />
             {draft ? <p className="cell-sub find-jobs-ceiling">Worst case with drafting on: up to everything left today.</p> : null}
             <dl className="find-jobs-cost">
               <div><dt>Fetch and filters</dt><dd>Free</dd></div>

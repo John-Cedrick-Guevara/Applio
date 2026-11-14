@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { costBlocks, costLine } from './cost';
+import { costBlocks, costLine, shareBlocks } from './cost';
 
 describe('costLine', () => {
   it("says the share of what's left today", () => {
@@ -28,6 +28,12 @@ describe('costBlocks', () => {
     expect(costBlocks(6_100, status(130_000))).toBe(4); // just over 30%
   });
 
+  it('keeps a cost near what is left on the full side: 95% of what is left is all ten blocks', () => {
+    expect(costBlocks(19_000, status(130_000))).toBe(10);
+    expect(costBlocks(18_100, status(130_000))).toBe(10); // 90.5% rounds up to the tenth
+    expect(costBlocks(18_000, status(130_000))).toBe(9); // exactly 90%
+  });
+
   it('is full when the cost reaches what is left, or when nothing is left', () => {
     expect(costBlocks(20_000, status(130_000))).toBe(10);
     expect(costBlocks(30_000, status(140_000))).toBe(10);
@@ -36,5 +42,16 @@ describe('costBlocks', () => {
 
   it('is full when AI is stopped by a budget, even with tokens left', () => {
     expect(costBlocks(6_000, { ...status(82_000), budgetStop: 'Monthly budget used' })).toBe(10);
+  });
+});
+
+describe('shareBlocks', () => {
+  it('fills nothing for no use, one block for any use, and all only at the whole', () => {
+    expect(shareBlocks(0, 10)).toBe(0);
+    expect(shareBlocks(0.01, 10)).toBe(1);
+    expect(shareBlocks(0.55, 10)).toBe(6);
+    expect(shareBlocks(0.96, 10)).toBe(9);
+    expect(shareBlocks(1, 10)).toBe(10);
+    expect(shareBlocks(1.4, 8)).toBe(8);
   });
 });

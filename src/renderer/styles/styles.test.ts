@@ -151,6 +151,18 @@ describe('v5 foundation', () => {
     expect(tokens).toMatch(/prefers-reduced-motion[^}]*--duration:\s*0ms/);
   });
 
+  it('sets page titles light with a bold word', () => {
+    const components = readFileSync(new URL('./components.css', import.meta.url), 'utf8');
+    expect(components).toMatch(/\.page-header h1\s*\{[^}]*font-weight:\s*400/);
+    expect(components).toMatch(/\.page-header h1 strong\s*\{[^}]*font-weight:\s*700/);
+  });
+
+  it('draws the 7-day chart in lavender mark with today in darker lavender ink', () => {
+    const usage = readFileSync(new URL('../pages/usage/usage.css', import.meta.url), 'utf8');
+    expect(usage).toMatch(/\.day-bar\s*\{[^}]*background:\s*var\(--lavender-mark\)/);
+    expect(usage).toMatch(/\.day-bar-today\s*\{[^}]*background:\s*var\(--lavender-ink\)/);
+  });
+
   it('keeps light shadows under 8% opacity', () => {
     // Shadows only: a dialog's dimmed backdrop is a scrim, not a shadow.
     const shadows = [...all.matchAll(/(?:box-shadow|--shadow-[\w-]+):([^;]*);/g)].map((m) => m[1]).join(' ');

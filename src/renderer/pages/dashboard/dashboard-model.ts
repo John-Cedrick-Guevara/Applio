@@ -1,4 +1,5 @@
 import type { AppStatus, Job, SentBy } from '../../../shared/types';
+import { shareBlocks } from '../../lib/cost';
 import { newCount } from '../../lib/job-lists';
 import { displayStatus, sentAt } from '../applications/applications-model';
 import { inboxTabs } from '../review/review-model';
@@ -49,12 +50,6 @@ export function needs(queue: readonly Job[], asking: number): { rows: NeedsRow[]
   return { rows, total: rows.reduce((sum, r) => sum + r.count, 0) };
 }
 
-/** Blocks filled for a share of a whole: any use fills one, and the last fills only at the limit. */
-function filledBlocks(share: number, total: number): number {
-  if (share <= 0) return 0;
-  return share >= 1 ? total : Math.min(total - 1, Math.ceil(share * total));
-}
-
 /** "Sent this week": sends since Monday 00:00 against the weekly goal. */
 export function weekCard(jobs: readonly Job[], goal: number, now: Date) {
   const from = startOfWeek(now).getTime();
@@ -69,7 +64,7 @@ export function weekCard(jobs: readonly Job[], goal: number, now: Date) {
     byYou,
     goal,
     pct: Math.round((sent.length / goal) * 100),
-    blocks: { filled: filledBlocks(sent.length / goal, total), total },
+    blocks: { filled: shareBlocks(sent.length / goal, total), total },
     line: `${byApplio} sent by Applio, ${byYou} you applied yourself. ${rest}`,
   };
 }
@@ -81,7 +76,7 @@ export function budgetCard(status: Pick<AppStatus, 'tokensToday' | 'dailyTokenBu
     used: status.tokensToday,
     total: status.dailyTokenBudget,
     pct: Math.min(100, Math.round(share * 100)),
-    blocks: { filled: filledBlocks(share, 8), total: 8 },
+    blocks: { filled: shareBlocks(share, 8), total: 8 },
     stopped: !!status.budgetStop,
     /** Why AI stopped, as main words it (daily or monthly), so the card never guesses. */
     stopReason: status.budgetStop,

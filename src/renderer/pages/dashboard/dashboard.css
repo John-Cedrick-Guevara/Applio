@@ -221,28 +221,6 @@
   color: var(--ink);
 }
 
-.dash-blocks {
-  display: grid;
-}
-
-.dash-blocks span {
-  height: 28px;
-  border: 1px dashed #b9bcd9;
-  border-radius: 6px;
-}
-
-.dash-ice .dash-blocks span {
-  border-color: var(--ice-line);
-}
-
-.dash-blocks span.on {
-  border-style: solid;
-  border-color: transparent;
-}
-
-.dash-blocks span.on-lavender { background: var(--lavender-block); }
-.dash-blocks span.on-ice { background: var(--ice-block); }
-
 .dash-legend {
   display: inline-flex;
   align-items: center;

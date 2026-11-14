@@ -14,9 +14,14 @@
 }
 
 .page-header h1 {
-  font-size: var(--text-3xl);
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-size: var(--text-4xl);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.page-header h1 strong {
+  font-weight: 700;
 }
 
 .page-header p {
@@ -813,3 +818,12 @@ a.btn-secondary:hover { color: var(--text); }
   display: none;
 }
 
+
+/* Blocks: the v5 meter. A dashed outline per empty block, a tint-filled block per used one. */
+.blocks { display: grid; }
+.blocks > span { border: 1px dashed var(--lavender-dashed); border-radius: 6px; }
+.blocks-sm > span { height: 16px; }
+.blocks-lg > span { height: 28px; }
+.blocks-ice > span { border-color: var(--ice-line); }
+.blocks > span.on { border-color: transparent; background: var(--lavender-block); }
+.blocks-ice > span.on { background: var(--ice-block); }
