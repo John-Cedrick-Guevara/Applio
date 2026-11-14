@@ -76,13 +76,16 @@ export function Sidebar() {
   const link = (item: NavItem) => {
     const inbox = item.to === '/inbox';
     const matches = item.to === '/matches';
+    // Collapsed, the visible label is hidden, so the name must carry the counts too; open, the content already does.
+    const count = inbox && pending ? `${pending} need a decision` : matches && fresh ? `${fresh} new` : '';
+    const name = open || !count ? undefined : `${item.label}, ${count}`;
     return (
       <a
         key={item.to}
         href={`#${item.to}`}
         className="nav-link"
         title={item.label}
-        aria-label={item.label}
+        aria-label={name ?? (open ? undefined : item.label)}
         aria-current={isActive(path, item.to) ? 'page' : undefined}
       >
         <Icon name={item.icon} size={20} />

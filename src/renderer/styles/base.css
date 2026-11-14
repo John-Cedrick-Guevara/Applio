@@ -93,10 +93,6 @@ button {
 }
 
 /* Sidebar: the dark v5 rail. 232px open, 72px collapsed. */
-.app {
-  grid-template-columns: auto 1fr;
-}
-
 .sidebar {
   display: flex;
   flex-direction: column;
@@ -308,7 +304,8 @@ button {
   font-weight: 600;
 }
 
-.activity-block-text > span:not(.activity-block-tok) {
+.activity-block-text > span:not(.activity-block-tok),
+.activity-block-clock {
   color: #a3a6ae;
   font-size: var(--text-xs);
 }

@@ -59,4 +59,31 @@ describe('ActivityBlock', () => {
     await screen.findByText('Nothing running');
     expect(screen.getByRole('link', { name: /Nothing running/ })).toHaveAttribute('href', '#/usage');
   });
+
+  it('keeps the scan clock out of the live region', async () => {
+    const { container } = show({ scan: { phase: 'scoring', startedAt: new Date().toISOString() } });
+    await screen.findByText(/^Scanning/);
+    expect(container.querySelector('.activity-block-clock')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByRole('link', { name: /^(?!.*\d:\d\d).*Scanning/ })).toBeInTheDocument();
+  });
+
+  it('fills at least one block for any use, and all ten only at the limit', async () => {
+    const low = show({ tokensToday: 3_000 });
+    await screen.findByText('Nothing running');
+    expect(low.container.querySelectorAll('.activity-block-tok .on')).toHaveLength(1);
+    low.unmount();
+    const near = show({ tokensToday: 96_000 });
+    await screen.findByText('Nothing running');
+    expect(near.container.querySelectorAll('.activity-block-tok .on')).toHaveLength(9);
+  });
+
+  it('says so, and retries, when the status cannot load', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    let calls = 0;
+    renderWithApp(<ActivityBlock />, { ...api, getStatus: async () => { if (calls++ === 0) throw new Error('down'); return { ...base, tokensToday: 0 }; } });
+    const retry = await screen.findByRole('button', { name: 'Retry' });
+    expect(screen.getByText(/Couldn't load/)).toBeInTheDocument();
+    retry.click();
+    expect(await screen.findByText('Nothing running')).toBeInTheDocument();
+  });
 });

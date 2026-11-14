@@ -21,7 +21,6 @@ const PATHS = {
   chevronLeft: <path d="M12 5l-5 5 5 5" />,
   chevronRight: <path d="m8 5 5 5-5 5" />,
   close: <path d="M5 5l10 10M15 5 5 15" />,
-  home: <path d="M3 9.5 10 4l7 5.5V16a1 1 0 0 1-1 1h-3.5v-4.5h-5V17H4a1 1 0 0 1-1-1z" />,
   doneCircle: <><circle cx="10" cy="10" r="8" /><path d="M6.5 10l2.5 2.5 4.5-5" /></>,
 } as const;
 
@@ -55,9 +54,9 @@ export function Icon({ name, size = 16, strokeWidth = 1.6, ...rest }: { name: Ic
 export function Logo({ tone = 'dark', size = 34 }: { tone?: 'light' | 'dark'; size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 34 34" aria-hidden="true" className="logo" style={{ flex: 'none' }}>
-      <rect width="34" height="34" rx="10" fill={tone === 'light' ? '#FFFFFF' : '#141519'} />
-      <path d="M7 26 14 8l7 18" fill="none" stroke={tone === 'light' ? '#141519' : '#FFFFFF'} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M10.5 19H27M24 16l3 3-3 3" fill="none" stroke="#7C83E6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+      <rect width="34" height="34" rx="10" style={{ fill: tone === 'light' ? 'var(--on-ink)' : 'var(--ink)' }} />
+      <path d="M7 26 14 8l7 18" fill="none" style={{ stroke: tone === 'light' ? 'var(--ink)' : 'var(--on-ink)' }} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10.5 19H27M24 16l3 3-3 3" fill="none" style={{ stroke: 'var(--lavender-mark)' }} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

@@ -94,4 +94,31 @@ describe('SidePanel', () => {
     await user.keyboard('{Escape}');
     expect(page).not.toHaveAttribute('inert');
   });
+
+  it('still closes on Escape after focus falls out of the panel', async () => {
+    const user = userEvent.setup();
+    render(<Harness position={{ index: 1, total: 1, onPrev: () => {}, onNext: () => {} }} />);
+    await user.click(screen.getByRole('button', { name: 'Open job' }));
+    (document.activeElement as HTMLElement).blur();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('returns focus to the opener even when the body autofocuses a field', async () => {
+    function Auto() {
+      const [open, setOpen] = useState(false);
+      return (
+        <div id="root">
+          <button onClick={() => setOpen(true)}>Open job</button>
+          {open ? <SidePanel title="Note" onClose={() => setOpen(false)}><input aria-label="Note" autoFocus /></SidePanel> : null}
+        </div>
+      );
+    }
+    const user = userEvent.setup();
+    render(<Auto />);
+    const trigger = screen.getByRole('button', { name: 'Open job' });
+    await user.click(trigger);
+    await user.keyboard('{Escape}');
+    expect(trigger).toHaveFocus();
+  });
 });

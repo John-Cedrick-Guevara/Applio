@@ -151,12 +151,6 @@ describe('v5 foundation', () => {
     expect(tokens).toMatch(/prefers-reduced-motion[^}]*--duration:\s*0ms/);
   });
 
-  it('draws the logo as a 34px tile with a 10px corner', () => {
-    const icons = readFileSync(new URL('../components/icons.tsx', import.meta.url), 'utf8');
-    expect(icons).toMatch(/size = 34/);
-    expect(icons).toMatch(/viewBox="0 0 34 34"[\s\S]*rx="10"/);
-  });
-
   it('keeps light shadows under 8% opacity', () => {
     // Shadows only: a dialog's dimmed backdrop is a scrim, not a shadow.
     const shadows = [...all.matchAll(/(?:box-shadow|--shadow-[\w-]+):([^;]*);/g)].map((m) => m[1]).join(' ');

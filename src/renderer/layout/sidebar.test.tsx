@@ -113,4 +113,23 @@ describe('Sidebar', () => {
     renderWithApp(<Sidebar />);
     expect(await screen.findByRole('link', { name: 'Applio, home' })).toHaveAttribute('href', '#/inbox');
   });
+
+  it('names the counts for screen readers, open or collapsed', async () => {
+    const user = userEvent.setup();
+    const api = createMockApi({ latencyMs: 0 });
+    const lastRun = { at: '2000-01-01T00:00:00.000Z', found: 2, newAfterDedup: 2, passedFilters: 2, drafted: 0 };
+    renderWithApp(<Sidebar />, { ...api, getStatus: async () => ({ ...(await api.getStatus()), lastRun }) });
+    expect(await screen.findByRole('link', { name: /Inbox.*need a decision/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Collapse sidebar' }));
+    expect(await screen.findByRole('link', { name: /Inbox, \d+ need a decision/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Matches, 2 new' })).toBeInTheDocument();
+  });
+
+  it('renders the logo as a 34px tile with a 10px corner', async () => {
+    const { container } = renderWithApp(<Sidebar />);
+    await screen.findByRole('link', { name: 'Applio, home' });
+    const svg = container.querySelector('svg.logo')!;
+    expect(svg).toHaveAttribute('width', '34');
+    expect(svg.querySelector('rect')).toHaveAttribute('rx', '10');
+  });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon } from './icons';
 
@@ -24,39 +24,50 @@ export function SidePanel({ title, onClose, position, children }: { title: strin
   const close = useRef(onClose);
   close.current = onClose;
 
+  // Read during render: a child's autoFocus runs at commit, before any effect, and would be captured instead.
+  const [opener] = useState(() => document.activeElement as HTMLElement | null);
+
   useEffect(() => {
-    const trigger = document.activeElement as HTMLElement | null;
     const page = document.getElementById('root');
     page?.setAttribute('inert', '');
     panel.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
     return () => {
       page?.removeAttribute('inert');
-      trigger?.focus();
+      opener?.focus();
     };
+  }, [opener]);
+
+  // On the document, not the layer: focus can fall to <body> (a button that just disabled itself) and Escape must still close.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        close.current();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const items = [...(panel.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])];
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (!first || !last) return;
+      const active = document.activeElement;
+      if (!panel.current?.contains(active)) {
+        e.preventDefault();
+        first.focus();
+      } else if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
   }, []);
 
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      e.stopPropagation();
-      close.current();
-      return;
-    }
-    if (e.key !== 'Tab') return;
-    const items = [...(panel.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])];
-    const first = items[0];
-    const last = items[items.length - 1];
-    if (!first || !last) return;
-    if (e.shiftKey && document.activeElement === first) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && document.activeElement === last) {
-      e.preventDefault();
-      first.focus();
-    }
-  };
-
   return createPortal(
-    <div className="side-panel-layer" onKeyDown={onKeyDown}>
+    <div className="side-panel-layer">
       <div className="side-panel-dim" data-testid="side-panel-dim" onClick={onClose} />
       <div className="side-panel" role="dialog" aria-modal="true" aria-labelledby={titleId} ref={panel}>
         <div className="side-panel-bar">
