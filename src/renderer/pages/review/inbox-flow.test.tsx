@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createMockApi } from '../../../shared/mock/mock-api';
@@ -89,7 +89,7 @@ describe('Inbox flow', () => {
     await inboxAt('j1', api);
     await userEvent.click(screen.getByRole('checkbox', { name: 'Open the next job after I decide' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Approve & send email' }));
-    expect(await screen.findByText(/Sent to jobs@northwind-labs.example/)).toBeInTheDocument();
+    expect((await screen.findAllByText(/Sent to jobs@northwind-labs.example/)).length).toBeGreaterThan(0);
     expect(window.location.hash).toBe('#/inbox/j1');
   });
 
@@ -180,5 +180,56 @@ describe('Inbox flow', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Skip job' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(window.location.hash).toBe('#/inbox');
+  });
+
+  it('keeps the Undo bar and toasts outside the page the panel makes inert', async () => {
+    await inboxAt('j1');
+    await userEvent.click(await screen.findByRole('button', { name: 'Skip job' }));
+    const undo = await screen.findByRole('status', { name: 'Undo' });
+    expect(undo.parentElement).toBe(document.body);
+    expect(document.querySelector('.toast-region')?.parentElement).toBe(document.body);
+  });
+
+  it('ignores a held key, so one press decides one job', async () => {
+    await inboxAt('j1');
+    await screen.findByRole('button', { name: 'Skip job' });
+    fireEvent.keyDown(document.body, { key: 's', repeat: true });
+    expect(screen.queryByRole('status', { name: 'Undo' })).not.toBeInTheDocument();
+  });
+
+  it('does not close on Escape or the dim layer while a draft is being edited', async () => {
+    await inboxAt('j1');
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    await userEvent.click(document.getElementById('letter-edit')!);
+    await userEvent.keyboard('{Escape}');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('side-panel-dim'));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('closes a panel opened on a job that is no longer in the Inbox', async () => {
+    window.location.hash = '#/inbox/nope';
+    renderWithApp(<App />);
+    await waitFor(() => expect(window.location.hash).toBe('#/inbox'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('puts focus back on a row when the opener was decided away', async () => {
+    window.location.hash = '#/inbox';
+    renderWithApp(<App />);
+    await userEvent.click((await screen.findAllByRole('link', { name: /Senior Backend Engineer/ }))[0]!);
+    await userEvent.click(await screen.findByRole('button', { name: 'Skip job' }));
+    await waitFor(() => expect(window.location.hash).toBe('#/inbox/j2'));
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(document.activeElement).toHaveClass('inbox-row');
+  });
+
+  it('says a send went out even when Open the next job is off', async () => {
+    const api = await withGmail();
+    await inboxAt('j1', api);
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Open the next job after I decide' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Approve & send email' }));
+    await waitFor(() => expect(document.querySelector('.toast')).toHaveTextContent(/Sent to jobs@northwind-labs.example/));
   });
 });

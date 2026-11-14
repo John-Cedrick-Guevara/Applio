@@ -34,7 +34,7 @@ const tabFor = (tabs: InboxTab[], id?: string): InboxTabKey =>
 /**
  * The Inbox list (redesign v2): one tab at a time so a long queue stays calm,
  * one-line rows, and a label only when something is off the normal path. The
- * list scrolls inside its frame, so the detail never scrolls out of view.
+ * list takes the full width; a job's detail opens in a side panel (v5).
  */
 export function InboxQueue({ tabs, drafting, currentId, sort, onSort }: InboxQueueProps) {
   const [active, setActive] = useState<InboxTabKey>(() => tabFor(tabs, currentId));

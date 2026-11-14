@@ -17,7 +17,7 @@ const FOCUSABLE = 'a[href], button:not(:disabled), input:not(:disabled), select:
  * the full width, details open only when asked). Mounting opens it. It takes focus,
  * traps Tab, makes the page behind inert, and on close returns focus to the row.
  */
-export function SidePanel({ title, onClose, position, titleHidden = false, children }: { title: string; onClose: () => void; position?: SidePanelPosition; /** The body already shows the title; keep it for the dialog's name only. */ titleHidden?: boolean; children: ReactNode }) {
+export function SidePanel({ title, onClose, position, titleHidden = false, fallbackFocus, children }: { title: string; /** Where focus goes on close when the opener is gone (it was decided away): a selector for a row in the list behind. */ fallbackFocus?: string; onClose: () => void; position?: SidePanelPosition; /** The body already shows the title; keep it for the dialog's name only. */ titleHidden?: boolean; children: ReactNode }) {
   const titleId = useId();
   const panel = useRef<HTMLDivElement>(null);
   // Latest onClose without re-running the open/close effect on every parent render.
@@ -33,16 +33,18 @@ export function SidePanel({ title, onClose, position, titleHidden = false, child
     panel.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
     return () => {
       page?.removeAttribute('inert');
-      opener?.focus();
+      const target = opener?.isConnected ? opener : fallbackFocus ? document.querySelector<HTMLElement>(fallbackFocus) : null;
+      target?.focus();
     };
-  }, [opener]);
+  }, [opener, fallbackFocus]);
 
   // On the document, not the layer: focus can fall to <body> (a button that just disabled itself) and Escape must still close.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation();
-        close.current();
+        // Escape and the dim layer must not throw away a draft being edited: an open editor has a textarea.
+        if (!panel.current?.querySelector('textarea')) close.current();
         return;
       }
       if (e.key !== 'Tab') return;
@@ -68,7 +70,7 @@ export function SidePanel({ title, onClose, position, titleHidden = false, child
 
   return createPortal(
     <div className="side-panel-layer">
-      <div className="side-panel-dim" data-testid="side-panel-dim" onClick={onClose} />
+      <div className="side-panel-dim" data-testid="side-panel-dim" onClick={() => { if (!panel.current?.querySelector('textarea')) onClose(); }} />
       <div className="side-panel" role="dialog" aria-modal="true" aria-labelledby={titleId} ref={panel}>
         <div className="side-panel-bar">
           {position ? (

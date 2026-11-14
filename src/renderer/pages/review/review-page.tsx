@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { Autonomy, Job } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { AsyncView } from '../../components/async-view';
@@ -112,6 +113,11 @@ function ReviewLayout({ data, selectedId, onJobChange, onRunComplete }: LayoutPr
   // Nothing opens by itself: the panel shows only the job named in the URL.
   const currentId = selectedId;
   const current = ordered.find((j) => j.id === currentId);
+  // A link to a job that is no longer a decision (sent, skipped, gone) closes instead of opening an empty panel.
+  const known = !!currentId && [...data.queue, ...data.asking, ...data.undrafted].some((j) => j.id === currentId);
+  useEffect(() => {
+    if (currentId && !known) navigate('/inbox');
+  }, [currentId, known]);
   /** The job after this one in tab order, else the one before it. */
   const nextAfter = (id: string) => {
     const i = ordered.findIndex((j) => j.id === id);
@@ -133,9 +139,8 @@ function ReviewLayout({ data, selectedId, onJobChange, onRunComplete }: LayoutPr
   };
   /** A final decision (sent, or marked applied): say what happened and, if asked, open the next job. */
   const decided = (job: Job, message: string) => {
-    if (!autoNext) return;
     toast.show(message, 'success');
-    open(nextAfter(job.id));
+    if (autoNext) open(nextAfter(job.id));
   };
   // A presses the open job's own Approve button, so every rule on it (disabled reason, suspicious confirm) still applies.
   const approveKey = () => {
@@ -148,7 +153,8 @@ function ReviewLayout({ data, selectedId, onJobChange, onRunComplete }: LayoutPr
   const keys = useRef<(e: KeyboardEvent) => void>(() => {});
   keys.current = (e) => {
     const t = e.target as HTMLElement;
-    if (e.metaKey || e.ctrlKey || e.altKey || t.closest('input:not([type=checkbox]), textarea, select, [contenteditable="true"]')) return;
+    // A held key repeats; one press must decide one job.
+    if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || t.closest('input:not([type=checkbox]), textarea, select, [contenteditable="true"]')) return;
     if (e.key === 'a' || e.key === 'A') approveKey();
     else if ((e.key === 's' || e.key === 'S') && current) skip(current);
   };
@@ -165,7 +171,7 @@ function ReviewLayout({ data, selectedId, onJobChange, onRunComplete }: LayoutPr
   const position = tab && at >= 0 ? { index: at + 1, total: tab.jobs.length, onPrev: () => open(tab.jobs[at - 1]?.id), onNext: () => open(tab.jobs[at + 1]?.id) } : undefined;
   const heading = current?.title ?? drafting.find((j) => j.id === currentId)?.title ?? data.undrafted.find((j) => j.id === currentId)?.title ?? 'Job';
 
-  const detail = !currentId ? null : isDrafting(currentId) && !data.queue.some((j) => j.id === currentId) ? (
+  const detail = !currentId || !known ? null : isDrafting(currentId) && !data.queue.some((j) => j.id === currentId) ? (
     <DraftingPanel job={drafting.find((j) => j.id === currentId)} since={draftingSince[currentId]} />
   ) : data.questions.has(currentId) ? (
     <QuestionsPanel
@@ -214,7 +220,7 @@ function ReviewLayout({ data, selectedId, onJobChange, onRunComplete }: LayoutPr
         <InboxQueue tabs={tabs} drafting={drafting} {...(currentId ? { currentId } : {})} sort={sort} onSort={setSort} />
       )}
       {detail ? (
-        <SidePanel title={heading} titleHidden onClose={() => open()} position={position}>
+        <SidePanel title={heading} titleHidden fallbackFocus="a.inbox-row" onClose={() => open()} position={position}>
           <div className="inbox-panel">
             {detail}
             <label className="inbox-next"><input type="checkbox" checked={autoNext} onChange={(e) => setAutoNext(e.target.checked)} />Open the next job after I decide</label>
@@ -222,11 +228,13 @@ function ReviewLayout({ data, selectedId, onJobChange, onRunComplete }: LayoutPr
           </div>
         </SidePanel>
       ) : null}
-      {skips.held ? (
+      {/* On the body: the panel makes the page inert, and Undo must stay reachable while the next job is open. */}
+      {skips.held ? createPortal(
         <div className="undo-bar" role="status" aria-label="Undo">
           <span>{skips.held.message}</span>
           <Button size="sm" variant="link" onClick={undo}>Undo</Button>
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </>
   );
