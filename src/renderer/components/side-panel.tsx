@@ -17,12 +17,14 @@ const FOCUSABLE = 'a[href], button:not(:disabled), input:not(:disabled), select:
  * the full width, details open only when asked). Mounting opens it. It takes focus,
  * traps Tab, makes the page behind inert, and on close returns focus to the row.
  */
-export function SidePanel({ title, onClose, position, titleHidden = false, fallbackFocus, children }: { title: string; /** Where focus goes on close when the opener is gone (it was decided away): a selector for a row in the list behind. */ fallbackFocus?: string; onClose: () => void; position?: SidePanelPosition; /** The body already shows the title; keep it for the dialog's name only. */ titleHidden?: boolean; children: ReactNode }) {
+export function SidePanel({ title, onClose, position, titleHidden = false, fallbackFocus, returnFocus, children }: { title: string; /** Where focus goes on close when the opener is gone (it was decided away): a selector for a row in the list behind. */ fallbackFocus?: string; onClose: () => void; position?: SidePanelPosition; /** The body already shows the title; keep it for the dialog's name only. */ titleHidden?: boolean; /** Evaluated on close: the row for the item being shown then, since stepping can leave the opener behind. */ returnFocus?: () => HTMLElement | null | undefined; children: ReactNode }) {
   const titleId = useId();
   const panel = useRef<HTMLDivElement>(null);
   // Latest onClose without re-running the open/close effect on every parent render.
   const close = useRef(onClose);
   close.current = onClose;
+  const focusBack = useRef(returnFocus);
+  focusBack.current = returnFocus;
 
   // Read during render: a child's autoFocus runs at commit, before any effect, and would be captured instead.
   const [opener] = useState(() => document.activeElement as HTMLElement | null);
@@ -33,10 +35,17 @@ export function SidePanel({ title, onClose, position, titleHidden = false, fallb
     panel.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
     return () => {
       page?.removeAttribute('inert');
-      const target = opener?.isConnected ? opener : fallbackFocus ? document.querySelector<HTMLElement>(fallbackFocus) : null;
+      const target = focusBack.current?.() ?? (opener?.isConnected && opener !== document.body ? opener : fallbackFocus ? document.querySelector<HTMLElement>(fallbackFocus) : null);
       target?.focus();
     };
   }, [opener, fallbackFocus]);
+
+  /** Stepping remounts the detail, which would drop an open editor's text: focus the editor instead. */
+  const step = (go: () => void) => {
+    const editor = panel.current?.querySelector<HTMLElement>('textarea');
+    if (editor) editor.focus();
+    else go();
+  };
 
   // On the document, not the layer: focus can fall to <body> (a button that just disabled itself) and Escape must still close.
   useEffect(() => {
@@ -76,8 +85,8 @@ export function SidePanel({ title, onClose, position, titleHidden = false, fallb
           {position ? (
             <>
               <span className="side-panel-pos">{position.index} of {position.total}</span>
-              <button type="button" className="btn btn-icon" aria-label="Previous" disabled={position.index <= 1} onClick={position.onPrev}><Icon name="chevronLeft" /></button>
-              <button type="button" className="btn btn-icon" aria-label="Next" disabled={position.index >= position.total} onClick={position.onNext}><Icon name="chevronRight" /></button>
+              <button type="button" className="btn btn-icon" aria-label="Previous" disabled={position.index <= 1} onClick={() => step(position.onPrev)}><Icon name="chevronLeft" /></button>
+              <button type="button" className="btn btn-icon" aria-label="Next" disabled={position.index >= position.total} onClick={() => step(position.onNext)}><Icon name="chevronRight" /></button>
             </>
           ) : null}
           <button type="button" className="btn btn-icon side-panel-close" aria-label="Close" onClick={onClose}><Icon name="close" /></button>

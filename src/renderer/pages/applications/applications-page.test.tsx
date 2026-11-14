@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { act } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -196,5 +196,48 @@ describe('ApplicationsPage', () => {
     renderWithApp(<ApplicationsPage />);
     await table();
     for (const label of ['Sent this month', 'Replies, incl. interviews', 'Interviews', 'Follow-ups due']) expect(screen.getByText(label)).toBeInTheDocument();
+  });
+
+  it('returns focus to the row after opening from a non-button cell', async () => {
+    renderWithApp(<ApplicationsPage />);
+    const t = await table();
+    const row = within(t).getByText('Corvid Health').closest('tr')!;
+    await userEvent.click(within(row).getAllByRole('cell')[3]!);
+    await userEvent.keyboard('{Escape}');
+    expect(within(row).getByRole('button')).toHaveFocus();
+  });
+
+  it('returns focus to the application shown when it closes, after stepping', async () => {
+    renderWithApp(<ApplicationsPage />);
+    await userEvent.click(await screen.findByRole('button', { name: /Quanta Robotics/ }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Next' }));
+    const shown = screen.getByRole('dialog').querySelector('.app-detail-title')!.textContent!;
+    await userEvent.keyboard('{Escape}');
+    expect(document.activeElement?.textContent).toContain(shown);
+  });
+
+  it('keeps an edit when Next is pressed: it focuses the editor instead of stepping', async () => {
+    renderWithApp(<ApplicationsPage />);
+    await userEvent.click(await screen.findByRole('button', { name: /Tessellate/ }));
+    const dialog = screen.getByRole('dialog');
+    await userEvent.click(await within(dialog).findByRole('button', { name: 'Draft follow-up' }));
+    const position = within(dialog).getByText(/^\d+ of \d+$/).textContent;
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Next' }));
+    expect(within(dialog).getByText(position!)).toBeInTheDocument();
+    expect(within(dialog).getByRole('textbox')).toHaveFocus();
+  });
+
+  it('does not open the panel when a click ends a text selection', async () => {
+    renderWithApp(<ApplicationsPage />);
+    const t = await table();
+    const cell = within(t).getByText('Corvid Health');
+    const range = document.createRange();
+    range.selectNodeContents(cell);
+    window.getSelection()!.removeAllRanges();
+    window.getSelection()!.addRange(range);
+    // fireEvent: a real mouse-up after a drag fires click without a fresh mousedown clearing the selection.
+    fireEvent.click(cell.closest('tr')!);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    window.getSelection()!.removeAllRanges();
   });
 });

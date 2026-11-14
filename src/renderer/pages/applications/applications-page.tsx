@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { Job } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { AsyncView } from '../../components/async-view';
@@ -58,9 +58,18 @@ function Applications({ jobs, followUpDays, ownerName, onJob }: { jobs: Job[]; f
       (filter === 'all' || filterGroup(r.status) === filter) &&
       (!q || `${r.job.company} ${r.job.title} ${CHANNEL_LABEL[r.job.channel]}`.toLowerCase().includes(q)),
   );
+  const selectedRef = useRef(selectedId);
+  // Kept through close: the panel reads it as it unmounts, after the id is already cleared.
+  if (selectedId) selectedRef.current = selectedId;
   const selected = rows.find((r) => r.job.id === selectedId);
   // Previous and next step through what the filters show, so the panel never leaves the list the operator is in.
   const at = visible.findIndex((r) => r.job.id === selectedId);
+  /** The whole row opens the panel; focus goes to its button first so closing returns there. A click that ends a text selection is not an open. */
+  const openRow = (id: string, row: HTMLElement) => {
+    if (window.getSelection()?.toString()) return;
+    row.querySelector<HTMLElement>('.row-button')?.focus();
+    setSelectedId(id);
+  };
   const step = (by: number) => setSelectedId(visible[at + by]?.job.id);
 
   return (
@@ -73,10 +82,10 @@ function Applications({ jobs, followUpDays, ownerName, onJob }: { jobs: Job[]; f
       </header>
 
       <dl className="app-stats">
-          <Stat label="Sent this month" value={stats.sentThisMonth} />
-          <Stat label="Replies, incl. interviews" value={stats.replies} />
-          <Stat label="Interviews" value={stats.interviews} />
-          <Stat label="Follow-ups due" value={stats.followUpsDue} />
+          <Stat label="Sent this month" value={stats.sentThisMonth} tint="lavender" />
+          <Stat label="Replies, incl. interviews" value={stats.replies} tint="pink" />
+          <Stat label="Interviews" value={stats.interviews} tint="ice" />
+          <Stat label="Follow-ups due" value={stats.followUpsDue} tint="amber" />
       </dl>
 
       <div className="spread">
@@ -94,7 +103,7 @@ function Applications({ jobs, followUpDays, ownerName, onJob }: { jobs: Job[]; f
         </div>
       </div>
 
-      <div>
+      <>
         <section className="card card-flush app-list" aria-label="Application list">
           <div className="table-scroll">
             <table className="table app-table">
@@ -114,9 +123,9 @@ function Applications({ jobs, followUpDays, ownerName, onJob }: { jobs: Job[]; f
                   const sent = sentAt(job);
                   return (
                     // The whole row opens the panel; the button inside is the keyboard stop.
-                    <tr key={job.id} className="app-row" onClick={() => setSelectedId(job.id)}>
+                    <tr key={job.id} className="app-row" onClick={(e) => openRow(job.id, e.currentTarget)}>
                       <td>
-                        <button type="button" className="row-button" aria-haspopup="dialog">
+                        <button type="button" className="row-button" aria-haspopup="dialog" data-app={job.id}>
                           <span className="row-role">{job.title}</span>
                           <span className="cell-sub">{job.company}</span>
                         </button>
@@ -152,20 +161,21 @@ function Applications({ jobs, followUpDays, ownerName, onJob }: { jobs: Job[]; f
             title={selected.job.title}
             titleHidden
             fallbackFocus=".row-button"
+            returnFocus={() => document.querySelector<HTMLElement>(`[data-app="${selectedRef.current}"]`)}
             onClose={() => setSelectedId(undefined)}
             position={at >= 0 ? { index: at + 1, total: visible.length, onPrev: () => step(-1), onNext: () => step(1) } : undefined}
           >
             <ApplicationDetail key={selected.job.id} job={selected.job} status={selected.status} followUpDays={followUpDays} now={now} ownerName={ownerName} onJob={onJob} />
           </SidePanel>
         ) : null}
-      </div>
+      </>
     </>
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({ label, value, tint }: { label: string; value: number; tint: 'lavender' | 'pink' | 'ice' | 'amber' }) {
   return (
-    <div className="app-stat">
+    <div className={`app-stat app-stat-${tint}`}>
       <dt>{label}</dt>
       <dd className="mono">{value}</dd>
     </div>

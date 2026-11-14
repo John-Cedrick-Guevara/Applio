@@ -36,8 +36,7 @@
 .inbox-row-chevron { flex: none; color: var(--text-subtle); }
 .inbox-panel { display: flex; flex-direction: column; gap: var(--space-4); }
 .inbox-panel-keys { align-self: flex-start; }
-/* Inside the side panel a detail card drops its own frame: the panel is the frame. */
-.side-panel .card { padding: 0; border: 0; }
+
 /* Role and company truncate on their own: a long role can't push the company out of sight. */
 .inbox-row-text { flex: 1; min-width: 0; display: flex; color: var(--text-muted); }
 .inbox-row-role { flex: 0 1 auto; min-width: 8ch; max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-weight: 500; }
