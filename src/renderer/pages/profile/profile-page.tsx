@@ -14,7 +14,7 @@ import { ResumeSuggestions } from './resume-suggestions';
 import { TemplatePreview } from './template-preview';
 import './profile.css';
 
-type Tab = 'facts' | 'answers';
+type Tab = 'facts' | 'answers' | 'prefs' | 'resume';
 
 /** Profile (prototype screen 4, SPEC F1): the only material the AI may write from. */
 export default function ProfilePage() {
@@ -23,7 +23,7 @@ export default function ProfilePage() {
 
   return (
     <div className="profile">
-      <PageHeader title="Profile" description="The AI writes only from what is here. Nothing else gets into a resume or an answer." />
+      <PageHeader title={<>My <strong>profile</strong></>} description="The AI writes only from what is here. Nothing else gets into a resume or an answer." />
       <AsyncView state={profile} what="your profile" rows={5}>
         {(p) => <ProfileBody profile={p} onChange={(patch) => profile.setData((cur) => ({ ...cur, ...patch }))} />}
       </AsyncView>
@@ -42,56 +42,69 @@ function ProfileBody({ profile, onChange }: { profile: Profile; onChange: (patch
     setTab(next);
     setAdding(false);
   };
+  const TABS: { id: Tab; label: string; count?: number }[] = [
+    { id: 'facts', label: 'Fact bank', count: profile.facts.length },
+    { id: 'answers', label: 'Answer bank', count: profile.answers.length },
+    { id: 'prefs', label: 'Preferences' },
+    { id: 'resume', label: 'Résumé' },
+  ];
+  // Every panel stays mounted and only the chosen one shows, so an open editor or the résumé suggestions survive a look at another tab.
+  const panel = (id: Tab, label: string, children: React.ReactNode) => (
+    <div role="tabpanel" id={`profile-${id}`} aria-label={label} hidden={tab !== id} className="profile-panel">{children}</div>
+  );
 
   return (
     <>
-      <div className="profile-top">
-        <ReferenceResumeCard
-          resume={profile.referenceResume}
-          templateOpen={templateOpen}
-          onToggleTemplate={() => setTemplateOpen((o) => !o)}
-          onImported={(result) => {
-            onChange({ referenceResume: result.resume });
-            setImported(result);
-          }}
-        />
-        <PreferencesCard preferences={profile.preferences} location={profile.contact.location} onSaved={(preferences) => onChange({ preferences })} />
+      <div className="profile-tabrow">
+        <div className="tabs" role="tablist" aria-label="Profile sections">
+          {TABS.map((t) => (
+            <button key={t.id} type="button" role="tab" className="tab" aria-selected={tab === t.id} aria-controls={`profile-${t.id}`} onClick={() => pick(t.id)}>
+              {t.label}{t.count !== undefined ? <span className="tab-count">{t.count}</span> : null}
+            </button>
+          ))}
+        </div>
+        {(tab === 'facts' || tab === 'answers') && !adding ? (
+          <Button variant="strong" onClick={() => setAdding(true)}>{tab === 'facts' ? 'Add fact' : 'Add answer'}</Button>
+        ) : null}
       </div>
 
-      <ContactCard contact={profile.contact} onSaved={(contact) => onChange({ contact })} />
-
-      {templateOpen ? <TemplatePreview profile={profile} /> : null}
-
-      {imported ? (
-        <ResumeSuggestions
-          key={imported.resume.uploadedAt}
-          fileName={imported.resume.fileName}
-          suggestions={imported.suggestions}
-          onAdded={(fact) => onChange({ facts: [fact, ...profile.facts] })}
-          onDone={() => setImported(null)}
-        />
-      ) : null}
-
-      <section className="card card-flush" aria-label="Fact and answer banks">
-        <div className="card-header">
-          <div className="tabs" role="tablist" aria-label="Profile data">
-            <button type="button" role="tab" className="tab" aria-selected={tab === 'facts'} onClick={() => pick('facts')}>
-              Fact bank · {profile.facts.length}
-            </button>
-            <button type="button" role="tab" className="tab" aria-selected={tab === 'answers'} onClick={() => pick('answers')}>
-              Answer bank · {profile.answers.length}
-            </button>
-          </div>
-          {adding ? null : (
-            <Button variant="strong" onClick={() => setAdding(true)}>{tab === 'facts' ? 'Add fact' : 'Add answer'}</Button>
-          )}
-        </div>
-        {tab === 'facts' ? (
-          <FactBank profile={profile} adding={adding} onCloseAdd={() => setAdding(false)} onChange={(facts) => onChange({ facts })} onGroupsChange={(factGroups) => onChange({ factGroups })} />
-        ) : (
-          <AnswerBank answers={profile.answers} adding={adding} onCloseAdd={() => setAdding(false)} onChange={(answers) => onChange({ answers })} />
-        )}
-      </section>
+      {panel('facts', 'Fact bank', (
+        <section className="card card-flush" aria-label="Fact bank">
+          <FactBank profile={profile} adding={adding && tab === 'facts'} onCloseAdd={() => setAdding(false)} onChange={(facts) => onChange({ facts })} onGroupsChange={(factGroups) => onChange({ factGroups })} />
+        </section>
+      ))}
+      {panel('answers', 'Answer bank', (
+        <section className="card card-flush" aria-label="Answer bank">
+          <AnswerBank answers={profile.answers} adding={adding && tab === 'answers'} onCloseAdd={() => setAdding(false)} onChange={(answers) => onChange({ answers })} />
+        </section>
+      ))}
+      {panel('prefs', 'Preferences', (
+        <PreferencesCard preferences={profile.preferences} location={profile.contact.location} onSaved={(preferences) => onChange({ preferences })} />
+      ))}
+      {panel('resume', 'Résumé', (
+        <>
+          <ReferenceResumeCard
+            resume={profile.referenceResume}
+            templateOpen={templateOpen}
+            onToggleTemplate={() => setTemplateOpen((o) => !o)}
+            onImported={(result) => {
+              onChange({ referenceResume: result.resume });
+              setImported(result);
+            }}
+          />
+          {imported ? (
+            <ResumeSuggestions
+              key={imported.resume.uploadedAt}
+              fileName={imported.resume.fileName}
+              suggestions={imported.suggestions}
+              onAdded={(fact) => onChange({ facts: [fact, ...profile.facts] })}
+              onDone={() => setImported(null)}
+            />
+          ) : null}
+          <ContactCard contact={profile.contact} onSaved={(contact) => onChange({ contact })} />
+          {templateOpen ? <TemplatePreview profile={profile} /> : null}
+        </>
+      ))}
     </>
   );
 }
