@@ -8,7 +8,7 @@ Decision (requester, 2026-11-14): where v5 and the v3 foundation spec (`ui-v3-fo
 - [ ] AC-2: Colour tokens match the v5 style guide: ink `#141519`, muted `#5E626B`, line `#E7E7E3`, ground `#F5F5F2`, surface `#FFFFFF`, lavender tint/block/mark/ink, pink, ice, and the four status grounds with their ink and dot colours. The page ground shows the 22px dot grid.
 - [ ] AC-3: Text sizes come only from 12, 13, 14, 17, 22, 28, 34 and 44px, and none is below 12px, in tokens and hard-coded CSS.
 - [ ] AC-4: Buttons are pills: primary (ink fill, white text), secondary (ink outline), small (36px, border `#D9D9D4`), text (underlined), icon (36px circle). Normal buttons are 40px tall. Disabled buttons are grey with `#5E626B` text. `.btn-strong` uses the same ink fill as primary.
-- [ ] AC-5: Cards use a 20px radius, 20px padding and a `#E7E7E3` border; tab and filter pills are 40px tall pills with a count bubble, ink when selected.
+- [ ] AC-5: Cards use a 20px radius, 20px padding and a `#E7E7E3` border; tab and filter pills are at least 40px tall pills, ink when selected. (The count bubble arrives with the first screen that shows counts, PR-4.)
 - [ ] AC-6: Status chips (`badge-*`) show the v5 status grounds and ink colours; each still carries a word, never colour alone.
 - [ ] AC-7: Text on every token pair used for chips, buttons and muted text meets 4.5:1 contrast.
 - [ ] AC-8: Focus is visible on every interactive element with a 2px ring in `#5B62D6` offset by 2px; reduced motion still removes transitions and the spinner animation.

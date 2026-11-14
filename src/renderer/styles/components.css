@@ -90,6 +90,7 @@
 
 .btn-sm {
   height: var(--control-h-sm);
+  border-color: var(--border-strong);
   padding: 0 var(--space-3);
   font-size: var(--text-md);
 }
@@ -98,12 +99,18 @@
 .btn-strong { padding: 0 var(--space-5); background: var(--ink); color: var(--on-ink); }
 .btn-primary:disabled,
 .btn-strong:disabled { background: var(--border); color: var(--text-muted); }
+.btn-primary:hover:not(:disabled),
+.btn-strong:hover:not(:disabled) { background: var(--ink-hover); filter: none; }
+.btn-secondary:disabled,
+.btn-ghost:disabled,
+.btn-danger:disabled,
+.btn-destructive:disabled { border-color: var(--border); background: var(--border); color: var(--text-muted); }
 .btn-secondary { background: transparent; border-color: var(--ink); color: var(--text); }
 .btn-ghost { background: transparent; color: var(--text-secondary); }
 .btn-danger { background: transparent; color: var(--danger-text); }
 .btn-destructive { padding: 0 var(--space-4); background: var(--danger); color: var(--on-accent); }
 .btn-link { height: auto; padding: 0; border: 0; background: none; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
-.btn-icon { width: var(--control-h-sm); padding: 0; border-radius: 50%; background: var(--bg); color: var(--text-muted); }
+.btn-icon { width: var(--control-h-sm); height: var(--control-h-sm); padding: 0; border-radius: 50%; background: var(--bg); color: var(--text-muted); }
 
 a.btn-primary:hover,
 a.btn-strong:hover { color: var(--on-ink); }
@@ -418,7 +425,7 @@ a.btn-secondary:hover { color: var(--text); }
 
 /* Filter pills */
 .pill {
-  height: var(--control-h);
+  min-height: var(--control-h);
   padding: 0 var(--space-4);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-pill);
@@ -681,7 +688,7 @@ a.btn-secondary:hover { color: var(--text); }
 .job-card-text strong { font-weight: 600; }
 .job-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .job-card-actions .btn { background: var(--surface); color: inherit; border-color: currentcolor; }
-.job-card-actions .btn-primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.job-card-actions .btn-primary { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
 .job-card-neutral { background: var(--neutral-soft); color: var(--text-secondary); }
 .job-card-next { margin: 0; color: var(--text-secondary); line-height: 1.5; }
 .job-card-next strong { color: var(--text); font-weight: 600; }

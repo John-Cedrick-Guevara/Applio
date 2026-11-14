@@ -53,6 +53,7 @@
 
   /* Ink: dark primary buttons and toasts */
   --ink: #141519;
+  --ink-hover: #2e3038;
   --on-ink: #ffffff;
 
   /* Status */

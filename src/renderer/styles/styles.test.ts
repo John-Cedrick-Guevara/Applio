@@ -88,6 +88,34 @@ describe('v5 foundation', () => {
     expect(all).toMatch(/\.btn-strong:disabled\s*\{[^}]*background:\s*var\(--border\)[^}]*color:\s*var\(--text-muted\)/);
   });
 
+  it('greys every disabled button variant, not only primary', () => {
+    for (const v of ['btn-secondary', 'btn-ghost', 'btn-danger', 'btn-destructive']) {
+      expect(all, v).toMatch(new RegExp(`\\.${v}:disabled`));
+    }
+  });
+
+  it('shows hover on ink buttons by lightening them', () => {
+    expect(all).toMatch(/\.btn-primary:hover:not\(:disabled\)[^{]*\{[^}]*background:\s*var\(--ink-hover\)/);
+    expect(hex('ink-hover')).toBe('#2e3038');
+  });
+
+  it('uses tabular figures for numbers', () => {
+    expect(all).toMatch(/body\s*\{[^}]*font-variant-numeric:\s*tabular-nums/);
+  });
+
+  it('keeps the job card primary button ink, like every other primary', () => {
+    expect(all).toMatch(/\.job-card-actions \.btn-primary\s*\{[^}]*background:\s*var\(--ink\)/);
+  });
+
+  it('makes icon buttons 36px circles and small buttons outlined', () => {
+    expect(all).toMatch(/\.btn-icon\s*\{[^}]*height:\s*var\(--control-h-sm\)/);
+    expect(all).toMatch(/\.btn-sm\s*\{[^}]*border-color:\s*var\(--border-strong\)/);
+  });
+
+  it('lets pills grow instead of clipping a long label', () => {
+    expect(all).toMatch(/\.pill\s*\{[^}]*min-height:\s*var\(--control-h\)/);
+  });
+
   it('gives cards a 20px radius and 20px padding', () => {
     expect(px('radius-card')).toBe(20);
     const card = all.match(/\.card\s*\{([^}]*)\}/)?.[1] ?? '';
