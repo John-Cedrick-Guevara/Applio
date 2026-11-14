@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { AppStatus, Job, Settings } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { AsyncView } from '../../components/async-view';
 import { Button, buttonClass } from '../../components/button';
 import { PageHeader } from '../../components/page-header';
+import { SidePanel } from '../../components/side-panel';
+import { JobPanel } from '../review/job-panel';
 import { useAction } from '../../hooks/use-action';
 import { useAsync } from '../../hooks/use-async';
 import { useHeldAction } from '../../hooks/use-held-action';
@@ -43,7 +46,7 @@ export default function MatchesPage({ params = {} }: { params?: RouteParams }) {
 
   return (
     <div className="matches">
-      <PageHeader title="Matches" description="Jobs that passed your filters but have no draft yet. Draft the ones worth it; drafts go to the Inbox when ready." />
+      <PageHeader title={<>My <strong>matches</strong></>} description="Jobs that passed your filters but have no draft yet. Draft the ones worth it; drafts go to the Inbox when ready." />
       <AsyncView state={state} what="your matches" rows={6}>
         {(data) => (
           <MatchesView
@@ -55,6 +58,7 @@ export default function MatchesPage({ params = {} }: { params?: RouteParams }) {
             status={data.status}
             onSettings={(settings) => state.setData((d) => ({ ...d, settings }))}
             onJob={(job) => state.setData((d) => ({ ...d, jobs: d.jobs.map((j) => (j.id === job.id ? job : j)) }))}
+            onReload={state.reload}
           />
         )}
       </AsyncView>
@@ -71,9 +75,11 @@ interface ViewProps {
   onSettings: (settings: Settings) => void;
   /** Swaps in a job the page changed (scored on request). */
   onJob: (job: Job) => void;
+  /** Reloads the list after the panel drafts or skips a match. */
+  onReload: () => void;
 }
 
-function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings, onJob }: ViewProps) {
+function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings, onJob, onReload }: ViewProps) {
   const api = useApi();
   const action = useAction();
   const [bar, setBar] = useState(settings.draftThreshold);
@@ -81,6 +87,11 @@ function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings, onJob
   const [query, setQuery] = useState('');
   const [onlyNew, setOnlyNew] = useState(onlyNewAtStart);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  // The match open in the side panel, if any; stepping walks the rows the filters show.
+  const [openId, setOpenId] = useState<string | undefined>();
+  const openRef = useRef(openId);
+  // Kept through close: the panel reads it as it unmounts, after the id is already cleared.
+  if (openId) openRef.current = openId;
   // Clean up: a previewed, manual move of stale matches to the Trash.
   const [cleaning, setCleaning] = useState(false);
   const [olderOn, setOlderOn] = useState(true);
@@ -137,6 +148,8 @@ function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings, onJob
   const stale = staleMatches(visible, { olderOn, olderDays: daysOk ? daysNum : Infinity, belowOn, bar, drafting: status.drafting ?? [], now });
   const cleanBlock = !daysOk ? 'Enter a whole number of days from 1 to 365.' : stale.picked.length === 0 ? 'Nothing matches these rules.' : undefined;
   const rows = matchRows(visible, filters);
+  const openJob = rows.find((j) => j.id === openId);
+  const at = openJob ? rows.indexOf(openJob) : -1;
   const counts = tabCounts(visible, filters);
   const strong = tabCounts(visible, { ...filters, query: '', onlyNew: false }).strong;
   const chosen = rows.filter((j) => selected.has(j.id));
@@ -292,7 +305,7 @@ function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings, onJob
                       <td><input type="checkbox" aria-label={`Select ${j.title} at ${j.company}`} checked={selected.has(j.id)} onChange={() => toggle(j.id)} /></td>
                       <td className="mono">{j.score ?? '—'}</td>
                       <td>
-                        <a href={`#/inbox/${j.id}`} className="matches-role">{j.title}</a>
+                        <button type="button" className="matches-role" aria-haspopup="dialog" data-match={j.id} onClick={() => setOpenId(j.id)}>{j.title}</button>
                         <span className="cell-sub matches-sub">{j.company} · {j.sourceName} · {CHANNEL_LABEL[j.channel]}</span>
                       </td>
                       <td className="matches-why">
@@ -351,16 +364,41 @@ function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings, onJob
         {status.budgetStop ? <p className="cell-sub matches-foot">{status.budgetStop} Drafting waits until it resets.</p> : null}
       </section>
 
-      {skips.held ? (
+      {openJob ? (
+        <SidePanel
+          title={openJob.title}
+          titleHidden
+          fallbackFocus=".matches-role"
+          returnFocus={() => document.querySelector<HTMLElement>(`[data-match="${openRef.current}"]`)}
+          onClose={() => setOpenId(undefined)}
+          position={at >= 0 ? { index: at + 1, total: rows.length, onPrev: () => setOpenId(rows[at - 1]?.id), onNext: () => setOpenId(rows[at + 1]?.id) } : undefined}
+        >
+          <JobPanel
+            key={openJob.id}
+            job={openJob}
+            draftThreshold={bar}
+            {...(status.budgetStop ? { budgetStop: status.budgetStop } : {})}
+            onChanged={() => {
+              setOpenId(undefined);
+              onReload();
+            }}
+          />
+        </SidePanel>
+      ) : null}
+
+      {/* On the body: an open panel makes the page inert, and Undo must stay reachable. */}
+      {skips.held ? createPortal(
         <div className="undo-bar" role="status" aria-label="Undo">
           <span>{skips.held.message}</span>
           <Button size="sm" variant="link" onClick={() => { unhide(skips.held!.ids); skips.undo(); }}>Undo</Button>
-        </div>
-      ) : cleaned ? (
+        </div>,
+        document.body,
+      ) : cleaned ? createPortal(
         <div className="undo-bar" role="status" aria-label="Undo">
           <span>{cleaned.message}</span>
           <Button size="sm" variant="link" onClick={undoCleanup}>Undo</Button>
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </>
   );
