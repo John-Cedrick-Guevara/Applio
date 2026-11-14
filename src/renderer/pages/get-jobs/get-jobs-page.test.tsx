@@ -48,7 +48,9 @@ describe('GetJobsPage', () => {
 
   it('is headed "Get jobs" with the v5 pill tabs', async () => {
     renderWithApp(<GetJobsPage params={{}} />);
-    expect(screen.getByRole('heading', { level: 1, name: 'Get jobs' })).toBeInTheDocument();
+    const heading = screen.getByRole('heading', { level: 1, name: 'Get jobs' });
+    // A light word and a bold one, like every v5 page title.
+    expect(heading.querySelector('strong')).toHaveTextContent('jobs');
     expect(screen.getByRole('tablist', { name: 'How to get jobs' })).toBeInTheDocument();
   });
 
@@ -63,9 +65,22 @@ describe('GetJobsPage', () => {
     expect(filled).toBeLessThanOrEqual(3);
   });
 
-  it('fills the whole meter when drafting is on, since drafting spends up to what is left', async () => {
+  it('fills the whole meter when drafting is on, and says it is the ceiling', async () => {
     const { container } = renderWithApp(<GetJobsPage params={{}} />);
-    await userEvent.click(await screen.findByRole('checkbox', { name: /Also draft strong matches/ }));
+    await screen.findByRole('list', { name: 'Sources this scan checks' });
+    const before = container.querySelectorAll('.find-jobs-meter span.on').length;
+    expect(before).toBeLessThan(10);
+    expect(screen.queryByText(/Worst case/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('checkbox', { name: /Also draft strong matches/ }));
+    expect(container.querySelectorAll('.find-jobs-meter span.on')).toHaveLength(10);
+    expect(screen.getByText(/Worst case with drafting on/)).toBeInTheDocument();
+  });
+
+  it('shows a full meter when the budget is used up', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const used = { ...api, getStatus: async () => ({ ...(await api.getStatus()), tokensToday: 150_000, dailyTokenBudget: 150_000, budgetStop: 'Daily budget used' }) };
+    const { container } = renderWithApp(<GetJobsPage params={{}} />, used);
+    await screen.findByText(/Can't scan right now/);
     expect(container.querySelectorAll('.find-jobs-meter span.on')).toHaveLength(10);
   });
 });

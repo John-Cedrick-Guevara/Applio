@@ -1,10 +1,11 @@
 /* Find jobs: what a scan checks and costs, the scan running, and what it kept. */
-.find-jobs { display: flex; flex-direction: column; gap: var(--space-5); max-width: 880px; }
+.find-jobs { display: flex; flex-direction: column; gap: var(--space-5); max-width: 720px; }
 .find-jobs-body { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5) var(--space-6); }
 .find-jobs-sources li { display: flex; justify-content: space-between; gap: var(--space-4); padding: var(--space-3) 0; border-bottom: 1px solid var(--border-soft); }
 .find-jobs-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-4); padding: var(--space-5) var(--space-6); border-top: 1px solid var(--border-soft); background: var(--ice-tint); }
 .find-jobs-meter { display: grid; flex-basis: 100%; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 6px; }
-.find-jobs-meter span { height: 16px; border: 1px dashed #a9b9c2; border-radius: 6px; }
+.find-jobs-meter span { height: 16px; border: 1px dashed var(--ice-line); border-radius: 6px; }
+.find-jobs-ceiling { flex-basis: 100%; margin: 0; }
 .find-jobs-meter span.on { border-color: transparent; background: var(--ice-block); }
 .find-jobs-actions { justify-content: flex-end; }
 .find-jobs-cost { display: flex; flex-wrap: wrap; gap: var(--space-6); margin: 0; font-size: var(--text-sm); }

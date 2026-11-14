@@ -3,7 +3,7 @@ Give Get jobs the v5 look and show, before the scan button, what a scan costs as
 
 ## Acceptance criteria
 - [ ] AC-1: The page is headed "Get jobs" with the pill tabs Scan sources and Paste a job; the tab still lives in the URL.
-- [ ] AC-2: The cost panel shows a 10-block meter of the scan's share of what is left today: scoring alone fills at least one block; with "Also draft strong matches" on it fills all ten, because drafting spends up to what is left; with nothing left it is full.
+- [ ] AC-2: The cost panel shows a 10-block meter of the scan's share of what is left today, computed by the same helper as the cost line: scoring alone fills at least one block; with "Also draft strong matches" on it fills all ten and says so as a worst case, because drafting spends up to what is left; with nothing left, or AI stopped by a budget, it is full.
 - [ ] AC-3: The scan funnel (fetched, new, passed, drafted) shows as four tinted count cards.
 - [ ] AC-4: A running scan survives a look at the other tab, and the scan, stop and result links behave as before.
 
@@ -17,8 +17,8 @@ Give Get jobs the v5 look and show, before the scan button, what a scan costs as
 
 ## Test plan
 - AC-1: `get-jobs-page.test.tsx` › "is headed 'Get jobs' with the v5 pill tabs", "opens on Scan sources and switches to Paste a job".
-- AC-2: › "shows what a scan costs as a share of what is left today, with a block meter", "fills the whole meter when drafting is on…".
-- AC-3: existing `find-jobs-page.test.tsx` funnel test.
+- AC-2: `cost.test.ts` › "costBlocks" (three tests); `get-jobs-page.test.tsx` › "shows what a scan costs as a share…", "fills the whole meter when drafting is on, and says it is the ceiling", "shows a full meter when the budget is used up".
+- AC-3: manual: screenshot of the results cards in the PR (styling only); the counts are covered by the existing `find-jobs-page.test.tsx` funnel test.
 - AC-4: › "keeps a running scan on screen while the operator looks at the other tab".
 - MNB-1..3: existing `find-jobs-page.test.tsx`, `add-job-page.test.tsx`.
 
