@@ -5,7 +5,7 @@ const draft = { draft: '75', auto: '85', perDay: '10', tokens: '150,000', monthT
 
 describe('parseGuardrails', () => {
   it('accepts valid limits, including thousands separators', () => {
-    expect(parseGuardrails(draft)).toEqual({ ok: true, value: { draftThreshold: 75, autoSendThreshold: 85, maxPerChannelPerDay: 10, dailyTokenBudget: 150_000, monthlyTokenBudget: 3_000_000 } });
+    expect(parseGuardrails(draft)).toEqual({ ok: true, value: { draftThreshold: 75, autoSendThreshold: 85, maxPerChannelPerDay: 10, weeklyGoal: 15, dailyTokenBudget: 150_000, monthlyTokenBudget: 3_000_000 } });
   });
 
   it('keeps scores within 0–100', () => {
