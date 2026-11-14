@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { AppStatus, Job, OpenQuestions, Settings, Source } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { AsyncView } from '../../components/async-view';
+import { Blocks } from '../../components/blocks';
 import { buttonClass } from '../../components/button';
 import { Icon } from '../../components/icons';
 import { useAsync } from '../../hooks/use-async';
@@ -12,15 +13,6 @@ import { budgetCard, needs, pipeline, sentSeries, upNext, weekCard, type Pipelin
 import './dashboard.css';
 
 const dateFormat = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
-
-/** n filled blocks out of total, as a decorative meter; the numbers beside it say the same in words. */
-function Blocks({ filled, total, tone, gap = 4 }: { filled: number; total: number; tone: 'lavender' | 'ice'; gap?: number }) {
-  return (
-    <div className="dash-blocks" aria-hidden="true" style={{ gridTemplateColumns: `repeat(${total}, minmax(0, 1fr))`, gap }}>
-      {Array.from({ length: total }, (_, i) => <span key={i} className={i < filled ? `on on-${tone}` : undefined} />)}
-    </div>
-  );
-}
 
 /**
  * Dashboard (v5 home): what needs the operator, how the week and the AI budget stand,
@@ -147,7 +139,7 @@ function DashboardView({ jobs, questions, status, settings, sources }: Data) {
             <span className="dash-pill">{week.pct}% of goal</span>
           </div>
           <p className="dash-hero"><span>{week.sent}</span> <span className="muted">/ {week.goal} goal</span></p>
-          <Blocks filled={week.blocks.filled} total={week.blocks.total} tone="lavender" />
+          <Blocks filled={week.blocks.filled} total={week.blocks.total} tone="lavender" size="lg" className="dash-blocks" />
           <p className="dash-line">{week.line}</p>
         </section>
 
@@ -157,7 +149,7 @@ function DashboardView({ jobs, questions, status, settings, sources }: Data) {
             <span className="dash-pill">{budget.pct}% used</span>
           </div>
           <p className="dash-hero"><span>{formatTokens(budget.used)}</span> <span className="muted">/ {formatTokens(budget.total)} tokens</span></p>
-          <Blocks filled={budget.blocks.filled} total={budget.blocks.total} tone="ice" gap={6} />
+          <Blocks filled={budget.blocks.filled} total={budget.blocks.total} tone="ice" size="lg" gap={6} className="dash-blocks" />
           <p className="dash-line">
             {budget.stopped
               ? <>AI is paused: {budget.stopReason}. <a href="#/settings/guard">Raise budget</a></>

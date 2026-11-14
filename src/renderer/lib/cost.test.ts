@@ -28,6 +28,12 @@ describe('costBlocks', () => {
     expect(costBlocks(6_100, status(130_000))).toBe(4); // just over 30%
   });
 
+  it('keeps a cost near what is left on the full side: 95% of what is left is all ten blocks', () => {
+    expect(costBlocks(19_000, status(130_000))).toBe(10);
+    expect(costBlocks(18_100, status(130_000))).toBe(10); // 90.5% rounds up to the tenth
+    expect(costBlocks(18_000, status(130_000))).toBe(9); // exactly 90%
+  });
+
   it('is full when the cost reaches what is left, or when nothing is left', () => {
     expect(costBlocks(20_000, status(130_000))).toBe(10);
     expect(costBlocks(30_000, status(140_000))).toBe(10);

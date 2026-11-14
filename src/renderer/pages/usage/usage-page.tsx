@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Usage, UsagePeriod } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { AsyncView } from '../../components/async-view';
+import { Blocks } from '../../components/blocks';
 import { useAsync } from '../../hooks/use-async';
 import { shareBlocks } from '../../lib/cost';
 import { formatTokens } from '../../lib/format';
@@ -40,13 +41,15 @@ export default function UsagePage() {
 function UsageBody({ usage }: { usage: Usage }) {
   const { summary, period } = usage;
   const today = period === 'today';
-  const pct = Math.round((summary.tokens / summary.tokenBudget) * 100);
+  // One share, so the percentage, the meter and its value always agree (and a zero budget reads 0%, not NaN).
+  const share = summary.tokenBudget > 0 ? summary.tokens / summary.tokenBudget : 0;
+  const pct = Math.round(share * 100);
   const b = summary.sentBreakdown;
 
   return (
     <>
       <div className="tiles">
-        <Tile tint="lavender" label="Claude tokens" value={formatTokens(summary.tokens)} of={`/ ${formatTokens(summary.tokenBudget)}`} note={`${pct}% of ${today ? 'daily' : 'monthly'} budget`} blocks={shareBlocks(summary.tokens / Math.max(1, summary.tokenBudget), 10)} />
+        <Tile tint="lavender" label="Claude tokens" value={formatTokens(summary.tokens)} of={`/ ${formatTokens(summary.tokenBudget)}`} note={`${pct}% of ${today ? 'daily' : 'monthly'} budget`} blocks={shareBlocks(share, 10)} pct={pct} />
         <Tile
           tint="pink"
           label="Applications sent"
@@ -121,7 +124,7 @@ function PrefilterCard({ prefilter, today }: { prefilter: NonNullable<Usage['pre
   );
 }
 
-function Tile({ label, value, of, note, tint, blocks }: { label: string; value: string; of?: string; note: string; tint: 'lavender' | 'pink' | 'ice' | 'amber'; blocks?: number }) {
+function Tile({ label, value, of, note, tint, blocks, pct }: { label: string; value: string; of?: string; note: string; tint: 'lavender' | 'pink' | 'ice' | 'amber'; blocks?: number; pct?: number }) {
   return (
     <div className={`tile tile-tint-${tint}`}>
       <div className="tile-label">{label}</div>
@@ -129,11 +132,7 @@ function Tile({ label, value, of, note, tint, blocks }: { label: string; value: 
         <span className="mono">{value}</span>
         {of ? <span className="tile-of">{of}</span> : null}
       </div>
-      {blocks !== undefined ? (
-        <div className="tile-meter" aria-hidden="true">
-          {Array.from({ length: 10 }, (_, i) => <span key={i} className={i < blocks ? 'on' : undefined} />)}
-        </div>
-      ) : null}
+      {blocks !== undefined && pct !== undefined ? <Blocks filled={blocks} total={10} tone="lavender" className="tile-meter" meter={{ label: `${label} used`, now: pct }} /> : null}
       <div className="cell-sub">{note}</div>
     </div>
   );

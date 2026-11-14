@@ -19,28 +19,12 @@
 .tile-tint-ice { background: var(--ice-tint); }
 .tile-tint-amber { background: var(--warning-soft); }
 
-.tile-meter {
-  display: grid;
-  grid-template-columns: repeat(10, minmax(0, 1fr));
-  gap: 4px;
-  margin: var(--space-2) 0 var(--space-3);
-}
-
-.tile-meter span {
-  height: 16px;
-  border: 1px dashed var(--lavender-block);
-  border-radius: 6px;
-}
-
-.tile-meter span.on {
-  border-color: transparent;
-  background: var(--lavender-block);
-}
-
 .tile-label {
   color: var(--text-muted);
   font-size: var(--text-sm);
 }
+
+.tile-meter { margin: var(--space-2) 0 var(--space-3); }
 
 .tile-value {
   display: flex;
@@ -117,7 +101,7 @@
   top: 8px;
   left: 0;
   right: 0;
-  border-top: 1px dashed var(--border-strong);
+  border-top: 1px dashed var(--text-subtle);
 }
 
 .budget-label {
