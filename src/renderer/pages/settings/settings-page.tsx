@@ -6,6 +6,7 @@ import { PageHeader } from '../../components/page-header';
 import { TabList, TabPanel } from '../../components/tabs';
 import { useAsync } from '../../hooks/use-async';
 import { navigate, type RouteParams } from '../../lib/router';
+import { AutoSendSection } from './auto-send-section';
 import { ChannelsSection } from './channels-section';
 import { ConnectionsSection } from './connections-section';
 import { GuardrailsSection } from './guardrails-section';
@@ -41,18 +42,19 @@ export default function SettingsPage({ params }: { params: RouteParams }) {
     navigate(`/settings/${id}`);
   };
   const state = useAsync(async () => {
-    const [settings, sources] = await Promise.all([api.getSettings(), api.listSources()]);
-    return { settings, sources };
+    const [settings, sources, status] = await Promise.all([api.getSettings(), api.listSources(), api.getStatus()]);
+    return { settings, sources, paused: status.paused };
   }, [api]);
 
   const setSettings = (settings: Settings) => state.setData((d) => ({ ...d, settings }));
+  const setPaused = (paused: boolean) => state.setData((d) => ({ ...d, paused }));
   const setSource = (source: Source) => state.setData((d) => ({ ...d, sources: d.sources.map((s) => (s.id === source.id ? source : s)) }));
 
   return (
     <div className="settings">
       <PageHeader title={<>My <strong>settings</strong></>} description="Changes save automatically." />
       <AsyncView state={state} what="settings" rows={6}>
-        {({ settings, sources }) => (
+        {({ settings, sources, paused }) => (
           <>
             <TabList label="Settings sections" idPrefix="settings" tabs={TAB_LIST} value={tab} onChange={choose} />
             <TabPanel idPrefix="settings" id="sources" active={tab === 'sources'}>
@@ -62,6 +64,7 @@ export default function SettingsPage({ params }: { params: RouteParams }) {
               <ChannelsSection settings={settings} onChange={setSettings} />
             </TabPanel>
             <TabPanel idPrefix="settings" id="guard" active={tab === 'guard'}>
+              <AutoSendSection paused={paused} autoSendThreshold={settings.autoSendThreshold} autonomousSources={sources.filter((s) => s.enabled && s.autonomy === 'autonomous').length} onChange={setPaused} />
               <GuardrailsSection settings={settings} onChange={setSettings} />
             </TabPanel>
             <TabPanel idPrefix="settings" id="conn" active={tab === 'conn'}>

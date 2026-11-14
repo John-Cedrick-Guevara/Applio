@@ -244,4 +244,37 @@ describe('SettingsPage', () => {
     expect(screen.queryByRole('radiogroup', { name: 'AI engine' })).not.toBeInTheDocument();
     expect(testConnection).not.toHaveBeenCalled();
   });
+
+  describe('auto-send pause', () => {
+    it('shows auto-send as on, and pauses it with a switch on the Guardrails tab', async () => {
+      const { api } = renderWithApp(<SettingsPage params={{}} />);
+      await go(/^Guardrails/);
+      const toggle = await screen.findByRole('switch', { name: 'Pause auto-send' });
+      expect(toggle).not.toBeChecked();
+      await userEvent.click(toggle);
+      await waitFor(async () => expect((await api.getStatus()).paused).toBe(true));
+      expect(screen.getByRole('switch', { name: 'Pause auto-send' })).toBeChecked();
+      expect(screen.getByText(/Nothing goes out on its own while this is on/)).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('switch', { name: 'Pause auto-send' }));
+      await waitFor(async () => expect((await api.getStatus()).paused).toBe(false));
+    });
+
+    it('opens already paused when auto-send is paused', async () => {
+      const api = createMockApi({ latencyMs: 0 });
+      await api.setAutomationPaused(true);
+      renderWithApp(<SettingsPage params={{}} />, api);
+      await go(/^Guardrails/);
+      expect(await screen.findByRole('switch', { name: 'Pause auto-send' })).toBeChecked();
+    });
+
+    it('says why a pause fails and leaves the switch where it was', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const api = createMockApi({ latencyMs: 0 });
+      renderWithApp(<SettingsPage params={{}} />, { ...api, setAutomationPaused: async () => { throw new Error('locked'); } });
+      await go(/^Guardrails/);
+      await userEvent.click(await screen.findByRole('switch', { name: 'Pause auto-send' }));
+      expect(await screen.findByText(/Couldn't pause auto-send/)).toBeInTheDocument();
+      expect(screen.getByRole('switch', { name: 'Pause auto-send' })).not.toBeChecked();
+    });
+  });
 });

@@ -2,23 +2,29 @@ import { useEffect, useState } from 'react';
 import type { AppStatus } from '../../shared/types';
 import { useApi } from '../api/api-context';
 import { useAsync } from '../hooks/use-async';
+import { shareBlocks } from '../lib/cost';
 import { usePath } from '../lib/router';
 import { activityModel } from './activity-model';
 
 /**
- * The rail's activity block: what is running right now, in words, and today's token
- * use as 10 blocks. It always says something, so "is it doing anything?" never needs
- * a guess. Status comes from main's pushes; auto-send details stay in the top bar.
+ * The rail's activity block: what is running right now, whether anything sends on its own,
+ * and today's token use. It always says something, so "is it doing anything?" never needs a
+ * guess. Its link goes where the next step is: Get jobs while a scan runs (Stop scan is
+ * there), Settings when the budget or Claude blocks work, else Usage. Status comes from
+ * main's pushes; auto-send pause lives in Settings.
  */
 export function ActivityBlock() {
   const api = useApi();
   const path = usePath();
-  const state = useAsync(() => api.getStatus(), [api, path]);
-  const setStatus = (status: AppStatus) => state.setData(status);
+  const state = useAsync(async () => {
+    const [status, settings, sources] = await Promise.all([api.getStatus(), api.getSettings(), api.listSources()]);
+    return { status, autoSendThreshold: settings.autoSendThreshold, autonomousSources: sources.filter((s) => s.enabled && s.autonomy === 'autonomous').length };
+  }, [api, path]);
+  const setStatus = (status: AppStatus) => state.setData((d) => (d ? { ...d, status } : d));
   useEffect(() => window.applioEvents?.onStatus(setStatus), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Ticks once a second only while a scan runs, for its elapsed time.
-  const scanning = !!state.data?.scan;
+  const scanning = !!state.data?.status.scan;
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!scanning) return;
@@ -36,25 +42,34 @@ export function ActivityBlock() {
       </div>
     ) : null;
   }
-  const m = activityModel(state.data, { autoSendThreshold: 0, autonomousSources: 0, now });
-  const [text = '', ...rest] = m.running.text.split(' · ');
+  const { status, autoSendThreshold, autonomousSources } = state.data;
+  const m = activityModel(status, { autoSendThreshold, autonomousSources, now });
+  const [runText = '', ...rest] = m.running.text.split(' · ');
   // The scan clock is the last part; it ticks every second, so it stays out of the live region.
   const clock = m.running.kind === 'scan' ? rest.pop() : undefined;
-  const sub = rest.join(' · ');
+  const runSub = rest.join(' · ');
+  const stopped = m.running.kind === 'stopped';
+  // The most urgent thing leads; a blocked AI or missing Claude is a link to the fix, not just a colour.
+  const lead = m.engine
+    ? { text: m.engine, sub: 'Open Settings to set it up', to: '#/settings/conn' }
+    : stopped
+    ? { text: runText, sub: 'Raise the budget in Settings', to: '#/settings/guard' }
+    : { text: runText, sub: runSub, to: m.running.kind === 'scan' ? '#/get-jobs' : '#/usage' };
   const busy = m.running.kind === 'scan' || m.running.kind === 'drafting';
-  // Any use fills a block, and the last fills only at the limit, so the bar never reads empty or exhausted early.
-  const on = m.budget.pct <= 0 ? 0 : m.budget.pct >= 100 ? 10 : Math.min(9, Math.ceil(m.budget.pct / 10));
+  const auto = m.auto.text.split(' · ')[0] ?? '';
+  const on = shareBlocks(m.budget.pct / 100, 10);
 
   return (
     <div role="status" aria-live="polite" className="activity-block">
-      <a href="#/usage" title={`${text}. ${sub}`} className="activity-block-link">
+      <a href={lead.to} title={`${lead.text}. ${lead.sub}. ${auto}.`} className="activity-block-link">
         <span className="activity-block-icon" aria-hidden="true">
-          {busy ? <span className="spinner" /> : <span className={`activity-block-dot activity-block-dot-${m.running.kind === 'stopped' || m.engine ? 'stop' : 'ok'}`} />}
+          {busy ? <span className="spinner" /> : <span className={`activity-block-dot activity-block-dot-${stopped || m.engine ? 'stop' : m.auto.kind === 'paused' ? 'warn' : 'ok'}`} />}
         </span>
         <span className="activity-block-text">
-          <strong>{text}</strong>
-          <span>{sub}</span>
+          <strong>{lead.text}</strong>
+          <span>{lead.sub}</span>
           {clock ? <span className="activity-block-clock" aria-hidden="true">{clock}</span> : null}
+          <span className="activity-block-auto">{auto}</span>
           <span className="activity-block-tok" aria-hidden="true">
             {Array.from({ length: 10 }, (_, i) => <span key={i} className={i < on ? 'on' : undefined} />)}
           </span>
