@@ -6,7 +6,7 @@ export function ReviewHeader({ status }: { status: AppStatus }) {
   return (
     <header className="page-header">
       <div>
-        <h1>Inbox</h1>
+        <h1>My <strong>inbox</strong></h1>
         <p role="status">{runLine(status.lastRun)}</p>
       </div>
     </header>

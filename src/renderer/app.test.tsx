@@ -40,7 +40,7 @@ describe('App routing', () => {
   });
 
   it('keeps a page mounted when only its route params change', async () => {
-    window.location.hash = '#/inbox';
+    window.location.hash = '#/inbox/j1';
     renderWithApp(<App />);
     // The sort is page state: a remount (the bug) would reset it to Best match first.
     await userEvent.selectOptions(await screen.findByLabelText('Sort'), 'oldest');

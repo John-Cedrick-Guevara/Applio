@@ -17,7 +17,7 @@ const FOCUSABLE = 'a[href], button:not(:disabled), input:not(:disabled), select:
  * the full width, details open only when asked). Mounting opens it. It takes focus,
  * traps Tab, makes the page behind inert, and on close returns focus to the row.
  */
-export function SidePanel({ title, onClose, position, children }: { title: string; onClose: () => void; position?: SidePanelPosition; children: ReactNode }) {
+export function SidePanel({ title, onClose, position, titleHidden = false, children }: { title: string; onClose: () => void; position?: SidePanelPosition; /** The body already shows the title; keep it for the dialog's name only. */ titleHidden?: boolean; children: ReactNode }) {
   const titleId = useId();
   const panel = useRef<HTMLDivElement>(null);
   // Latest onClose without re-running the open/close effect on every parent render.
@@ -80,7 +80,7 @@ export function SidePanel({ title, onClose, position, children }: { title: strin
           ) : null}
           <button type="button" className="btn btn-icon side-panel-close" aria-label="Close" onClick={onClose}><Icon name="close" /></button>
         </div>
-        <h2 id={titleId} className="side-panel-title">{title}</h2>
+        <h2 id={titleId} className={titleHidden ? 'visually-hidden' : 'side-panel-title'}>{title}</h2>
         <div className="side-panel-body">{children}</div>
       </div>
     </div>,

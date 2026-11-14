@@ -17,7 +17,9 @@ describe('ReviewPage', () => {
     const rows = within(within(queue).getByRole('tabpanel')).getAllByRole('link');
     expect(rows).toHaveLength(2);
     expect(rows[0]).toHaveTextContent('Senior Backend Engineer');
-    expect(rows[0]).toHaveAttribute('aria-current', 'true');
+    // Nothing opens by itself: the list is the whole page until a row is opened.
+    expect(rows[0]).not.toHaveAttribute('aria-current');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('says nothing needs a decision when the Inbox is empty', async () => {
@@ -65,11 +67,11 @@ describe('ReviewPage', () => {
   });
 
   it('previews the résumé with exactly the markup the PDF is printed from', async () => {
-    const { api, container } = open('j2');
+    const { api } = open('j2');
     const detail = await screen.findByRole('region', { name: 'Draft detail' });
     await userEvent.click(await within(detail).findByRole('tab', { name: 'Resume' }));
     const [draft, settings] = await Promise.all([api.getDraft('j2'), api.getSettings()]);
-    expect(container.querySelector('.applio-doc')!.innerHTML).toBe(resumeBody(draft!, { name: settings.fullName, email: settings.gmailAddress }));
+    expect(document.querySelector('.applio-doc')!.innerHTML).toBe(resumeBody(draft!, { name: settings.fullName, email: settings.gmailAddress }));
   });
 
   it('opens the generated PDF in the system viewer', async () => {
