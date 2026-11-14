@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { createMockApi } from '../../../shared/mock/mock-api';
@@ -86,10 +86,17 @@ describe('HandoffPage', () => {
   });
 
   it('puts a job strip above the steps instead of a side column', async () => {
-    open();
+    const api = createMockApi({ latencyMs: 0 });
+    const job = await api.getJob('j3');
+    renderWithApp(<HandoffPage params={{ id: 'j3' }} />, api);
     const strip = await screen.findByRole('region', { name: 'Job' });
-    expect(strip).toHaveTextContent(/\d+/);
-    expect(strip).toHaveTextContent('tokens used');
+    expect(within(strip).getByRole('img', { name: `Match ${job.score}` })).toBeInTheDocument();
+    expect(within(strip).getByText('match')).toBeInTheDocument();
+    expect(within(strip).getByRole('heading', { name: job.title })).toBeInTheDocument();
+    expect(strip).toHaveTextContent(job.applyTarget);
+    if (job.salary) expect(strip).toHaveTextContent(`Pay ${job.salary}`);
+    if (job.roleSummary) expect(strip).toHaveTextContent(job.roleSummary);
+    expect(strip).toHaveTextContent(/[\d.,k]+ tokens used/);
     expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
   });
 });

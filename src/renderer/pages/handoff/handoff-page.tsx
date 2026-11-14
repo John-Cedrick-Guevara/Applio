@@ -70,11 +70,17 @@ function Handoff({ job, draft, assisted, onJob }: { job: Job; draft: Draft | nul
         ) : null}
       </header>
 
+      <div className="handoff-wrap">
       <section className="handoff-strip" aria-label="Job">
-        {job.score !== undefined ? <span className="handoff-strip-score" aria-label={`Match ${job.score}`}>{job.score}</span> : null}
+        {job.score !== undefined ? (
+          <span className="handoff-strip-match">
+            <span className="handoff-strip-score" role="img" aria-label={`Match ${job.score}`}>{job.score}</span>
+            <span className="cell-sub">match</span>
+          </span>
+        ) : null}
         <div className="handoff-strip-text">
-          <h2 className="aside-title">{job.title}</h2>
-          <div className="cell-sub">{job.company} · <SourceCredit job={job} /> · {EMPLOYMENT_LABEL[job.employmentType]} · {job.applyTarget}{job.salary ? ` · ${job.salary}` : ''}</div>
+          <h2 className="handoff-strip-title">{job.title}</h2>
+          <div className="cell-sub"><SourceCredit job={job} /> · {EMPLOYMENT_LABEL[job.employmentType]} · {job.applyTarget}{job.salary ? ` · Pay ${job.salary}` : ''}</div>
           {job.roleSummary ? <p className="body-text">{job.roleSummary}</p> : null}
         </div>
         <span className="cell-sub">{formatTokens(job.tokensUsed)} tokens used</span>
@@ -163,6 +169,7 @@ function Handoff({ job, draft, assisted, onJob }: { job: Job; draft: Draft | nul
             <a href="#/settings">Channel settings</a>
           </section>
         )}
+      </div>
       </div>
     </>
   );

@@ -13,11 +13,11 @@ Give the manual hand-off screen the v5 layout: one column with a job strip, then
 - MNB-3: An older-profile draft still warns before copying.
 
 ## Known risks
-- Role summary and facts moved from the side column into the strip; nothing is dropped except the duplicate Channel and Type labels.
+- Role summary and facts moved from the side column into the strip. The score keeps its "match" label but loses the meter bar; Type and Channel become a dot-separated line, and Pay keeps its label. The company is not repeated (the header names it).
 
 ## Test plan
 - AC-1: `handoff-page.test.tsx` › "names the company in bold and links back to the Inbox hand-off list", "walks through applying on the platform".
-- AC-2: › "puts a job strip above the steps instead of a side column".
+- AC-2: › "puts a job strip above the steps instead of a side column" (asserts the score, its label, title, apply target, pay, summary and tokens for the mock job).
 - AC-3: existing tests: "numbers only the steps it shows…", "copies an answer to the clipboard", "fills the form in Applio when assisted fill is on…", "shows the Connects an Upwork proposal costs…", "logs the application once the operator is done", "records when the operator decided not to apply".
 - AC-4: › "words the assisted-fill tip for a career-site job as career sites, not platforms", "stays a manual handoff when assisted fill is off".
 - MNB-1..3: the existing tests above.
