@@ -45,4 +45,42 @@ describe('GetJobsPage', () => {
     expect(await screen.findByRole('region', { name: 'Scan in progress' })).toBeInTheDocument();
     await act(async () => finish());
   });
+
+  it('is headed "Get jobs" with the v5 pill tabs', async () => {
+    renderWithApp(<GetJobsPage params={{}} />);
+    const heading = screen.getByRole('heading', { level: 1, name: 'Get jobs' });
+    // A light word and a bold one, like every v5 page title.
+    expect(heading.querySelector('strong')).toHaveTextContent('jobs');
+    expect(screen.getByRole('tablist', { name: 'How to get jobs' })).toBeInTheDocument();
+  });
+
+  it('shows what a scan costs as a share of what is left today, with a block meter', async () => {
+    const { container } = renderWithApp(<GetJobsPage params={{}} />);
+    await screen.findByRole('list', { name: 'Sources this scan checks' });
+    const meter = container.querySelector('.find-jobs-meter')!;
+    expect(meter.querySelectorAll('span')).toHaveLength(10);
+    // Scoring alone is a small share of what is left, so only a block or two fill.
+    const filled = meter.querySelectorAll('span.on').length;
+    expect(filled).toBeGreaterThanOrEqual(1);
+    expect(filled).toBeLessThanOrEqual(3);
+  });
+
+  it('fills the whole meter when drafting is on, and says it is the ceiling', async () => {
+    const { container } = renderWithApp(<GetJobsPage params={{}} />);
+    await screen.findByRole('list', { name: 'Sources this scan checks' });
+    const before = container.querySelectorAll('.find-jobs-meter span.on').length;
+    expect(before).toBeLessThan(10);
+    expect(screen.queryByText(/Worst case/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('checkbox', { name: /Also draft strong matches/ }));
+    expect(container.querySelectorAll('.find-jobs-meter span.on')).toHaveLength(10);
+    expect(screen.getByText(/Worst case with drafting on/)).toBeInTheDocument();
+  });
+
+  it('shows a full meter when the budget is used up', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const used = { ...api, getStatus: async () => ({ ...(await api.getStatus()), tokensToday: 150_000, dailyTokenBudget: 150_000, budgetStop: 'Daily budget used' }) };
+    const { container } = renderWithApp(<GetJobsPage params={{}} />, used);
+    await screen.findByText(/Can't scan right now/);
+    expect(container.querySelectorAll('.find-jobs-meter span.on')).toHaveLength(10);
+  });
 });

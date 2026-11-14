@@ -12,3 +12,14 @@ export function costLine(tokens: number, status: Pick<AppStatus, 'tokensToday' |
   if (tokens > left) return `${cost} · more than the ${formatTokens(left)} left today`;
   return `${cost} · ${Math.max(1, Math.round((tokens / left) * 100))}% of the ${formatTokens(left)} left today`;
 }
+
+/**
+ * The same share as `costLine`, as 0-10 blocks for a meter: any cost fills one, each
+ * further tenth of what is left fills another, and it is full when the cost reaches
+ * what is left, when nothing is left, or when AI is stopped by a budget.
+ */
+export function costBlocks(tokens: number, status: Pick<AppStatus, 'tokensToday' | 'dailyTokenBudget' | 'budgetStop'>): number {
+  const left = Math.max(0, status.dailyTokenBudget - status.tokensToday);
+  if (left === 0 || status.budgetStop || tokens >= left) return 10;
+  return Math.max(1, Math.ceil((tokens / left) * 10));
+}

@@ -6,7 +6,7 @@ import { Button } from '../../components/button';
 import { Callout, StepList } from '../../components/job-state';
 import { useAction } from '../../hooks/use-action';
 import { useAsync } from '../../hooks/use-async';
-import { costLine } from '../../lib/cost';
+import { costBlocks, costLine } from '../../lib/cost';
 import { runResult } from '../../lib/run-summary';
 import './find-jobs.css';
 
@@ -50,6 +50,8 @@ function Scan({ status, sources }: { status: AppStatus; sources: { id: string; n
   const [phase, setPhase] = useState<ScanPhase>();
   const [stopping, setStopping] = useState(false);
   useEffect(() => window.applioEvents?.onStatus((s) => setPhase(s.scan?.phase)), []);
+  // Scoring is a known small cost; drafting spends up to what is left, so with it on the meter shows that ceiling.
+  const filled = draft ? 10 : costBlocks(SCAN_SCORE_TOKENS, status);
   const chosen = sources.filter((s) => !skipped.has(s.id)).map((s) => s.id);
   const toggle = (id: string) => setSkipped((prev) => {
     const next = new Set(prev);
@@ -115,6 +117,10 @@ function Scan({ status, sources }: { status: AppStatus; sources: { id: string; n
             </div>
           ) : null}
           <div className="find-jobs-foot">
+            <div className="find-jobs-meter" aria-hidden="true">
+              {Array.from({ length: 10 }, (_, i) => <span key={i} className={i < filled ? 'on' : undefined} />)}
+            </div>
+            {draft ? <p className="cell-sub find-jobs-ceiling">Worst case with drafting on: up to everything left today.</p> : null}
             <dl className="find-jobs-cost">
               <div><dt>Fetch and filters</dt><dd>Free</dd></div>
               <div><dt>Scoring</dt><dd>{costLine(SCAN_SCORE_TOKENS, status)}</dd></div>

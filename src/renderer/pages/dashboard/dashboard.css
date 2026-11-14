@@ -232,7 +232,7 @@
 }
 
 .dash-ice .dash-blocks span {
-  border-color: #a9b9c2;
+  border-color: var(--ice-line);
 }
 
 .dash-blocks span.on {

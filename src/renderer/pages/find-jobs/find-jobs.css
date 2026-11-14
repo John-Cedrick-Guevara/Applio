@@ -2,7 +2,11 @@
 .find-jobs { display: flex; flex-direction: column; gap: var(--space-5); max-width: 720px; }
 .find-jobs-body { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5) var(--space-6); }
 .find-jobs-sources li { display: flex; justify-content: space-between; gap: var(--space-4); padding: var(--space-3) 0; border-bottom: 1px solid var(--border-soft); }
-.find-jobs-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-4); padding: var(--space-4) var(--space-6); border-top: 1px solid var(--border-soft); background: var(--surface-subtle); }
+.find-jobs-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-4); padding: var(--space-5) var(--space-6); border-top: 1px solid var(--border-soft); background: var(--ice-tint); }
+.find-jobs-meter { display: grid; flex-basis: 100%; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 6px; }
+.find-jobs-meter span { height: 16px; border: 1px dashed var(--ice-line); border-radius: 6px; }
+.find-jobs-ceiling { flex-basis: 100%; margin: 0; }
+.find-jobs-meter span.on { border-color: transparent; background: var(--ice-block); }
 .find-jobs-actions { justify-content: flex-end; }
 .find-jobs-cost { display: flex; flex-wrap: wrap; gap: var(--space-6); margin: 0; font-size: var(--text-sm); }
 .find-jobs-cost dt { color: var(--text-muted); }
@@ -12,8 +16,8 @@
 .find-jobs-running + .step-list { margin-bottom: var(--space-4); }
 .find-jobs-title { margin: 0; font-size: var(--text-lg); font-weight: 600; }
 .find-jobs-funnel { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); }
-.find-jobs-funnel li { padding: var(--space-3); border: 1px solid var(--border-soft); border-radius: var(--radius); color: var(--text-muted); font-size: var(--text-sm); }
-.find-jobs-count { display: block; color: var(--text); font-size: var(--text-3xl); font-weight: 500; }
+.find-jobs-funnel li { padding: var(--space-4); border-radius: var(--radius-lg); background: var(--lavender-tint); color: var(--text-secondary); font-size: var(--text-sm); }
+.find-jobs-count { display: block; color: var(--text); font-size: var(--text-3xl); font-weight: 700; }
 .find-jobs-source { display: flex; align-items: center; gap: var(--space-3); width: 100%; min-height: 44px; }
 .find-jobs-source > span:nth-child(2) { flex: 1; }
 .find-jobs-sources li { padding: 0; }

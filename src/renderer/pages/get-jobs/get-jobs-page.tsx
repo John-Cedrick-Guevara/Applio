@@ -16,7 +16,7 @@ export default function GetJobsPage({ params }: { params: RouteParams }) {
   const active = params.tab === 'paste' ? 'paste' : 'scan';
   return (
     <div className="get-jobs">
-      <PageHeader title="Get jobs" description="Applio never looks for jobs on its own. Scan your sources, or paste one you found." />
+      <PageHeader title={<>Get <strong>jobs</strong></>} description="Applio never looks for jobs on its own. Scan your sources, or paste one you found." />
       <div className="tabs" role="tablist" aria-label="How to get jobs">
         {TABS.map((t) => (
           <button key={t.id} type="button" role="tab" className="tab" aria-selected={t.id === active} onClick={() => navigate(t.path)}>
