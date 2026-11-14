@@ -779,3 +779,6 @@ a.btn-secondary:hover { color: var(--text); }
 .side-panel-pos + .btn-icon { margin-left: 0; }
 .side-panel-title { font-size: var(--text-2xl); font-weight: 700; }
 .side-panel-body { display: flex; flex-direction: column; gap: var(--space-4); }
+
+/* Inside the side panel a detail card drops its own frame: the panel is the frame. */
+.side-panel .card { padding: 0; border: 0; }
