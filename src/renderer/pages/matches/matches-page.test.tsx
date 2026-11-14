@@ -348,4 +348,80 @@ describe('MatchesPage', () => {
     expect(await screen.findByText('No matches yet')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Get jobs' })).toHaveAttribute('href', '#/get-jobs');
   });
+
+  describe('side panel', () => {
+    it('is headed "My matches"', async () => {
+      await setup();
+      expect(screen.getByRole('heading', { level: 1, name: 'My matches' })).toBeInTheDocument();
+    });
+
+    it('opens a match in the side panel with its state card, position and steps', async () => {
+      const { list } = await setup();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      await userEvent.click(within(row(list, ORBITAL)).getByRole('button', { name: ORBITAL }));
+      const dialog = screen.getByRole('dialog');
+      expect(within(dialog).getByText(/^\d+ of \d+$/)).toBeInTheDocument();
+      expect(within(dialog).getByRole('button', { name: /Draft this one/ })).toBeInTheDocument();
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Next' }));
+      expect(within(dialog).getByText(/^2 of \d+$/)).toBeInTheDocument();
+    });
+
+    it('drafts from the panel, then closes it and says drafting started', async () => {
+      const base = createMockApi({ latencyMs: 0 });
+      const draftJob = vi.spyOn(base, 'draftJob');
+      await base.saveSettings({ draftThreshold: 60 });
+      renderWithApp(<MatchesPage />, base);
+      const list = await screen.findByRole('region', { name: 'Match list' });
+      await userEvent.click(await within(list).findByRole('button', { name: ORBITAL }));
+      await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Draft this one/ }));
+      await waitFor(() => expect(draftJob).toHaveBeenCalledOnce());
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    });
+
+    it('closes on Escape and returns focus to the role button', async () => {
+      const { list } = await setup();
+      const button = within(row(list, ORBITAL)).getByRole('button', { name: ORBITAL });
+      await userEvent.click(button);
+      await userEvent.keyboard('{Escape}');
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(button).toHaveFocus();
+    });
+
+    it('skips from the panel through the same held path as the row, staying on Matches with Undo', async () => {
+      const base = createMockApi({ latencyMs: 0 });
+      await base.saveSettings({ draftThreshold: 60 });
+      const skipJob = vi.spyOn(base, 'skipJob');
+      renderWithApp(<MatchesPage />, base);
+      const list = await screen.findByRole('region', { name: 'Match list' });
+      await userEvent.click(await within(list).findByRole('button', { name: ORBITAL }));
+      await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Skip job' }));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(window.location.hash).not.toBe('#/inbox');
+      const undo = await screen.findByRole('status', { name: 'Undo' });
+      expect(undo.parentElement).toBe(document.body);
+      expect(skipJob).not.toHaveBeenCalled();
+      await userEvent.click(within(undo).getByRole('button', { name: 'Undo' }));
+      expect(within(list).getByText(ORBITAL)).toBeInTheDocument();
+    });
+
+    it('closes on the dim layer and on Close', async () => {
+      const { list } = await setup();
+      await userEvent.click(within(list).getByRole('button', { name: ORBITAL }));
+      await userEvent.click(screen.getByTestId('side-panel-dim'));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      await userEvent.click(within(list).getByRole('button', { name: ORBITAL }));
+      await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('does not open a trashed job in the panel: it has Restore on its row instead', async () => {
+      const api = createMockApi({ latencyMs: 0 });
+      await api.skipJob('j5');
+      renderWithApp(<MatchesPage />, api);
+      const list = await screen.findByRole('region', { name: 'Match list' });
+      await userEvent.click(await within(list).findByRole('button', { name: /^Trash/ }));
+      expect(await within(list).findByText(ORBITAL)).toBeInTheDocument();
+      expect(within(list).queryByRole('button', { name: ORBITAL })).not.toBeInTheDocument();
+    });
+  });
 });
