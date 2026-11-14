@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { AppStatus, Job, OpenQuestions, Settings, Source } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { AsyncView } from '../../components/async-view';
@@ -36,6 +36,9 @@ export default function DashboardPage() {
     return { jobs, questions, status, settings, sources };
   }, [api, jobsChanges]);
 
+  const setStatus = (status: AppStatus) => state.setData((d) => (d ? { ...d, status } : d));
+  useEffect(() => window.applioEvents?.onStatus(setStatus), []); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div className="dash">
       <AsyncView state={state} what="your dashboard" rows={6}>
@@ -54,20 +57,30 @@ interface Data {
 }
 
 function DashboardView({ jobs, questions, status, settings, sources }: Data) {
-  const now = new Date();
   const [range, setRange] = useState<SentRange>('day');
   const [period, setPeriod] = useState<PipelinePeriod>('all');
   const [picked, setPicked] = useState<number | null>(null);
 
-  const running = activityModel(status, { autoSendThreshold: 0, autonomousSources: 0, now: now.getTime() }).running;
-  const queue = jobs.filter((j) => j.status === 'drafted' || j.status === 'approved');
-  const asking = new Set(questions.map((q) => q.jobId)).size;
-  const n = needs(queue, asking);
-  const week = weekCard(jobs, settings.weeklyGoal, now);
-  const budget = budgetCard(status);
-  const series = sentSeries(jobs, range, now);
-  const next = upNext(jobs, { followUpDays: settings.followUpDays, lastRunAt: status.lastRun?.at, sources: sources.filter((s) => s.enabled).length, now });
-  const pipe = pipeline(jobs, period, now);
+  // Hovering a bar re-renders; the models only rerun when their inputs change, with one fixed "now" per load.
+  const m = useMemo(() => {
+    const now = new Date();
+    // Same rule as the Inbox's Answer tab: scored jobs Claude asked about that are not being drafted.
+    const drafting = new Set(status.drafting ?? []);
+    const asking = new Set(questions.map((q) => q.jobId));
+    const answerCount = jobs.filter((j) => j.status === 'scored' && asking.has(j.id) && !drafting.has(j.id)).length;
+    return {
+      now,
+      running: activityModel(status, { autoSendThreshold: 0, autonomousSources: 0, now: now.getTime() }).running,
+      asking: answerCount,
+      n: needs(jobs.filter((j) => j.status === 'drafted' || j.status === 'approved'), answerCount),
+      week: weekCard(jobs, settings.weeklyGoal, now),
+      budget: budgetCard(status),
+      next: upNext(jobs, { followUpDays: settings.followUpDays, lastRunAt: status.lastRun?.at, sources: sources.filter((s) => s.enabled).length, now }),
+    };
+  }, [jobs, questions, status, settings, sources]);
+  const series = useMemo(() => sentSeries(jobs, range, m.now), [jobs, range, m.now]);
+  const pipe = useMemo(() => pipeline(jobs, period, m.now), [jobs, period, m.now]);
+  const { now, running, asking, n, week, budget, next } = m;
   const selected = Math.min(picked ?? series.labels.length - 1, series.labels.length - 1);
   const H = 180;
   const seg = (count: number) => (count ? Math.max(6, Math.round((count / series.max) * H) - 2) : 0);
@@ -79,7 +92,7 @@ function DashboardView({ jobs, questions, status, settings, sources }: Data) {
         <h1 className="dash-title">My <strong>job hunt</strong></h1>
       </div>
       <div className="dash-head-actions">
-        <span role="status" aria-label="Activity" className="dash-chip">
+        <span className="dash-chip">
           <span aria-hidden="true" className={`dash-dot${running.kind === 'stopped' ? ' dash-dot-stop' : ''}`} />
           {running.text}
         </span>
@@ -147,7 +160,7 @@ function DashboardView({ jobs, questions, status, settings, sources }: Data) {
           <Blocks filled={budget.blocks.filled} total={budget.blocks.total} tone="ice" gap={6} />
           <p className="dash-line">
             {budget.stopped
-              ? <>AI is paused: today's budget is used. <a href="#/settings">Raise budget</a></>
+              ? <>AI is paused: {budget.stopReason}. <a href="#/settings">Raise budget</a></>
               : `Hard stop at ${formatTokens(budget.total)}. Resets at midnight.`}
           </p>
         </section>
@@ -178,7 +191,7 @@ function DashboardView({ jobs, questions, status, settings, sources }: Data) {
                 return (
                   <button key={label} type="button" className="dash-bar" aria-label={text} aria-pressed={on} onClick={() => setPicked(i)} onMouseEnter={() => setPicked(i)} onFocus={() => setPicked(i)}>
                     <span className="dash-bar-col">
-                      {on ? <span className="dash-tip" style={{ bottom: Math.round(((a + y) / series.max) * H) + 8 }}>{a + y ? `${a + y} sent · ${a} Applio, ${y} you` : 'None sent'}</span> : null}
+                      {on ? <span className={`dash-tip${i < 2 ? ' dash-tip-start' : i >= series.labels.length - 2 ? ' dash-tip-end' : ''}`} style={{ bottom: Math.min(Math.round(((a + y) / series.max) * H) + 8, H - 32) }}>{a + y ? `${a + y} sent · ${a} Applio, ${y} you` : 'None sent'}</span> : null}
                       {y ? <span className="dash-seg dash-seg-you" style={{ height: seg(y) }} /> : null}
                       {a ? <span className="dash-seg dash-seg-app" style={{ height: seg(a) }} /> : null}
                     </span>

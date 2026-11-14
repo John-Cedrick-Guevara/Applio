@@ -340,6 +340,17 @@
   white-space: nowrap;
 }
 
+.dash-tip-start {
+  left: 0;
+  transform: none;
+}
+
+.dash-tip-end {
+  right: 0;
+  left: auto;
+  transform: none;
+}
+
 .dash-bar-label {
   overflow: hidden;
   color: var(--text-muted);

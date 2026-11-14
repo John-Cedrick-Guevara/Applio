@@ -1,4 +1,5 @@
-import { screen, within } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
+import type { AppStatus } from '../../../shared/types';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { createMockApi } from '../../../shared/mock/mock-api';
@@ -11,7 +12,7 @@ describe('DashboardPage', () => {
   it('greets with the date and status chip, and links Get jobs', async () => {
     renderWithApp(<DashboardPage />);
     expect(await screen.findByRole('heading', { level: 1, name: 'My job hunt' })).toBeInTheDocument();
-    expect(screen.getByRole('status', { name: 'Activity' })).toHaveTextContent(/Nothing running|Scanning|Drafting/);
+    expect(screen.getAllByText(/Nothing running|Scanning|Drafting/).length).toBeGreaterThan(0);
     expect(screen.getByRole('link', { name: 'Get jobs' })).toHaveAttribute('href', '#/get-jobs');
   });
 
@@ -43,7 +44,7 @@ describe('DashboardPage', () => {
     const api = base();
     renderWithApp(<DashboardPage />, { ...api, getStatus: async () => ({ ...(await api.getStatus()), budgetStop: 'Daily budget used', tokensToday: 150_000, dailyTokenBudget: 150_000 }) });
     const card = (await screen.findByRole('heading', { name: 'AI budget today' })).closest('section')!;
-    expect(card).toHaveTextContent('AI is paused');
+    expect(card).toHaveTextContent('AI is paused: Daily budget used');
     expect(within(card).getByRole('link', { name: 'Raise budget' })).toHaveAttribute('href', '#/settings');
   });
 
@@ -92,5 +93,30 @@ describe('DashboardPage', () => {
     await screen.findByRole('heading', { name: 'My job hunt' });
     await screen.findByRole('heading', { name: 'Pipeline' });
     for (const s of spies) expect(s).not.toHaveBeenCalled();
+  });
+
+  it('counts Answer only for scored jobs that are not drafting, like the Inbox tab', async () => {
+    const api = base();
+    const jobs = await api.listJobs();
+    const scored = jobs.find((j) => j.status === 'scored')!;
+    const other = jobs.find((j) => j.status === 'drafted')!;
+    renderWithApp(<DashboardPage />, {
+      ...api,
+      listQuestions: async () => [{ jobId: scored.id, questions: ['q'], askedAt: '' }, { jobId: other.id, questions: ['q'], askedAt: '' }],
+    });
+    const section = (await screen.findByRole('heading', { name: 'Needs you' })).closest('section')!;
+    expect(within(section).getByText('Answer').closest('a')).toHaveTextContent('1');
+  });
+
+  it('updates the budget card when main pushes a status', async () => {
+    const listeners = new Set<(s: AppStatus) => void>();
+    window.applioEvents = { onStatus: (l) => { listeners.add(l); return () => listeners.delete(l); } };
+    const api = base();
+    renderWithApp(<DashboardPage />, api);
+    const card = (await screen.findByRole('heading', { name: 'AI budget today' })).closest('section')!;
+    const current = await api.getStatus();
+    act(() => listeners.forEach((l) => l({ ...current, tokensToday: 150_000, dailyTokenBudget: 150_000, budgetStop: 'Monthly budget used' })));
+    expect(await within(card).findByText(/AI is paused: Monthly budget used/)).toBeInTheDocument();
+    delete window.applioEvents;
   });
 });

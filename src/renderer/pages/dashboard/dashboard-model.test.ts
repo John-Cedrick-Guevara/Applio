@@ -29,6 +29,7 @@ describe('needs', () => {
     const n = needs(queue, 3);
     expect(n.rows.map((r) => [r.key, r.count])).toEqual([['fix', 2], ['answer', 3], ['approve', 1], ['handoff', 1]]);
     expect(n.total).toBe(7);
+    expect(n.rows[0]?.hint).toBe('failed sends, posts to check');
   });
 });
 
@@ -54,6 +55,8 @@ describe('weekCard', () => {
 
   it('caps blocks at 20 and says how many more reach the goal', () => {
     expect(weekCard([], 50, now).blocks).toEqual({ filled: 0, total: 20 });
+    // Any send fills a block, like the budget meter, even when the goal is large.
+    expect(weekCard([job({ sentBy: 'autonomous' })], 100, now).blocks).toEqual({ filled: 1, total: 20 });
     expect(weekCard([job({ sentBy: 'autonomous' })], 15, now).line).toBe('1 sent by Applio, 0 you applied yourself. 14 more to hit your goal by Sunday.');
   });
 
@@ -71,7 +74,7 @@ describe('budgetCard', () => {
   });
 
   it('says AI is stopped when the budget is used', () => {
-    expect(budgetCard(status({ tokensToday: 150_000, budgetStop: 'Daily budget used' }))).toMatchObject({ stopped: true, blocks: { filled: 8, total: 8 } });
+    expect(budgetCard(status({ tokensToday: 150_000, budgetStop: 'Daily budget used' }))).toMatchObject({ stopped: true, stopReason: 'Daily budget used', blocks: { filled: 8, total: 8 } });
   });
 });
 
@@ -137,6 +140,12 @@ describe('pipeline', () => {
     expect(p.stages[0]?.n).toBe(4);
     expect(p.stages.find((s) => s.label === 'Applied')?.n).toBe(2);
     expect(p.closed).toEqual({ rejected: 1, noReply: 0, skipped: 1 });
+  });
+
+  it('never shows a stage larger than the one before it', () => {
+    const odd = [job({ id: '1', status: 'replied', events: [['found', at(11, 2)], ['replied', at(11, 5)]] })];
+    const p = pipeline(odd, 'all', now);
+    expect(p.stages.map((s) => s.n)).toEqual([1, 0, 0, 0, 0, 0, 0]);
   });
 
   it('gives conversion from the previous stage and scales bars to Found', () => {

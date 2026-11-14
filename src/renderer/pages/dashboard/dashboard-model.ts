@@ -38,9 +38,10 @@ export interface NeedsRow {
  * the two can never disagree; `asking` is the number of jobs Claude has open questions on.
  */
 export function needs(queue: readonly Job[], asking: number): { rows: NeedsRow[]; total: number } {
-  const tab = (key: NeedsRow['key']) => inboxTabs(queue, [], 'score').find((t) => t.key === key)?.jobs.length ?? 0;
+  const tabs = inboxTabs(queue, [], 'score');
+  const tab = (key: NeedsRow['key']) => tabs.find((t) => t.key === key)?.jobs.length ?? 0;
   const rows: NeedsRow[] = [
-    { key: 'fix', label: 'Fix first', hint: 'failed sends', count: tab('fix') },
+    { key: 'fix', label: 'Fix first', hint: 'failed sends, posts to check', count: tab('fix') },
     { key: 'answer', label: 'Answer', hint: 'Claude asked', count: asking },
     { key: 'approve', label: 'Approve', hint: 'drafts ready', count: tab('approve') },
     { key: 'handoff', label: 'Hand off', hint: 'you apply', count: tab('handoff') },
@@ -68,7 +69,7 @@ export function weekCard(jobs: readonly Job[], goal: number, now: Date) {
     byYou,
     goal,
     pct: Math.round((sent.length / goal) * 100),
-    blocks: { filled: Math.min(total, Math.round((Math.min(sent.length, goal) / goal) * total)), total },
+    blocks: { filled: filledBlocks(sent.length / goal, total), total },
     line: `${byApplio} sent by Applio, ${byYou} you applied yourself. ${rest}`,
   };
 }
@@ -82,6 +83,8 @@ export function budgetCard(status: Pick<AppStatus, 'tokensToday' | 'dailyTokenBu
     pct: Math.min(100, Math.round(share * 100)),
     blocks: { filled: filledBlocks(share, 8), total: 8 },
     stopped: !!status.budgetStop,
+    /** Why AI stopped, as main words it (daily or monthly), so the card never guesses. */
+    stopReason: status.budgetStop,
   };
 }
 
@@ -146,6 +149,8 @@ export function pipeline(jobs: readonly Job[], period: PipelinePeriod, now: Date
     ['Interview', inPeriod.filter((j) => reached(j, 'interview', 'offer')).length],
     ['Offer', inPeriod.filter((j) => reached(j, 'offer')).length],
   ];
+  // A job can reach Replied without an Applied event (marked by hand); clamp so a stage never exceeds the one before it.
+  counts.forEach((c, i) => { if (i > 0) c[1] = Math.min(c[1], counts[i - 1]![1]); });
   const top = counts[0]![1];
   const stages = counts.map(([label, n], i) => ({
     label,
