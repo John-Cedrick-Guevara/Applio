@@ -169,6 +169,28 @@ describe('v5 foundation', () => {
     expect(components).toMatch(/prefers-reduced-motion[^}]*\{[^}]*\.indet::after\s*\{[^}]*animation:\s*none/);
   });
 
+  it('centres the Get jobs and Profile columns at their widths', () => {
+    const rule = (css: string, selector: string) => css.match(new RegExp(`(?:^|\\n)${selector.replace(/[.>]/g, '\\$&')}\\s*\\{([^}]*)\\}`))?.[1] ?? '';
+    const getJobs = readFileSync(new URL('../pages/get-jobs/get-jobs.css', import.meta.url), 'utf8');
+    const profile = readFileSync(new URL('../pages/profile/profile.css', import.meta.url), 'utf8');
+    for (const [css, selector, width] of [[getJobs, '.get-jobs', '820px'], [profile, '.profile', '1040px']] as const) {
+      const body = rule(css, selector);
+      expect(body, selector).toMatch(new RegExp(`max-width:\\s*${width}`));
+      expect(body, selector).toMatch(/margin:\s*0 auto/);
+      expect(body, selector).toMatch(/width:\s*100%/);
+    }
+  });
+
+  it('keeps the Get jobs tab group as wide as its tabs', () => {
+    const getJobs = readFileSync(new URL('../pages/get-jobs/get-jobs.css', import.meta.url), 'utf8');
+    expect(getJobs).toMatch(/\.get-jobs > \.tabs\s*\{[^}]*align-self:\s*flex-start/);
+  });
+
+  it('makes the side panel 640px wide, still capped to the window', () => {
+    const components = readFileSync(new URL('./components.css', import.meta.url), 'utf8');
+    expect(components).toMatch(/\.side-panel\s*\{[^}]*width:\s*min\(640px, 100%\)/);
+  });
+
   it('keeps light shadows under 8% opacity', () => {
     // Shadows only: a dialog's dimmed backdrop is a scrim, not a shadow.
     const shadows = [...all.matchAll(/(?:box-shadow|--shadow-[\w-]+):([^;]*);/g)].map((m) => m[1]).join(' ');

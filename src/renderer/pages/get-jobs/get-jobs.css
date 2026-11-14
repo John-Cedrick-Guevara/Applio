@@ -1,0 +1,14 @@
+/* Get jobs: one centred column for the header, tabs and both tab panels. */
+.get-jobs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  width: 100%;
+  max-width: 820px;
+  margin: 0 auto;
+}
+
+/* The tab group is as wide as its tabs, not the whole column. */
+.get-jobs > .tabs {
+  align-self: flex-start;
+}

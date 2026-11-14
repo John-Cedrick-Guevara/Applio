@@ -2,6 +2,7 @@ import { PageHeader } from '../../components/page-header';
 import { navigate, type RouteParams } from '../../lib/router';
 import AddJobPage from '../add-job/add-job-page';
 import FindJobsPage from '../find-jobs/find-jobs-page';
+import './get-jobs.css';
 
 const TABS = [
   { id: 'scan', label: 'Scan sources', path: '/get-jobs' },
