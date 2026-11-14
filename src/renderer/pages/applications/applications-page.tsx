@@ -4,6 +4,7 @@ import { useApi } from '../../api/api-context';
 import { AsyncView } from '../../components/async-view';
 import { Button } from '../../components/button';
 import { Icon } from '../../components/icons';
+import { SidePanel } from '../../components/side-panel';
 import { useAsync } from '../../hooks/use-async';
 import { useJobsVersion } from '../../hooks/use-jobs-version';
 import { formatShortDate, formatTokens } from '../../lib/format';
@@ -45,7 +46,8 @@ export default function ApplicationsPage() {
 function Applications({ jobs, followUpDays, ownerName, onJob }: { jobs: Job[]; followUpDays: number; ownerName: string; onJob: (job: Job) => void }) {
   const [filter, setFilter] = useState<FilterGroup | 'all'>('all');
   const [query, setQuery] = useState('');
-  const [selectedId, setSelectedId] = useState(jobs[0]?.id);
+  // Nothing is open until a row is chosen; the side panel shows the chosen application.
+  const [selectedId, setSelectedId] = useState<string | undefined>();
   const now = useMemo(() => new Date(), []);
 
   const rows = useMemo(() => jobs.map((job) => ({ job, status: displayStatus(job, followUpDays, now) })), [jobs, followUpDays, now]);
@@ -57,21 +59,25 @@ function Applications({ jobs, followUpDays, ownerName, onJob }: { jobs: Job[]; f
       (!q || `${r.job.company} ${r.job.title} ${CHANNEL_LABEL[r.job.channel]}`.toLowerCase().includes(q)),
   );
   const selected = rows.find((r) => r.job.id === selectedId);
+  // Previous and next step through what the filters show, so the panel never leaves the list the operator is in.
+  const at = visible.findIndex((r) => r.job.id === selectedId);
+  const step = (by: number) => setSelectedId(visible[at + by]?.job.id);
 
   return (
     <>
       <header className="page-header">
         <div>
-          <h1>Applications</h1>
-          <p>Everything Applio sent, how it is going, and exactly what went out.</p>
+          <h1>My <strong>applications</strong></h1>
+          <p>Everything sent, by Applio or by you, with exactly what went out.</p>
         </div>
-        <dl className="app-stats">
+      </header>
+
+      <dl className="app-stats">
           <Stat label="Sent this month" value={stats.sentThisMonth} />
           <Stat label="Replies, incl. interviews" value={stats.replies} />
           <Stat label="Interviews" value={stats.interviews} />
           <Stat label="Follow-ups due" value={stats.followUpsDue} />
-        </dl>
-      </header>
+      </dl>
 
       <div className="spread">
         <div className="row" role="group" aria-label="Filter by status">
@@ -88,7 +94,7 @@ function Applications({ jobs, followUpDays, ownerName, onJob }: { jobs: Job[]; f
         </div>
       </div>
 
-      <div className="split">
+      <div>
         <section className="card card-flush app-list" aria-label="Application list">
           <div className="table-scroll">
             <table className="table app-table">
@@ -107,9 +113,10 @@ function Applications({ jobs, followUpDays, ownerName, onJob }: { jobs: Job[]; f
                 {visible.map(({ job, status }) => {
                   const sent = sentAt(job);
                   return (
-                    <tr key={job.id} className={job.id === selectedId ? 'is-selected' : undefined}>
+                    // The whole row opens the panel; the button inside is the keyboard stop.
+                    <tr key={job.id} className="app-row" onClick={() => setSelectedId(job.id)}>
                       <td>
-                        <button type="button" className="row-button" aria-pressed={job.id === selectedId} onClick={() => setSelectedId(job.id)}>
+                        <button type="button" className="row-button" aria-haspopup="dialog">
                           <span className="row-role">{job.title}</span>
                           <span className="cell-sub">{job.company}</span>
                         </button>
@@ -141,7 +148,15 @@ function Applications({ jobs, followUpDays, ownerName, onJob }: { jobs: Job[]; f
         </section>
 
         {selected ? (
-          <ApplicationDetail key={selected.job.id} job={selected.job} status={selected.status} followUpDays={followUpDays} now={now} ownerName={ownerName} onJob={onJob} />
+          <SidePanel
+            title={selected.job.title}
+            titleHidden
+            fallbackFocus=".row-button"
+            onClose={() => setSelectedId(undefined)}
+            position={at >= 0 ? { index: at + 1, total: visible.length, onPrev: () => step(-1), onNext: () => step(1) } : undefined}
+          >
+            <ApplicationDetail key={selected.job.id} job={selected.job} status={selected.status} followUpDays={followUpDays} now={now} ownerName={ownerName} onJob={onJob} />
+          </SidePanel>
         ) : null}
       </div>
     </>
@@ -150,7 +165,7 @@ function Applications({ jobs, followUpDays, ownerName, onJob }: { jobs: Job[]; f
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div>
+    <div className="app-stat">
       <dt>{label}</dt>
       <dd className="mono">{value}</dd>
     </div>

@@ -154,4 +154,47 @@ describe('ApplicationsPage', () => {
     expect(await screen.findByText('No applications yet')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Clear filters' })).not.toBeInTheDocument();
   });
+
+  it('shows the list full width with no application open', async () => {
+    renderWithApp(<ApplicationsPage />);
+    await table();
+    expect(screen.getByRole('heading', { level: 1, name: 'My applications' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: 'Application detail' })).not.toBeInTheDocument();
+  });
+
+  it('opens an application in the side panel, from the whole row, with its position', async () => {
+    renderWithApp(<ApplicationsPage />);
+    const t = await table();
+    await userEvent.click(within(t).getByText('Corvid Health').closest('tr')!);
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByRole('complementary', { name: 'Application detail' })).toBeInTheDocument();
+    expect(within(dialog).getByText(/^\d+ of \d+$/)).toBeInTheDocument();
+  });
+
+  it('steps to the next application in the filtered list', async () => {
+    renderWithApp(<ApplicationsPage />);
+    await userEvent.click(await screen.findByRole('button', { name: /Corvid Health/ }));
+    const dialog = screen.getByRole('dialog');
+    const before = within(dialog).getByRole('complementary', { name: 'Application detail' }).textContent;
+    const index = Number(within(dialog).getByText(/^\d+ of \d+$/).textContent!.split(' ')[0]);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Next' }));
+    expect(within(dialog).getByRole('complementary', { name: 'Application detail' }).textContent).not.toBe(before);
+    expect(within(dialog).getByText(new RegExp(`^${index + 1} of \\d+$`))).toBeInTheDocument();
+  });
+
+  it('closes on Escape and returns focus to the row', async () => {
+    renderWithApp(<ApplicationsPage />);
+    const row = await screen.findByRole('button', { name: /Corvid Health/ });
+    await userEvent.click(row);
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(row).toHaveFocus();
+  });
+
+  it('shows the four stats as cards', async () => {
+    renderWithApp(<ApplicationsPage />);
+    await table();
+    for (const label of ['Sent this month', 'Replies, incl. interviews', 'Interviews', 'Follow-ups due']) expect(screen.getByText(label)).toBeInTheDocument();
+  });
 });
