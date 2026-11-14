@@ -12,7 +12,7 @@ const job = (id: string, over: Partial<Job> = {}): Job => ({
 });
 
 function queue(jobs: Job[], { currentId, drafting = [], sort = 'score' as InboxSort, onSort = vi.fn() } = {} as { currentId?: string; drafting?: Job[]; sort?: InboxSort; onSort?: (s: InboxSort) => void }) {
-  return render(<InboxQueue tabs={inboxTabs(jobs, [], sort)} drafting={drafting} {...(currentId ? { currentId } : {})} sort={sort} onSort={onSort} autoNext onAutoNext={vi.fn()} onApproveKey={vi.fn()} onSkipKey={vi.fn()} />);
+  return render(<InboxQueue tabs={inboxTabs(jobs, [], sort)} drafting={drafting} {...(currentId ? { currentId } : {})} sort={sort} onSort={onSort} />);
 }
 const tab = (name: RegExp) => screen.getByRole('tab', { name });
 
@@ -66,10 +66,31 @@ describe('InboxQueue', () => {
     expect(onSort).toHaveBeenCalledWith('oldest');
   });
 
-  it('names the keys under the list, with the next-job switch on', () => {
+  it('names the keys under the list', () => {
     queue([job('a')]);
-    expect(screen.getByText('↑ ↓ move · A approve · S skip')).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: 'Open the next job after each decision' })).toBeChecked();
+    expect(screen.getByText('↑ ↓ move · Enter open')).toBeInTheDocument();
+  });
+
+  it('shows score, role, company and source, channel, age and a label only for exceptions', () => {
+    queue([job('a', { score: 88, sourceName: 'RemoteOK', channel: 'ats' })]);
+    const row = screen.getByRole('link', { name: /Role a/ });
+    expect(row).toHaveTextContent('88');
+    expect(row).toHaveTextContent('Co a · RemoteOK');
+    expect(row).toHaveTextContent('ATS form');
+    expect(row).not.toHaveTextContent(/Check post|Not sent/);
+    expect(row.querySelector('.inbox-row-chevron')).not.toBeNull();
+  });
+
+  it('moves focus with the arrow keys and leaves opening to Enter', async () => {
+    queue([job('a'), job('b')]);
+    const [first, second] = within(screen.getByRole('tabpanel')).getAllByRole('link');
+    first!.focus();
+    await userEvent.keyboard('{ArrowDown}');
+    expect(second).toHaveFocus();
+    await userEvent.keyboard('{ArrowUp}');
+    expect(first).toHaveFocus();
+    // Moving never navigates: the panel opens only on Enter or a click.
+    expect(window.location.hash).not.toContain('/inbox/');
   });
 
   it('lists jobs Claude is drafting, each linked', () => {

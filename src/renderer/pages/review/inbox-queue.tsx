@@ -2,7 +2,8 @@ import { useEffect, useState, type KeyboardEvent } from 'react';
 import type { Job } from '../../../shared/types';
 import { Button } from '../../components/button';
 import { formatRelative } from '../../lib/format';
-import { navigate } from '../../lib/router';
+import { CHANNEL_LABEL } from '../../lib/labels';
+import { Icon } from '../../components/icons';
 import type { InboxSort, InboxTab, InboxTabKey } from './review-model';
 
 interface InboxQueueProps {
@@ -13,15 +14,9 @@ interface InboxQueueProps {
   currentId?: string;
   sort: InboxSort;
   onSort: (sort: InboxSort) => void;
-  /** Whether a final decision opens the next job. */
-  autoNext: boolean;
-  onAutoNext: (on: boolean) => void;
-  /** A and S on the list: approve and skip the open job. */
-  onApproveKey: () => void;
-  onSkipKey: () => void;
 }
 
-/** ↑ and ↓ move between rows and open the one they land on, like a mail list. */
+/** ↑ and ↓ move focus between rows; Enter (the link's own action) opens the one focused. */
 function moveSelection(e: KeyboardEvent<HTMLElement>) {
   if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
   const rows = [...e.currentTarget.querySelectorAll<HTMLAnchorElement>('a.inbox-row')];
@@ -30,7 +25,6 @@ function moveSelection(e: KeyboardEvent<HTMLElement>) {
   e.preventDefault();
   const next = rows[Math.min(rows.length - 1, Math.max(0, at + (e.key === 'ArrowDown' ? 1 : -1)))]!;
   next.focus();
-  navigate(next.getAttribute('href')!.replace(/^#/, ''));
 }
 
 /** The tab a job sits in, else the most urgent tab with jobs. */
@@ -40,9 +34,9 @@ const tabFor = (tabs: InboxTab[], id?: string): InboxTabKey =>
 /**
  * The Inbox list (redesign v2): one tab at a time so a long queue stays calm,
  * one-line rows, and a label only when something is off the normal path. The
- * list scrolls inside its frame, so the detail never scrolls out of view.
+ * list takes the full width; a job's detail opens in a side panel (v5).
  */
-export function InboxQueue({ tabs, drafting, currentId, sort, onSort, autoNext, onAutoNext, onApproveKey, onSkipKey }: InboxQueueProps) {
+export function InboxQueue({ tabs, drafting, currentId, sort, onSort }: InboxQueueProps) {
   const [active, setActive] = useState<InboxTabKey>(() => tabFor(tabs, currentId));
   // Follow the selected job into its tab: one opened from a link, or one that moved (a refused send → Fix first).
   const owner = tabs.find((t) => t.jobs.some((j) => j.id === currentId))?.key;
@@ -83,9 +77,7 @@ export function InboxQueue({ tabs, drafting, currentId, sort, onSort, autoNext, 
 
       <div id="inbox-panel" role="tabpanel" aria-labelledby={`inbox-tab-${active}`} className="inbox-scroll" onKeyDown={(e) => {
         if (e.metaKey || e.ctrlKey || e.altKey) return;
-        if (e.key === 'a' || e.key === 'A') onApproveKey();
-        else if (e.key === 's' || e.key === 'S') onSkipKey();
-        else moveSelection(e);
+        moveSelection(e);
       }}>
         {tab.jobs.length ? (
           <ul className="list-plain">
@@ -100,8 +92,7 @@ export function InboxQueue({ tabs, drafting, currentId, sort, onSort, autoNext, 
       </div>
 
       <div className="inbox-foot">
-        <span className="cell-sub">↑ ↓ move · A approve · S skip</span>
-        <label className="inbox-next"><input type="checkbox" checked={autoNext} onChange={(e) => onAutoNext(e.target.checked)} />Open the next job after each decision</label>
+        <span className="cell-sub">↑ ↓ move · Enter open</span>
       </div>
 
       {drafting.length ? (
@@ -131,9 +122,11 @@ function InboxRow({ job, current }: { job: Job; current: boolean }) {
     <li>
       <a href={`#/inbox/${job.id}`} className="inbox-row" aria-current={current ? 'true' : undefined} title={text}>
         <span className="inbox-row-score mono">{job.score ?? '—'}</span>
-        <span className="inbox-row-text"><span className="inbox-row-role">{job.title}</span><span className="inbox-row-co"> · {job.company}</span></span>
+        <span className="inbox-row-text"><span className="inbox-row-role">{job.title}</span><span className="inbox-row-co"> · {job.company} · {job.sourceName}</span></span>
         {label ? <span className="badge badge-danger">{label}</span> : null}
+        <span className="inbox-row-channel cell-sub">{CHANNEL_LABEL[job.channel]}</span>
         <span className="inbox-row-age cell-sub">{formatRelative(job.history[0]?.at ?? job.postedAt)}</span>
+        <Icon name="chevronRight" className="inbox-row-chevron" />
       </a>
     </li>
   );

@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { Autonomy, Job } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { AsyncView } from '../../components/async-view';
 import { Button, buttonClass } from '../../components/button';
+import { SidePanel } from '../../components/side-panel';
 import { useToast } from '../../components/toast';
 import { useAction } from '../../hooks/use-action';
 import { useHeldAction } from '../../hooks/use-held-action';
@@ -108,8 +110,14 @@ function ReviewLayout({ data, selectedId, onJobChange, onRunComplete }: LayoutPr
   const tabs = inboxTabs(data.queue.filter((j) => !gone.has(j.id)), data.asking.filter((j) => !isDrafting(j.id) && !gone.has(j.id)), sort);
   // In tab order, so "next" after a decision is the next job in the same tab, then the next tab.
   const ordered = tabs.flatMap((t) => t.jobs);
-  const currentId = selectedId ?? ordered[0]?.id;
+  // Nothing opens by itself: the panel shows only the job named in the URL.
+  const currentId = selectedId;
   const current = ordered.find((j) => j.id === currentId);
+  // A link to a job that is no longer a decision (sent, skipped, gone) closes instead of opening an empty panel.
+  const known = !!currentId && [...data.queue, ...data.asking, ...data.undrafted].some((j) => j.id === currentId);
+  useEffect(() => {
+    if (currentId && !known) navigate('/inbox');
+  }, [currentId, known]);
   /** The job after this one in tab order, else the one before it. */
   const nextAfter = (id: string) => {
     const i = ordered.findIndex((j) => j.id === id);
@@ -131,9 +139,8 @@ function ReviewLayout({ data, selectedId, onJobChange, onRunComplete }: LayoutPr
   };
   /** A final decision (sent, or marked applied): say what happened and, if asked, open the next job. */
   const decided = (job: Job, message: string) => {
-    if (!autoNext) return;
     toast.show(message, 'success');
-    open(nextAfter(job.id));
+    if (autoNext) open(nextAfter(job.id));
   };
   // A presses the open job's own Approve button, so every rule on it (disabled reason, suspicious confirm) still applies.
   const approveKey = () => {
@@ -141,68 +148,93 @@ function ReviewLayout({ data, selectedId, onJobChange, onRunComplete }: LayoutPr
     if (button instanceof HTMLButtonElement && !button.disabled) button.click();
   };
 
+  // A and S act on the open job, but never while the operator is typing in a field. On the document so they
+  // work right after the panel opens, when focus is on its first button.
+  const keys = useRef<(e: KeyboardEvent) => void>(() => {});
+  keys.current = (e) => {
+    const t = e.target as HTMLElement;
+    // A held key repeats; one press must decide one job.
+    if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || t.closest('input:not([type=checkbox]), textarea, select, [contenteditable="true"]')) return;
+    if (e.key === 'a' || e.key === 'A') approveKey();
+    else if ((e.key === 's' || e.key === 'S') && current) skip(current);
+  };
+  const panelOpen = !!currentId;
+  useEffect(() => {
+    if (!panelOpen) return;
+    const onKey = (e: KeyboardEvent) => keys.current(e);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [panelOpen]);
+  /** Previous/next within the tab the open job sits in. */
+  const tab = tabs.find((t) => t.jobs.some((j) => j.id === currentId));
+  const at = tab ? tab.jobs.findIndex((j) => j.id === currentId) : -1;
+  const position = tab && at >= 0 ? { index: at + 1, total: tab.jobs.length, onPrev: () => open(tab.jobs[at - 1]?.id), onNext: () => open(tab.jobs[at + 1]?.id) } : undefined;
+  const heading = current?.title ?? drafting.find((j) => j.id === currentId)?.title ?? data.undrafted.find((j) => j.id === currentId)?.title ?? 'Job';
+
+  const detail = !currentId || !known ? null : isDrafting(currentId) && !data.queue.some((j) => j.id === currentId) ? (
+    <DraftingPanel job={drafting.find((j) => j.id === currentId)} since={draftingSince[currentId]} />
+  ) : data.questions.has(currentId) ? (
+    <QuestionsPanel
+      key={currentId}
+      job={data.asking.find((j) => j.id === currentId)!}
+      questions={data.questions.get(currentId)!}
+      sections={data.sections}
+      onAnswered={onRunComplete}
+    />
+  ) : data.undrafted.some((j) => j.id === currentId) ? (
+    <JobPanel
+      key={currentId}
+      job={data.undrafted.find((j) => j.id === currentId)!}
+      draftThreshold={data.thresholds.draft}
+      {...(data.status.budgetStop ? { budgetStop: data.status.budgetStop } : {})}
+      onChanged={onRunComplete}
+    />
+  ) : (
+    <DraftPanel
+      key={currentId}
+      jobId={currentId}
+      saving={isDrafting(currentId)}
+      onSkip={skip}
+      onDecided={decided}
+      thresholds={data.thresholds}
+      owner={data.owner}
+      autonomyBySource={data.autonomyBySource}
+      gmailIssue={data.gmailIssue}
+      onJobChange={onJobChange}
+    />
+  );
+
   return (
     <>
       <ReviewHeader status={data.status} />
-      <div className="split">
-        <InboxQueue
-          tabs={tabs}
-          drafting={drafting}
-          {...(currentId ? { currentId } : {})}
-          sort={sort}
-          onSort={setSort}
-          autoNext={autoNext}
-          onAutoNext={setAutoNext}
-          onApproveKey={approveKey}
-          onSkipKey={() => current && skip(current)}
-        />
-        {currentId && isDrafting(currentId) && !data.queue.some((j) => j.id === currentId) ? (
-          <DraftingPanel job={drafting.find((j) => j.id === currentId)} since={draftingSince[currentId]} />
-        ) : currentId && data.questions.has(currentId) ? (
-          <QuestionsPanel
-            key={currentId}
-            job={data.asking.find((j) => j.id === currentId)!}
-            questions={data.questions.get(currentId)!}
-            sections={data.sections}
-            onAnswered={onRunComplete}
-          />
-        ) : currentId && data.undrafted.some((j) => j.id === currentId) ? (
-          <JobPanel
-            key={currentId}
-            job={data.undrafted.find((j) => j.id === currentId)!}
-            draftThreshold={data.thresholds.draft}
-            {...(data.status.budgetStop ? { budgetStop: data.status.budgetStop } : {})}
-            onChanged={onRunComplete}
-          />
-        ) : currentId ? (
-          <DraftPanel
-            key={currentId}
-            jobId={currentId}
-            saving={isDrafting(currentId)}
-            onSkip={skip}
-            onDecided={decided}
-            thresholds={data.thresholds}
-            owner={data.owner}
-            autonomyBySource={data.autonomyBySource}
-            gmailIssue={data.gmailIssue}
-            onJobChange={onJobChange}
-          />
-        ) : (
-          <section className="card review-empty" aria-label="Draft detail">
-            <h2>Nothing needs a decision</h2>
-            <p className="muted">Drafts land here when they're ready. Draft a match, or find new jobs.</p>
-            <div className="row">
-              <a className={buttonClass('secondary')} href="#/get-jobs">Get jobs</a>
-              <a className={buttonClass('primary')} href="#/matches">Open Matches</a>
-            </div>
-          </section>
-        )}
-      </div>
-      {skips.held ? (
+      {ordered.length === 0 && drafting.length === 0 ? (
+        <section className="card review-empty" aria-label="Draft detail">
+          <h2>Nothing needs a decision</h2>
+          <p className="muted">Drafts land here when they're ready. Draft a match, or find new jobs.</p>
+          <div className="row">
+            <a className={buttonClass('secondary')} href="#/get-jobs">Get jobs</a>
+            <a className={buttonClass('primary')} href="#/matches">Open Matches</a>
+          </div>
+        </section>
+      ) : (
+        <InboxQueue tabs={tabs} drafting={drafting} {...(currentId ? { currentId } : {})} sort={sort} onSort={setSort} />
+      )}
+      {detail ? (
+        <SidePanel title={heading} titleHidden fallbackFocus="a.inbox-row" onClose={() => open()} position={position}>
+          <div className="inbox-panel">
+            {detail}
+            <label className="inbox-next"><input type="checkbox" checked={autoNext} onChange={(e) => setAutoNext(e.target.checked)} />Open the next job after I decide</label>
+            <span className="cell-sub inbox-panel-keys">A approve · S skip · Esc close</span>
+          </div>
+        </SidePanel>
+      ) : null}
+      {/* On the body: the panel makes the page inert, and Undo must stay reachable while the next job is open. */}
+      {skips.held ? createPortal(
         <div className="undo-bar" role="status" aria-label="Undo">
           <span>{skips.held.message}</span>
           <Button size="sm" variant="link" onClick={undo}>Undo</Button>
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </>
   );

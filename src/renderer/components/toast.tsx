@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 
 export type ToastTone = 'success' | 'error' | 'info';
@@ -51,6 +52,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={api}>
       {children}
+      {/* On the body, not in the app root: an open side panel makes the root inert, and a toast must stay readable and dismissable. */}
+      {createPortal(
       <div className="toast-region" role="status" aria-live="polite">
         {toasts.map((t) => (
           <div
@@ -65,7 +68,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             </button>
           </div>
         ))}
-      </div>
+      </div>,
+      document.body,
+      )}
     </ToastContext.Provider>
   );
 }

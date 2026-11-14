@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createMockApi } from '../../../shared/mock/mock-api';
@@ -32,7 +32,7 @@ describe('Inbox flow', () => {
     const skipJob = vi.fn(api.skipJob);
     const { panel } = await inboxAt('j1', { ...api, skipJob });
     await userEvent.click(await screen.findByRole('button', { name: 'Skip job' }));
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
     await waitFor(() => expect(window.location.hash).toBe('#/inbox/j2'));
     expect(within(panel()).queryByText(BACKEND)).not.toBeInTheDocument();
     expect(screen.getByRole('status', { name: 'Undo' })).toHaveTextContent(`Skipped ${BACKEND} at Northwind Labs.`);
@@ -87,9 +87,9 @@ describe('Inbox flow', () => {
   it('stays on the sent job when Open the next job is off', async () => {
     const api = await withGmail();
     await inboxAt('j1', api);
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Open the next job after each decision' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Open the next job after I decide' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Approve & send email' }));
-    expect(await screen.findByText(/Sent to jobs@northwind-labs.example/)).toBeInTheDocument();
+    expect((await screen.findAllByText(/Sent to jobs@northwind-labs.example/)).length).toBeGreaterThan(0);
     expect(window.location.hash).toBe('#/inbox/j1');
   });
 
@@ -103,20 +103,20 @@ describe('Inbox flow', () => {
     expect(await screen.findByText('Marked as applied.')).toBeInTheDocument();
   });
 
-  it('approves with A from the list, through the same button', async () => {
+  it('approves with A in the panel, through the same button', async () => {
     const api = await withGmail();
-    const { panel } = await inboxAt('j1', api);
+    await inboxAt('j1', api);
     // The draft loads inside the detail region; A needs its Approve button to exist.
     await screen.findByRole('button', { name: 'Approve & send email' });
-    within(panel()).getAllByRole('link')[0]!.focus();
+    screen.getByRole('button', { name: 'Close' }).focus();
     await userEvent.keyboard('a');
     await waitFor(async () => expect(await api.getSend('j1')).toMatchObject({ state: 'sent' }));
   });
 
   it('does nothing on A while Approve is disabled', async () => {
-    const { panel, api } = await inboxAt('j1');
+    const { api } = await inboxAt('j1');
     await screen.findByRole('link', { name: 'Set up Gmail to send' });
-    within(panel()).getAllByRole('link')[0]!.focus();
+    screen.getByRole('button', { name: 'Close' }).focus();
     await userEvent.keyboard('a');
     expect(await api.getSend('j1')).toBeNull();
   });
@@ -124,19 +124,112 @@ describe('Inbox flow', () => {
   it('asks for the second confirm when A approves a suspicious post', async () => {
     const api = await withGmail();
     const flagged: typeof api = { ...api, getJob: async (id) => ({ ...(await api.getJob(id)), suspicious: 'The post addresses AI tools directly.' }) };
-    const { panel } = await inboxAt('j1', flagged);
+    await inboxAt('j1', flagged);
     await screen.findByRole('button', { name: 'Approve & send email' });
-    within(panel()).getAllByRole('link')[0]!.focus();
+    screen.getByRole('button', { name: 'Close' }).focus();
     await userEvent.keyboard('a');
     expect(await screen.findByRole('button', { name: 'Send anyway' })).toBeInTheDocument();
     expect(await api.getSend('j1')).toBeNull();
   });
 
-  it('skips with S from the list', async () => {
-    const { panel } = await inboxAt('j1');
+  it('skips with S in the panel', async () => {
+    await inboxAt('j1');
     await screen.findByRole('button', { name: 'Skip job' });
-    within(panel()).getAllByRole('link')[0]!.focus();
+    screen.getByRole('button', { name: 'Close' }).focus();
     await userEvent.keyboard('s');
     expect(await screen.findByRole('status', { name: 'Undo' })).toHaveTextContent(`Skipped ${BACKEND}`);
+  });
+
+  it('ignores A and S while typing in a field', async () => {
+    const api = await withGmail();
+    await inboxAt('j1', api);
+    await screen.findByRole('button', { name: 'Approve & send email' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    await userEvent.click(document.getElementById('letter-edit')!);
+    await userEvent.keyboard('as');
+    expect(await api.getSend('j1')).toBeNull();
+    expect(screen.queryByRole('status', { name: 'Undo' })).not.toBeInTheDocument();
+  });
+
+  it('shows the position and steps to the next job in the tab', async () => {
+    await inboxAt('j1');
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('1 of 2')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Next' }));
+    await waitFor(() => expect(window.location.hash).toBe('#/inbox/j2'));
+    expect(await within(dialog).findByText('2 of 2')).toBeInTheDocument();
+  });
+
+  it('closes to the list on Escape and returns focus to the row that opened it', async () => {
+    window.location.hash = '#/inbox';
+    renderWithApp(<App />);
+    const row = (await screen.findAllByRole('link', { name: /Senior Backend Engineer/ }))[0]!;
+    await userEvent.click(row);
+    await screen.findByRole('dialog');
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(window.location.hash).toBe('#/inbox');
+    expect(row).toHaveFocus();
+  });
+
+  it('closes the panel when no job is left after a skip', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const others = (await api.listJobs({ statuses: ['drafted', 'approved'] })).filter((j) => j.id !== 'j1');
+    for (const j of others) await api.skipJob(j.id);
+    await inboxAt('j1', api);
+    await userEvent.click(await screen.findByRole('button', { name: 'Skip job' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(window.location.hash).toBe('#/inbox');
+  });
+
+  it('keeps the Undo bar and toasts outside the page the panel makes inert', async () => {
+    await inboxAt('j1');
+    await userEvent.click(await screen.findByRole('button', { name: 'Skip job' }));
+    const undo = await screen.findByRole('status', { name: 'Undo' });
+    expect(undo.parentElement).toBe(document.body);
+    expect(document.querySelector('.toast-region')?.parentElement).toBe(document.body);
+  });
+
+  it('ignores a held key, so one press decides one job', async () => {
+    await inboxAt('j1');
+    await screen.findByRole('button', { name: 'Skip job' });
+    fireEvent.keyDown(document.body, { key: 's', repeat: true });
+    expect(screen.queryByRole('status', { name: 'Undo' })).not.toBeInTheDocument();
+  });
+
+  it('does not close on Escape or the dim layer while a draft is being edited', async () => {
+    await inboxAt('j1');
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    await userEvent.click(document.getElementById('letter-edit')!);
+    await userEvent.keyboard('{Escape}');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('side-panel-dim'));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('closes a panel opened on a job that is no longer in the Inbox', async () => {
+    window.location.hash = '#/inbox/nope';
+    renderWithApp(<App />);
+    await waitFor(() => expect(window.location.hash).toBe('#/inbox'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('puts focus back on a row when the opener was decided away', async () => {
+    window.location.hash = '#/inbox';
+    renderWithApp(<App />);
+    await userEvent.click((await screen.findAllByRole('link', { name: /Senior Backend Engineer/ }))[0]!);
+    await userEvent.click(await screen.findByRole('button', { name: 'Skip job' }));
+    await waitFor(() => expect(window.location.hash).toBe('#/inbox/j2'));
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(document.activeElement).toHaveClass('inbox-row');
+  });
+
+  it('says a send went out even when Open the next job is off', async () => {
+    const api = await withGmail();
+    await inboxAt('j1', api);
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Open the next job after I decide' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Approve & send email' }));
+    await waitFor(() => expect(document.querySelector('.toast')).toHaveTextContent(/Sent to jobs@northwind-labs.example/));
   });
 });
