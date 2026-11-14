@@ -17,7 +17,8 @@
 .matches-selected-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-left: auto; }
 
 .matches-table tr[aria-selected='true'] td { background: var(--surface-selected); }
-.matches-role { display: block; padding: 0; border: 0; background: none; color: var(--text); font: inherit; font-weight: 600; text-align: left; }
+.matches-role { display: block; padding: 0; border: 0; background: none; color: var(--text); font: inherit; font-weight: 600; text-align: left; overflow-wrap: anywhere; }
+button.matches-role { cursor: pointer; }
 .matches-role:hover { text-decoration: underline; }
 .matches-sub { display: block; margin-top: var(--space-1); }
 .matches-why { color: var(--text-secondary); max-width: 360px; }

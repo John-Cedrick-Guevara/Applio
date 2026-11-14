@@ -18,6 +18,8 @@ interface JobPanelProps {
   budgetStop?: string;
   /** Called after a draft starts or the job is dismissed, so the queue reloads. */
   onChanged: () => void;
+  /** Replaces the direct skip (and its move to the Inbox): the caller decides how a skip is held and where to go. */
+  onSkip?: (job: Job) => void;
 }
 
 /**
@@ -25,7 +27,7 @@ interface JobPanelProps {
  * One state card says why it wasn't drafted, with Draft this one and Skip job, so a
  * good match under the threshold is one click from a draft instead of a settings change.
  */
-export function JobPanel({ job, draftThreshold, budgetStop, onChanged }: JobPanelProps) {
+export function JobPanel({ job, draftThreshold, budgetStop, onChanged, onSkip }: JobPanelProps) {
   const api = useApi();
   const action = useAction();
   const scored = job.status === 'scored';
@@ -37,6 +39,7 @@ export function JobPanel({ job, draftThreshold, budgetStop, onChanged }: JobPane
   };
 
   const skip = async () => {
+    if (onSkip) return onSkip(job);
     const next = await action.run('skip the job', () => api.skipJob(job.id), `Skipped ${job.title} at ${job.company}`);
     if (!next) return;
     navigate('/inbox');

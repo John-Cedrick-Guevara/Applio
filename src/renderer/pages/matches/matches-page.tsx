@@ -91,7 +91,9 @@ function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings, onJob
   const [openId, setOpenId] = useState<string | undefined>();
   const openRef = useRef(openId);
   // Kept through close: the panel reads it as it unmounts, after the id is already cleared.
-  if (openId) openRef.current = openId;
+  useEffect(() => {
+    if (openId) openRef.current = openId;
+  }, [openId]);
   // Clean up: a previewed, manual move of stale matches to the Trash.
   const [cleaning, setCleaning] = useState(false);
   const [olderOn, setOlderOn] = useState(true);
@@ -148,8 +150,8 @@ function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings, onJob
   const stale = staleMatches(visible, { olderOn, olderDays: daysOk ? daysNum : Infinity, belowOn, bar, drafting: status.drafting ?? [], now });
   const cleanBlock = !daysOk ? 'Enter a whole number of days from 1 to 365.' : stale.picked.length === 0 ? 'Nothing matches these rules.' : undefined;
   const rows = matchRows(visible, filters);
-  const openJob = rows.find((j) => j.id === openId);
-  const at = openJob ? rows.indexOf(openJob) : -1;
+  const at = rows.findIndex((j) => j.id === openId);
+  const openJob = rows[at];
   const counts = tabCounts(visible, filters);
   const strong = tabCounts(visible, { ...filters, query: '', onlyNew: false }).strong;
   const chosen = rows.filter((j) => selected.has(j.id));
@@ -305,7 +307,10 @@ function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings, onJob
                       <td><input type="checkbox" aria-label={`Select ${j.title} at ${j.company}`} checked={selected.has(j.id)} onChange={() => toggle(j.id)} /></td>
                       <td className="mono">{j.score ?? '—'}</td>
                       <td>
-                        <button type="button" className="matches-role" aria-haspopup="dialog" data-match={j.id} onClick={() => setOpenId(j.id)}>{j.title}</button>
+                        {/* A trashed job has no panel: its row says it is in the Trash and offers Restore. */}
+                        {j.status === 'skipped'
+                          ? <span className="matches-role">{j.title}</span>
+                          : <button type="button" className="matches-role" aria-haspopup="dialog" data-match={j.id} onClick={() => setOpenId(j.id)}>{j.title}</button>}
                         <span className="cell-sub matches-sub">{j.company} · {j.sourceName} · {CHANNEL_LABEL[j.channel]}</span>
                       </td>
                       <td className="matches-why">
@@ -369,7 +374,7 @@ function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings, onJob
           title={openJob.title}
           titleHidden
           fallbackFocus=".matches-role"
-          returnFocus={() => document.querySelector<HTMLElement>(`[data-match="${openRef.current}"]`)}
+          returnFocus={() => document.querySelector<HTMLElement>(`[data-match="${CSS.escape(openRef.current ?? '')}"]`)}
           onClose={() => setOpenId(undefined)}
           position={at >= 0 ? { index: at + 1, total: rows.length, onPrev: () => setOpenId(rows[at - 1]?.id), onNext: () => setOpenId(rows[at + 1]?.id) } : undefined}
         >
@@ -381,6 +386,11 @@ function MatchesView({ onlyNewAtStart, jobs, settings, status, onSettings, onJob
             onChanged={() => {
               setOpenId(undefined);
               onReload();
+            }}
+            // Same held skip with Undo as the row's Skip, so the action means one thing wherever it is clicked.
+            onSkip={(job) => {
+              setOpenId(undefined);
+              skip([job]);
             }}
           />
         </SidePanel>

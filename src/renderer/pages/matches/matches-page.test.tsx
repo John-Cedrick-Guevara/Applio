@@ -386,5 +386,42 @@ describe('MatchesPage', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       expect(button).toHaveFocus();
     });
+
+    it('skips from the panel through the same held path as the row, staying on Matches with Undo', async () => {
+      const base = createMockApi({ latencyMs: 0 });
+      await base.saveSettings({ draftThreshold: 60 });
+      const skipJob = vi.spyOn(base, 'skipJob');
+      renderWithApp(<MatchesPage />, base);
+      const list = await screen.findByRole('region', { name: 'Match list' });
+      await userEvent.click(await within(list).findByRole('button', { name: ORBITAL }));
+      await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Skip job' }));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(window.location.hash).not.toBe('#/inbox');
+      const undo = await screen.findByRole('status', { name: 'Undo' });
+      expect(undo.parentElement).toBe(document.body);
+      expect(skipJob).not.toHaveBeenCalled();
+      await userEvent.click(within(undo).getByRole('button', { name: 'Undo' }));
+      expect(within(list).getByText(ORBITAL)).toBeInTheDocument();
+    });
+
+    it('closes on the dim layer and on Close', async () => {
+      const { list } = await setup();
+      await userEvent.click(within(list).getByRole('button', { name: ORBITAL }));
+      await userEvent.click(screen.getByTestId('side-panel-dim'));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      await userEvent.click(within(list).getByRole('button', { name: ORBITAL }));
+      await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('does not open a trashed job in the panel: it has Restore on its row instead', async () => {
+      const api = createMockApi({ latencyMs: 0 });
+      await api.skipJob('j5');
+      renderWithApp(<MatchesPage />, api);
+      const list = await screen.findByRole('region', { name: 'Match list' });
+      await userEvent.click(await within(list).findByRole('button', { name: /^Trash/ }));
+      expect(await within(list).findByText(ORBITAL)).toBeInTheDocument();
+      expect(within(list).queryByRole('button', { name: ORBITAL })).not.toBeInTheDocument();
+    });
   });
 });
