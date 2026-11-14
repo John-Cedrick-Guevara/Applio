@@ -1,4 +1,4 @@
-/* Profile: resume + preferences row, template preview, fact/answer banks. */
+/* Profile (v5): four tab panels (fact bank, answer bank, preferences, résumé). */
 .profile {
   display: flex;
   flex-direction: column;
@@ -42,13 +42,6 @@
 
 .profile-panel[hidden] {
   display: none;
-}
-
-.profile-top {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: stretch;
-  gap: var(--space-4);
 }
 
 .profile-resume {

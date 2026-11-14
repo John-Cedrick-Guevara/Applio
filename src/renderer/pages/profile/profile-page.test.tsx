@@ -203,4 +203,53 @@ describe('ProfilePage', () => {
     await tab(/^Résumé/);
     expect(screen.getByRole('region', { name: 'Facts found in resume.pdf' })).toBeInTheDocument();
   });
+
+  it('keeps a half-typed new fact while the operator looks at another tab', async () => {
+    renderWithApp(<ProfilePage />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Add fact' }));
+    await userEvent.type(screen.getByRole('textbox', { name: /fact/i }), 'Led a team of six');
+    await tab(/^Preferences/);
+    await tab(/^Fact bank/);
+    expect(screen.getByRole('textbox', { name: /fact/i })).toHaveValue('Led a team of six');
+  });
+
+  it('keeps every accepted résumé suggestion in the fact bank and its count', async () => {
+    const { api } = renderWithApp(<ProfilePage />);
+    await screen.findByRole('tab', { name: /^Fact bank/ });
+    const before = (await api.getProfile()).facts.length;
+    await tab(/^Résumé/);
+    await userEvent.click(await screen.findByRole('button', { name: 'Replace' }));
+    const review = await screen.findByRole('region', { name: 'Facts found in resume.pdf' });
+    // The row's button is busy while a save runs, so a second accept waits for the first.
+    await userEvent.click(within(review).getAllByRole('button', { name: 'Add to fact bank' })[0]!);
+    await screen.findByText('1 added to your Fact bank.');
+    await userEvent.click(within(review).getAllByRole('button', { name: 'Add to fact bank' })[0]!);
+    await waitFor(async () => expect((await api.getProfile()).facts).toHaveLength(before + 2));
+    expect(screen.getByRole('tab', { name: /^Fact bank/ })).toHaveTextContent(String(before + 2));
+  });
+
+  it('says where an accepted résumé suggestion went', async () => {
+    renderWithApp(<ProfilePage />);
+    await screen.findByRole('tab', { name: /^Fact bank/ });
+    await tab(/^Résumé/);
+    await userEvent.click(await screen.findByRole('button', { name: 'Replace' }));
+    const review = await screen.findByRole('region', { name: 'Facts found in resume.pdf' });
+    await userEvent.click(within(review).getAllByRole('button', { name: 'Add to fact bank' })[0]!);
+    expect(await screen.findByText('1 added to your Fact bank.')).toBeInTheDocument();
+  });
+
+  it('moves between tabs with the arrow keys, labelling each panel by its tab', async () => {
+    renderWithApp(<ProfilePage />);
+    const first = await screen.findByRole('tab', { name: /^Fact bank/ });
+    first.focus();
+    await userEvent.keyboard('{ArrowRight}');
+    expect(screen.getByRole('tab', { name: /^Answer bank/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: /^Answer bank/ })).toHaveFocus();
+    await userEvent.keyboard('{End}');
+    expect(screen.getByRole('tab', { name: /^Résumé/ })).toHaveAttribute('aria-selected', 'true');
+    await userEvent.keyboard('{ArrowRight}');
+    expect(screen.getByRole('tab', { name: /^Fact bank/ })).toHaveAttribute('aria-selected', 'true');
+    const panel = screen.getByRole('tabpanel');
+    expect(panel).toHaveAttribute('aria-labelledby', first.id);
+  });
 });

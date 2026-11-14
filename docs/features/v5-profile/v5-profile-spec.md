@@ -5,8 +5,8 @@ Organise Profile into four pill tabs (Fact bank, Answer bank, Preferences, Résu
 - [ ] AC-1: The page is headed "My profile" and shows four pill tabs, in order: Fact bank (with its count), Answer bank (with its count), Preferences, Résumé. It opens on the Fact bank.
 - [ ] AC-2: Fact bank and Answer bank each show only their own list; the Add fact / Add answer button shows beside the tabs on those two tabs only.
 - [ ] AC-3: Preferences shows "What you are looking for" with its existing editor; Résumé shows the reference résumé, the contact details for the résumé header and the ATS template preview.
-- [ ] AC-4: Facts the résumé import finds are listed under Résumé, survive a look at another tab, and adding or dismissing them works as before.
-- [ ] AC-5: An open editor or half-typed field survives switching tabs (panels stay mounted, only the chosen one shows).
+- [ ] AC-4: Facts the résumé import finds are listed under Résumé, survive a look at another tab, and adding or dismissing them works as before; each accepted fact is kept in the fact bank and its tab count, and the page says how many were added to the Fact bank.
+- [ ] AC-5: An open editor, a half-typed new fact or answer survives switching tabs (panels stay mounted, only the chosen one shows). The tabs are a labelled tablist with arrow-key, Home and End navigation, and each panel is labelled by its tab.
 - [ ] AC-6: Every fact, answer, preference, contact and section editor behaves and validates as before, and every saved value comes from the existing save calls.
 
 ## Must not break
@@ -22,8 +22,8 @@ Organise Profile into four pill tabs (Fact bank, Answer bank, Preferences, Résu
 - AC-1: `profile-page.test.tsx` › "shows four pill tabs, opens on the fact bank, and puts each section under its own tab".
 - AC-2: › "offers Add fact and Add answer only on their own tabs", "shows facts grouped by role…", "lists saved answers and adds one".
 - AC-3: › "edits what the operator is looking for", "toggles the ATS template preview", "saves contact details and links for the résumé header".
-- AC-4: › "imports a résumé and adds only the suggested facts the operator accepts", "keeps the résumé suggestions while the operator looks at another tab".
-- AC-5: › "keeps the résumé suggestions while the operator looks at another tab" (state kept across tabs).
+- AC-4: › "imports a résumé and adds only the suggested facts the operator accepts", "keeps the résumé suggestions while the operator looks at another tab", "keeps every accepted résumé suggestion in the fact bank and its count", "says where an accepted résumé suggestion went".
+- AC-5: › "keeps a half-typed new fact while the operator looks at another tab", "keeps the résumé suggestions…", "moves between tabs with the arrow keys, labelling each panel by its tab".
 - AC-6: › "adds a fact to a chosen group", "edits a fact inline and deletes one", "edits work type and remote-only…", "asks for a currency and period…", "points at a link line…", "edits a section's kind, dates, context and link".
 - MNB-1..3: the existing tests above.
 
