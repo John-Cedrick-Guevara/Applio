@@ -28,6 +28,25 @@ describe('AddJobPage', () => {
     expect(screen.getByRole('button', { name: 'Checking the match…' })).toHaveAttribute('aria-busy', 'true');
   });
 
+  it('shows the moving bar while a post is read, and a plain note when it takes about three times as long', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const api = createMockApi({ latencyMs: 0 });
+      vi.spyOn(api, 'analyzeJob').mockReturnValue(new Promise(() => {}));
+      renderWithApp(<AddJobPage />, api);
+      await userEvent.click(screen.getByRole('button', { name: 'Use an example' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Check the match' }));
+      const busy = screen.getByText(/Claude is reading and scoring the post/).closest('[aria-busy="true"]')!;
+      expect(busy.querySelector('.indet')).not.toBeNull();
+      expect(busy).not.toHaveTextContent('taking longer than usual');
+      await act(async () => void vi.advanceTimersByTime(95_000));
+      expect(busy).toHaveTextContent('Checking the match is taking longer than usual.');
+      expect(busy).toHaveTextContent('Nothing was added and you can leave.');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('reads a pasted post, works out the channel and adds it to review', async () => {
     const { api } = renderWithApp(<AddJobPage />);
     await userEvent.click(screen.getByRole('button', { name: 'Use an example' }));

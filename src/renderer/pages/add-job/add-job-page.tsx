@@ -4,12 +4,15 @@ import { useApi } from '../../api/api-context';
 import { Button, buttonClass } from '../../components/button';
 import { Callout, StepList, Stepper, type StepState } from '../../components/job-state';
 import { ScoreBlock } from '../../components/score-block';
+import { ProgressBar } from '../../components/progress-bar';
 import { useAction } from '../../hooks/use-action';
+import { useElapsed } from '../../hooks/use-elapsed';
 import { useAsync } from '../../hooks/use-async';
 import { useJobsVersion } from '../../hooks/use-jobs-version';
 import { costLine } from '../../lib/cost';
 import { formatTokens } from '../../lib/format';
 import { filesState, pendingReason } from '../../lib/job-progress';
+import { stalledLine } from '../../lib/waits';
 import { REVIEW_STATUSES } from '../../lib/job-lists';
 import { AUTONOMY_LABEL, LIFECYCLE, STATUS_LABEL } from '../../lib/labels';
 import { EXAMPLES, inputError } from './add-job-model';
@@ -27,6 +30,7 @@ const ANALYZE_TOKENS = 8_000;
 export default function AddJobPage() {
   const api = useApi();
   const analyze = useAction();
+  const slowAnalyze = stalledLine('analyze', useElapsed(analyze.pending));
   const { data: settings } = useAsync(() => api.getSettings(), [api]);
   // Analysis spends tokens, so a used-up budget disables it up front, with the reason, instead of failing on click.
   const { data: status } = useAsync(() => api.getStatus(), [api]);
@@ -115,6 +119,8 @@ export default function AddJobPage() {
       {analyze.pending ? (
         <section className="card" role="status" aria-busy="true">
           <div className="analyzing row"><span className="spinner" aria-hidden="true" />Claude is reading and scoring the post against your fact bank. This usually takes 20–40 seconds.</div>
+          <ProgressBar />
+          {slowAnalyze ? <Callout tone="needs" title={slowAnalyze.title}>{slowAnalyze.body}</Callout> : null}
           {/* Shaped like the result card, so nothing jumps when it arrives. */}
           <div className="skeleton-stack" aria-hidden="true">
             <div className="skeleton skeleton-line" style={{ width: '30%' }} />
@@ -258,6 +264,7 @@ function DraftProgress({ job, onDone, onAnother }: { job: Job; onDone: (done: bo
   const ready = !busy && files?.kind === 'ready';
   useEffect(() => onDone(ready), [ready, onDone]);
   const since = drafting.since[job.id];
+  const slowDraft = since ? stalledLine('draft', Math.max(0, now - Date.parse(since))) : undefined;
 
   return (
     <section className="preview-progress" aria-label="Draft progress">
@@ -268,6 +275,8 @@ function DraftProgress({ job, onDone, onAnother }: { job: Job; onDone: (done: bo
             <span className="mono cell-sub">{since ? `${clock(Math.max(0, now - Date.parse(since)))} elapsed · ` : ''}usually 1–2 minutes</span>
           </div>
           <StepList label="Drafting steps" steps={[{ label: 'Claude is writing the résumé and letter from your fact bank', state: 'active', note: 'In progress' }, { label: 'Save the PDFs', state: 'pending' }]} />
+          <ProgressBar />
+          {slowDraft ? <Callout tone="needs" title={slowDraft.title}>{slowDraft.body}</Callout> : null}
         </>
       ) : ready ? (
         <Callout tone="done" title="Ready to review.">The résumé and letter are saved and wait for your approval.</Callout>

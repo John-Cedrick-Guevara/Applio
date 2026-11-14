@@ -1,6 +1,6 @@
 import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AppStatus } from '../../../shared/types';
 import { createMockApi } from '../../../shared/mock/mock-api';
 import { renderWithApp } from '../../../test/render';
@@ -129,5 +129,23 @@ describe('FindJobsPage', () => {
     await userEvent.click(within(alert).getByRole('button', { name: 'Try again' }));
     expect(run).toHaveBeenCalledTimes(2);
     expect(await screen.findByRole('region', { name: 'Scan results' })).toBeInTheDocument();
+  });
+
+  describe('while a scan runs', () => {
+    afterEach(() => vi.useRealTimers());
+
+    it('shows the moving bar with its words, and the slow-scan note at about three times the usual', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const api = createMockApi({ latencyMs: 0 });
+      renderWithApp(<FindJobsPage />, { ...api, runDiscovery: () => new Promise(() => {}) });
+      await userEvent.click(await screen.findByRole('button', { name: 'Start scan' }));
+      const running = await screen.findByRole('region', { name: 'Scan in progress' });
+      expect(running.querySelector('.indet')).not.toBeNull();
+      expect(within(running).queryByText('The scan is taking longer than usual.')).not.toBeInTheDocument();
+      await act(async () => void vi.advanceTimersByTime(3 * 60_000));
+      expect(within(running).getByText('The scan is taking longer than usual.')).toBeInTheDocument();
+      expect(running).toHaveTextContent('Everything found so far is kept, and you can stop it.');
+      expect(within(running).getByRole('button', { name: 'Stop scan' })).toBeEnabled();
+    });
   });
 });

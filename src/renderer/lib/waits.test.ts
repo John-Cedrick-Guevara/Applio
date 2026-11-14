@@ -1,0 +1,34 @@
+import { describe, expect, it } from 'vitest';
+import { stalledLine } from './waits';
+
+const MIN = 60_000;
+
+describe('stalledLine', () => {
+  it('says nothing until about three times the usual time has passed', () => {
+    expect(stalledLine('draft', 6 * MIN - 1)).toBeUndefined();
+    expect(stalledLine('scan', 3 * MIN - 1)).toBeUndefined();
+    expect(stalledLine('analyze', 90_000 - 1)).toBeUndefined();
+  });
+
+  it('says a draft is slow, for how long, the usual time, and what is safe', () => {
+    expect(stalledLine('draft', 6 * MIN)).toEqual({
+      title: 'Drafting is taking longer than usual.',
+      body: 'It has run for 6 minutes. The usual time is 2. Nothing has been sent and the tokens used so far are logged.',
+    });
+  });
+
+  it('says a scan is slow and that what it found is kept', () => {
+    expect(stalledLine('scan', 4 * MIN)).toEqual({
+      title: 'The scan is taking longer than usual.',
+      body: 'It has run for 4 minutes. The usual time is 1. Everything found so far is kept, and you can stop it.',
+    });
+  });
+
+  it('says a match check is slow and that nothing was added', () => {
+    expect(stalledLine('analyze', 100_000)?.body).toBe('It has run for 2 minutes. The usual time is under a minute. Nothing was added and you can leave.');
+  });
+
+  it('says one minute, not one minutes', () => {
+    expect(stalledLine('analyze', 90_000)?.body).toMatch(/^It has run for 2 minutes|^It has run for 1 minute/);
+  });
+});
