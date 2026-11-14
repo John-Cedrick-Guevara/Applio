@@ -17,27 +17,110 @@ describe('app frame layout', () => {
   });
 });
 
-describe('v3 type and control floor', () => {
+describe('v5 foundation', () => {
   const root = new URL('..', import.meta.url);
   const files = readdirSync(root, { recursive: true, encoding: 'utf8' }).filter((f) => f.endsWith('.css'));
   const all = files.map((f) => readFileSync(new URL(f, root), 'utf8')).join('\n');
   const tokens = readFileSync(new URL('./tokens.css', import.meta.url), 'utf8');
-  const token = (name: string) => Number(tokens.match(new RegExp(`--${name}:\\s*([\\d.]+)px`))?.[1]);
+  const main = readFileSync(new URL('../main.tsx', import.meta.url), 'utf8');
+  const px = (name: string) => Number(tokens.match(new RegExp(`--${name}:\\s*([\\d.]+)px`))?.[1]);
+  const hex = (name: string) => tokens.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})`))?.[1]?.toLowerCase();
+  const sizes = () => [...all.matchAll(/(?:font-size:|--text-[\w-]+:)\s*([\d.]+)px/g)].map((m) => Number(m[1]));
+  /** WCAG contrast ratio of two #rrggbb colours. */
+  const contrast = (a: string, b: string) => {
+    const chan = (h: string, i: number) => {
+      const c = parseInt(h.slice(i, i + 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    };
+    const lum = (h: string) => 0.2126 * chan(h, 1) + 0.7152 * chan(h, 3) + 0.0722 * chan(h, 5);
+    return (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
+  };
+
+  it('loads Plus Jakarta Sans 400-700 from the package and sets it as the font', () => {
+    for (const w of [400, 500, 600, 700]) expect(main).toContain(`@fontsource/plus-jakarta-sans/${w}.css`);
+    expect(tokens).toMatch(/--font:\s*'Plus Jakarta Sans'/);
+    expect(all).not.toMatch(/fonts\.googleapis|https?:\/\/[^\s)]*font/);
+  });
+
+  it('defines the v5 colour tokens', () => {
+    const want: Record<string, string> = {
+      ink: '#141519', 'text-muted': '#5e626b', border: '#e7e7e3', bg: '#f5f5f2', surface: '#ffffff',
+      'lavender-tint': '#eeeffc', 'lavender-block': '#a7adf0', 'lavender-mark': '#7c83e6', 'lavender-ink': '#3d43a8',
+      'pink-tint': '#fbeaf0', 'pink-mark': '#e58aa8', 'ice-tint': '#e8f0f3', 'ice-block': '#bccbd3',
+      'success-soft': '#e9f5ee', 'success-text': '#145a37', success: '#2f8a57',
+      'warning-soft': '#fdf1de', 'warning-text': '#7a4508', warning: '#b4690e',
+      'danger-soft': '#fce8e6', 'danger-text': '#8f1d14', danger: '#c0362c',
+      'neutral-soft': '#eef2f4', 'focus-ring-color': '#5b62d6',
+    };
+    const wrong = Object.entries(want).filter(([k, v]) => hex(k) !== v);
+    expect(wrong).toEqual([]);
+  });
+
+  it('paints the dot grid on the page ground', () => {
+    const base = readFileSync(new URL('./base.css', import.meta.url), 'utf8');
+    expect(base).toMatch(/body\s*\{[^}]*radial-gradient\(#dadad4 1px, transparent 1px\)[^}]*22px 22px/i);
+  });
 
   it('never sets text below 12px, in tokens or hard-coded', () => {
-    const sizes = [...all.matchAll(/(?:font-size:|--text-[\w-]+:)\s*([\d.]+)px/g)].map((m) => Number(m[1]));
-    expect(sizes.length).toBeGreaterThan(0);
-    expect(sizes.filter((s) => s < 12)).toEqual([]);
+    expect(sizes().length).toBeGreaterThan(0);
+    expect(sizes().filter((s) => s < 12)).toEqual([]);
   });
 
-  it('keeps text on the 12 / 14 / 16 / 20 / 24 scale, plus big score numbers', () => {
-    const sizes = new Set([...all.matchAll(/(?:font-size:|--text-[\w-]+:)\s*([\d.]+)px/g)].map((m) => Number(m[1])));
-    expect([...sizes].filter((s) => ![12, 14, 16, 20, 24, 32].includes(s))).toEqual([]);
+  it('keeps text on the v5 scale', () => {
+    expect(sizes().filter((s) => ![12, 13, 14, 17, 22, 28, 34, 44].includes(s))).toEqual([]);
   });
 
-  it('makes buttons at least 44px tall', () => {
-    expect(token('control-h')).toBeGreaterThanOrEqual(44);
-    expect(token('control-h-sm')).toBeGreaterThanOrEqual(44);
+  it('makes normal buttons 40px and small ones 36px', () => {
+    expect(px('control-h')).toBe(40);
+    expect(px('control-h-sm')).toBe(36);
+  });
+
+  it('makes buttons pills', () => {
+    expect(all).toMatch(/\.btn\s*\{[^}]*border-radius:\s*var\(--radius-pill\)/);
+  });
+
+  it('gives strong buttons the ink fill of primary ones', () => {
+    expect(all).toMatch(/\.btn-primary\s*\{[^}]*background:\s*var\(--ink\)/);
+    expect(all).toMatch(/\.btn-strong\s*\{[^}]*background:\s*var\(--ink\)/);
+  });
+
+  it('greys a disabled button with muted text', () => {
+    expect(all).toMatch(/\.btn-strong:disabled\s*\{[^}]*background:\s*var\(--border\)[^}]*color:\s*var\(--text-muted\)/);
+  });
+
+  it('gives cards a 20px radius and 20px padding', () => {
+    expect(px('radius-card')).toBe(20);
+    const card = all.match(/\.card\s*\{([^}]*)\}/)?.[1] ?? '';
+    expect(card).toMatch(/border-radius:\s*var\(--radius-card\)/);
+    expect(card).toMatch(/padding:\s*var\(--space-5\)/);
+  });
+
+  it('makes tabs 40px pills', () => {
+    expect(all).toMatch(/\.tab\s*\{[^}]*min-height:\s*var\(--control-h\)[^}]*border-radius:\s*var\(--radius-pill\)/);
+  });
+
+  it('colours each badge with its v5 ground and ink', () => {
+    expect(all).toMatch(/\.badge-success\s*\{[^}]*var\(--success-soft\)[^}]*var\(--success-text\)/);
+    expect(all).toMatch(/\.badge-warning\s*\{[^}]*var\(--warning-soft\)[^}]*var\(--warning-text\)/);
+    expect(all).toMatch(/\.badge-danger\s*\{[^}]*var\(--danger-soft\)[^}]*var\(--danger-text\)/);
+    expect(all).toMatch(/\.badge-accent\s*\{[^}]*var\(--lavender-tint\)[^}]*var\(--lavender-ink\)/);
+  });
+
+  it('keeps chip, button and muted text at 4.5:1', () => {
+    const pairs: [string, string][] = [
+      ['success-text', 'success-soft'], ['warning-text', 'warning-soft'], ['danger-text', 'danger-soft'],
+      ['lavender-ink', 'lavender-tint'], ['text-muted', 'bg'], ['text-muted', 'surface'], ['on-ink', 'ink'], ['text-muted', 'border'],
+    ];
+    const low = pairs.filter(([f, b]) => contrast(hex(f) ?? '#000000', hex(b) ?? '#000000') < 4.5);
+    expect(low).toEqual([]);
+  });
+
+  it('draws a 2px lavender focus ring', () => {
+    expect(tokens).toMatch(/--focus-ring:\s*0 0 0 2px var\(--surface\),\s*0 0 0 4px var\(--focus-ring-color\)/);
+  });
+
+  it('stops motion under reduced motion', () => {
+    expect(tokens).toMatch(/prefers-reduced-motion[^}]*--duration:\s*0ms/);
   });
 
   it('keeps light shadows under 8% opacity', () => {
@@ -45,10 +128,6 @@ describe('v3 type and control floor', () => {
     const shadows = [...all.matchAll(/(?:box-shadow|--shadow-[\w-]+):([^;]*);/g)].map((m) => m[1]).join(' ');
     const alphas = [...shadows.matchAll(/rgb\(\s*\d+ \d+ \d+ \/ (0?\.\d+)\)/g)].map((m) => Number(m[1]));
     expect(alphas.filter((a) => a >= 0.08)).toEqual([]);
-  });
-
-  it('gives strong buttons the same blue as primary ones, so each view has one accent', () => {
-    expect(all).toMatch(/\.btn-strong\s*\{[^}]*background:\s*var\(--accent\)/);
   });
 });
 
