@@ -16,6 +16,7 @@ interface NavItem {
 
 /** Pages in the primary nav, then the pair pinned to the bottom. Each page PR adds its entry here. */
 const NAV: NavItem[] = [
+  { to: '/dashboard', label: 'Dashboard', icon: 'home' },
   { to: '/inbox', label: 'Inbox', icon: 'review' },
   { to: '/matches', label: 'Matches', icon: 'matches' },
   { to: '/get-jobs', label: 'Get jobs', icon: 'search' },

@@ -16,6 +16,7 @@ const MatchesView = lazy(() => import('./pages/matches/matches-page'));
 const GetJobsView = lazy(() => import('./pages/get-jobs/get-jobs-page'));
 
 export const ROUTES: RouteDef[] = [
+  { pattern: '/dashboard', view: lazy(() => import('./pages/dashboard/dashboard-page')) },
   { pattern: '/inbox', view: InboxView },
   { pattern: '/inbox/:id', view: InboxView },
   { pattern: '/matches', view: MatchesView },
@@ -29,7 +30,7 @@ export const ROUTES: RouteDef[] = [
   { pattern: '/settings', view: lazy(() => import('./pages/settings/settings-page')) },
 ];
 
-export const DEFAULT_PATH = '/inbox';
+export const DEFAULT_PATH = '/dashboard';
 
 /** Old paths that moved: links from before the Inbox (bookmarks, notifications) keep working. */
 export const REDIRECTS: [from: string, to: string][] = [['/review', '/inbox'], ['/find-jobs', '/get-jobs'], ['/add-job', '/get-jobs/paste']];

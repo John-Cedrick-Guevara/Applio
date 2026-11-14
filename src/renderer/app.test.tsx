@@ -18,11 +18,11 @@ describe('App shell', () => {
 });
 
 describe('App routing', () => {
-  it('opens on the Inbox', async () => {
+  it('opens on the dashboard', async () => {
     window.location.hash = '';
     renderWithApp(<App />);
-    await waitFor(() => expect(window.location.hash).toBe('#/inbox'));
-    expect(await screen.findByRole('heading', { name: 'Inbox' })).toBeInTheDocument();
+    await waitFor(() => expect(window.location.hash).toBe('#/dashboard'));
+    expect(await screen.findByRole('heading', { level: 1, name: 'My job hunt' })).toBeInTheDocument();
   });
 
   it('redirects Find jobs and Add job to Get jobs', async () => {
