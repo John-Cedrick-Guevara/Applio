@@ -6,7 +6,6 @@ import { AsyncView } from '../../components/async-view';
 import { Button } from '../../components/button';
 import { CopyButton } from '../../components/copy-button';
 import { FileIcon, Icon } from '../../components/icons';
-import { ScoreBlock } from '../../components/score-block';
 import { useAction } from '../../hooks/use-action';
 import { useAsync } from '../../hooks/use-async';
 import { formatClock, formatTokens } from '../../lib/format';
@@ -50,8 +49,8 @@ function Handoff({ job, draft, assisted, onJob }: { job: Job; draft: Draft | nul
   return (
     <>
       <header>
-        <a href={`#/inbox/${job.id}`} className="back-link">← Inbox</a>
-        <h1 className="handoff-title">Apply to {job.company} on {platform}</h1>
+        <a href={`#/inbox/${job.id}`} className="back-link">← Inbox · Hand off</a>
+        <h1 className="handoff-title">Apply to <strong>{job.company}</strong> on {platform}</h1>
         <p className="muted handoff-lede">
           {assisted
             ? `Applio can fill the form in its own window, signed in as you. You check it and click Submit. Applio never submits on ${platform}.`
@@ -71,7 +70,23 @@ function Handoff({ job, draft, assisted, onJob }: { job: Job; draft: Draft | nul
         ) : null}
       </header>
 
-      <div className="split">
+      <div className="handoff-wrap">
+      <section className="handoff-strip" aria-label="Job">
+        {job.score !== undefined ? (
+          <span className="handoff-strip-match">
+            <span className="handoff-strip-score" role="img" aria-label={`Match ${job.score}`}>{job.score}</span>
+            <span className="cell-sub">match</span>
+          </span>
+        ) : null}
+        <div className="handoff-strip-text">
+          <h2 className="handoff-strip-title">{job.title}</h2>
+          <div className="cell-sub"><SourceCredit job={job} /> · {EMPLOYMENT_LABEL[job.employmentType]} · {job.applyTarget}{job.salary ? ` · Pay ${job.salary}` : ''}</div>
+          {job.roleSummary ? <p className="body-text">{job.roleSummary}</p> : null}
+        </div>
+        <span className="cell-sub">{formatTokens(job.tokensUsed)} tokens used</span>
+      </section>
+
+      <div className="handoff-layout">
         <ol className="list-plain handoff-steps">
           {assisted ? (
             <Step n={next()} title="Fill the form in Applio" sub={`The first time, sign in to ${platform} in the window that opens.`}>
@@ -147,27 +162,14 @@ function Handoff({ job, draft, assisted, onJob }: { job: Job; draft: Draft | nul
           </li>
         </ol>
 
-        <aside className="handoff-aside">
-          <section className="card">
-            <div className="cell-sub">{job.company} · <SourceCredit job={job} /></div>
-            <h2 className="aside-title">{job.title}</h2>
-            {job.score !== undefined ? <ScoreBlock score={job.score} size="md" /> : null}
-            <p className="body-text">{job.roleSummary}</p>
-            <dl className="facts-grid">
-              <div><dt>Type</dt><dd>{EMPLOYMENT_LABEL[job.employmentType]}</dd></div>
-              <div><dt>Channel</dt><dd>{job.applyTarget}</dd></div>
-              <div><dt>Tokens</dt><dd className="mono">{formatTokens(job.tokensUsed)}</dd></div>
-              {job.salary ? <div><dt>Pay</dt><dd>{job.salary}</dd></div> : null}
-            </dl>
+        {assisted ? null : (
+          <section className="handoff-tip">
+            <div className="handoff-tip-title">Want this filled for you?</div>
+            <p>Turn on assisted fill for {job.channel === 'custom' ? 'company career sites' : `${platform} and other platforms`}. Applio opens the form in its own window and fills it in. You still click Submit.</p>
+            <a href="#/settings">Channel settings</a>
           </section>
-          {assisted ? null : (
-            <section className="handoff-tip">
-              <div className="handoff-tip-title">Want this filled for you?</div>
-              <p>Turn on assisted fill for {job.channel === 'custom' ? 'company career sites' : `${platform} and other platforms`}. Applio opens the form in its own window and fills it in. You still click Submit.</p>
-              <a href="#/settings">Channel settings</a>
-            </section>
-          )}
-        </aside>
+        )}
+      </div>
       </div>
     </>
   );

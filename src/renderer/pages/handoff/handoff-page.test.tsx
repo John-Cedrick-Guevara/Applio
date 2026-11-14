@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { createMockApi } from '../../../shared/mock/mock-api';
@@ -76,5 +76,27 @@ describe('HandoffPage', () => {
     vi.spyOn(api, 'getJob').mockResolvedValue({ ...job, platform: 'Upwork', description: 'Send a proposal for: 16 Connects' });
     renderWithApp(<HandoffPage params={{ id: 'j3' }} />, api);
     expect(await screen.findByText('This proposal costs 16 Connects on Upwork.')).toBeInTheDocument();
+  });
+
+  it('names the company in bold and links back to the Inbox hand-off list', async () => {
+    open();
+    const heading = await screen.findByRole('heading', { name: 'Apply to Ledgerly on LinkedIn' });
+    expect(heading.querySelector('strong')).toHaveTextContent('Ledgerly');
+    expect(screen.getByRole('link', { name: /Inbox · Hand off/ })).toHaveAttribute('href', '#/inbox/j3');
+  });
+
+  it('puts a job strip above the steps instead of a side column', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const job = await api.getJob('j3');
+    renderWithApp(<HandoffPage params={{ id: 'j3' }} />, api);
+    const strip = await screen.findByRole('region', { name: 'Job' });
+    expect(within(strip).getByRole('img', { name: `Match ${job.score}` })).toBeInTheDocument();
+    expect(within(strip).getByText('match')).toBeInTheDocument();
+    expect(within(strip).getByRole('heading', { name: job.title })).toBeInTheDocument();
+    expect(strip).toHaveTextContent(job.applyTarget);
+    if (job.salary) expect(strip).toHaveTextContent(`Pay ${job.salary}`);
+    if (job.roleSummary) expect(strip).toHaveTextContent(job.roleSummary);
+    expect(strip).toHaveTextContent(/[\d.,k]+ tokens used/);
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
   });
 });

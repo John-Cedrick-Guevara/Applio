@@ -546,7 +546,6 @@ a.btn-secondary:hover { color: var(--text); }
 .stack-sm { display: flex; flex-direction: column; gap: var(--space-2); }
 .row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .spread { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
-.split { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-4); }
 .list-plain { margin: 0; padding: 0; list-style: none; }
 .pre { margin: 0; font-family: inherit; white-space: pre-wrap; }
 
