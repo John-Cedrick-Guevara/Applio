@@ -1,4 +1,4 @@
-/* Profile: resume + preferences row, template preview, fact/answer banks. */
+/* Profile (v5): four tab panels (fact bank, answer bank, preferences, résumé). */
 .profile {
   display: flex;
   flex-direction: column;
@@ -6,11 +6,42 @@
   max-width: 1040px;
 }
 
-.profile-top {
+.profile-tabrow {
   display: flex;
   flex-wrap: wrap;
-  align-items: stretch;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  margin-left: var(--space-2);
+  padding: 0 6px;
+  border-radius: 11px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.tab[aria-selected='true'] .tab-count {
+  background: var(--ink-hover);
+  color: var(--on-ink);
+}
+
+.profile-panel {
+  display: flex;
+  flex-direction: column;
   gap: var(--space-4);
+}
+
+.profile-panel[hidden] {
+  display: none;
 }
 
 .profile-resume {

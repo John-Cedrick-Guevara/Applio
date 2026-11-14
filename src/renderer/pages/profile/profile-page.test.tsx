@@ -5,6 +5,8 @@ import { createMockApi } from '../../../shared/mock/mock-api';
 import { renderWithApp } from '../../../test/render';
 import ProfilePage from './profile-page';
 
+const tab = (name: RegExp) => userEvent.click(screen.getByRole('tab', { name }));
+
 describe('ProfilePage', () => {
   it('shows facts grouped by role with how often each was used', async () => {
     renderWithApp(<ProfilePage />);
@@ -57,6 +59,8 @@ describe('ProfilePage', () => {
 
   it('edits what the operator is looking for', async () => {
     const { api } = renderWithApp(<ProfilePage />);
+    await screen.findByRole('tab', { name: /^Fact bank/ });
+    await tab(/^Preferences/);
     await userEvent.click(await screen.findByRole('button', { name: 'Edit preferences' }));
     const roles = screen.getByLabelText(/Target roles/);
     await userEvent.clear(roles);
@@ -68,6 +72,8 @@ describe('ProfilePage', () => {
 
   it('edits work type and remote-only, and saves pay with its currency and period', async () => {
     const { api } = renderWithApp(<ProfilePage />);
+    await screen.findByRole('tab', { name: /^Fact bank/ });
+    await tab(/^Preferences/);
     await userEvent.click(await screen.findByRole('button', { name: 'Edit preferences' }));
     await userEvent.click(screen.getByRole('checkbox', { name: 'Freelance' }));
     await userEvent.click(screen.getByRole('switch', { name: 'Remote only' }));
@@ -90,11 +96,15 @@ describe('ProfilePage', () => {
     const api = createMockApi({ latencyMs: 0 });
     await api.savePreferences({ ...(await api.getProfile()).preferences, minimumPay: '30,000' });
     renderWithApp(<ProfilePage />, api);
+    await screen.findByRole('tab', { name: /^Fact bank/ });
+    await tab(/^Preferences/);
     expect(await screen.findByText(/Pick a currency and period so Applio can compare pay/)).toBeInTheDocument();
   });
 
   it('saves contact details and links for the résumé header', async () => {
     const { api } = renderWithApp(<ProfilePage />);
+    await screen.findByRole('tab', { name: /^Fact bank/ });
+    await tab(/^Résumé/);
     await userEvent.click(await screen.findByRole('button', { name: 'Edit contact and links' }));
     const phone = screen.getByLabelText('Phone');
     await userEvent.clear(phone);
@@ -109,6 +119,8 @@ describe('ProfilePage', () => {
 
   it('points at a link line with no web address instead of saving', async () => {
     renderWithApp(<ProfilePage />);
+    await screen.findByRole('tab', { name: /^Fact bank/ });
+    await tab(/^Résumé/);
     await userEvent.click(await screen.findByRole('button', { name: 'Edit contact and links' }));
     const links = screen.getByLabelText(/Links/);
     await userEvent.clear(links);
@@ -130,6 +142,8 @@ describe('ProfilePage', () => {
 
   it('imports a résumé and adds only the suggested facts the operator accepts', async () => {
     const { api } = renderWithApp(<ProfilePage />);
+    await screen.findByRole('tab', { name: /^Fact bank/ });
+    await tab(/^Résumé/);
     await userEvent.click(await screen.findByRole('button', { name: 'Replace' }));
     const review = await screen.findByRole('region', { name: 'Facts found in resume.pdf' });
     expect(screen.getByText(/found 2 facts/)).toBeInTheDocument();
@@ -149,10 +163,93 @@ describe('ProfilePage', () => {
 
   it('toggles the ATS template preview', async () => {
     renderWithApp(<ProfilePage />);
+    await screen.findByRole('tab', { name: /^Fact bank/ });
+    await tab(/^Résumé/);
     await userEvent.click(await screen.findByRole('button', { name: 'Preview template' }));
     const preview = screen.getByRole('region', { name: 'Resume template preview' });
     // The locked layout with the operator's own sections and dates.
     expect(within(preview).getByText('EXPERIENCE')).toBeInTheDocument();
     expect(within(preview).getByText('2022 – now')).toBeInTheDocument();
+  });
+
+  it('shows four pill tabs, opens on the fact bank, and puts each section under its own tab', async () => {
+    renderWithApp(<ProfilePage />);
+    const tabs = within(await screen.findByRole('tablist', { name: 'Profile sections' })).getAllByRole('tab');
+    expect(tabs.map((t) => t.textContent?.replace(/\d+$/, ''))).toEqual(['Fact bank', 'Answer bank', 'Preferences', 'Résumé']);
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByRole('button', { name: 'Edit preferences' })).not.toBeInTheDocument();
+    await tab(/^Preferences/);
+    expect(screen.getByRole('button', { name: 'Edit preferences' })).toBeInTheDocument();
+    await tab(/^Résumé/);
+    expect(screen.getByRole('button', { name: 'Replace' })).toBeInTheDocument();
+  });
+
+  it('offers Add fact and Add answer only on their own tabs', async () => {
+    renderWithApp(<ProfilePage />);
+    expect(await screen.findByRole('button', { name: 'Add fact' })).toBeInTheDocument();
+    await tab(/^Answer bank/);
+    expect(screen.getByRole('button', { name: 'Add answer' })).toBeInTheDocument();
+    await tab(/^Preferences/);
+    expect(screen.queryByRole('button', { name: /^Add (fact|answer)$/ })).not.toBeInTheDocument();
+  });
+
+  it('keeps the résumé suggestions while the operator looks at another tab', async () => {
+    renderWithApp(<ProfilePage />);
+    await screen.findByRole('tab', { name: /^Fact bank/ });
+    await tab(/^Résumé/);
+    await userEvent.click(screen.getByRole('button', { name: 'Replace' }));
+    await screen.findByRole('region', { name: 'Facts found in resume.pdf' });
+    await tab(/^Fact bank/);
+    await tab(/^Résumé/);
+    expect(screen.getByRole('region', { name: 'Facts found in resume.pdf' })).toBeInTheDocument();
+  });
+
+  it('keeps a half-typed new fact while the operator looks at another tab', async () => {
+    renderWithApp(<ProfilePage />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Add fact' }));
+    await userEvent.type(screen.getByRole('textbox', { name: /fact/i }), 'Led a team of six');
+    await tab(/^Preferences/);
+    await tab(/^Fact bank/);
+    expect(screen.getByRole('textbox', { name: /fact/i })).toHaveValue('Led a team of six');
+  });
+
+  it('keeps every accepted résumé suggestion in the fact bank and its count', async () => {
+    const { api } = renderWithApp(<ProfilePage />);
+    await screen.findByRole('tab', { name: /^Fact bank/ });
+    const before = (await api.getProfile()).facts.length;
+    await tab(/^Résumé/);
+    await userEvent.click(await screen.findByRole('button', { name: 'Replace' }));
+    const review = await screen.findByRole('region', { name: 'Facts found in resume.pdf' });
+    // The row's button is busy while a save runs, so a second accept waits for the first.
+    await userEvent.click(within(review).getAllByRole('button', { name: 'Add to fact bank' })[0]!);
+    await screen.findByText('1 added to your Fact bank.');
+    await userEvent.click(within(review).getAllByRole('button', { name: 'Add to fact bank' })[0]!);
+    await waitFor(async () => expect((await api.getProfile()).facts).toHaveLength(before + 2));
+    expect(screen.getByRole('tab', { name: /^Fact bank/ })).toHaveTextContent(String(before + 2));
+  });
+
+  it('says where an accepted résumé suggestion went', async () => {
+    renderWithApp(<ProfilePage />);
+    await screen.findByRole('tab', { name: /^Fact bank/ });
+    await tab(/^Résumé/);
+    await userEvent.click(await screen.findByRole('button', { name: 'Replace' }));
+    const review = await screen.findByRole('region', { name: 'Facts found in resume.pdf' });
+    await userEvent.click(within(review).getAllByRole('button', { name: 'Add to fact bank' })[0]!);
+    expect(await screen.findByText('1 added to your Fact bank.')).toBeInTheDocument();
+  });
+
+  it('moves between tabs with the arrow keys, labelling each panel by its tab', async () => {
+    renderWithApp(<ProfilePage />);
+    const first = await screen.findByRole('tab', { name: /^Fact bank/ });
+    first.focus();
+    await userEvent.keyboard('{ArrowRight}');
+    expect(screen.getByRole('tab', { name: /^Answer bank/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: /^Answer bank/ })).toHaveFocus();
+    await userEvent.keyboard('{End}');
+    expect(screen.getByRole('tab', { name: /^Résumé/ })).toHaveAttribute('aria-selected', 'true');
+    await userEvent.keyboard('{ArrowRight}');
+    expect(screen.getByRole('tab', { name: /^Fact bank/ })).toHaveAttribute('aria-selected', 'true');
+    const panel = screen.getByRole('tabpanel');
+    expect(panel).toHaveAttribute('aria-labelledby', first.id);
   });
 });
