@@ -1,5 +1,6 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AppStatus } from '../../shared/types';
 import { createMockApi } from '../../shared/mock/mock-api';
 import { renderWithApp } from '../../test/render';
@@ -7,6 +8,8 @@ import { Sidebar } from './sidebar';
 
 afterEach(() => {
   delete window.applioEvents;
+  localStorage.clear();
+  vi.restoreAllMocks();
 });
 
 describe('Sidebar', () => {
@@ -44,7 +47,7 @@ describe('Sidebar', () => {
     const lastRun = { at: '2000-01-01T00:00:00.000Z', found: 2, newAfterDedup: 2, passedFilters: 2, drafted: 0 };
     renderWithApp(<Sidebar />, { ...api, getStatus: async () => ({ ...(await api.getStatus()), lastRun }) });
     const link = await screen.findByRole('link', { name: /Matches/ });
-    expect(await within(link).findByText('2 new')).toBeInTheDocument();
+    await waitFor(() => expect(link).toHaveTextContent('2 new'));
     expect(link).toHaveAttribute('href', '#/matches');
   });
 
@@ -54,5 +57,79 @@ describe('Sidebar', () => {
     renderWithApp(<Sidebar />, { ...api, getStatus: async () => ({ ...(await api.getStatus()), lastRun }) });
     const link = await screen.findByRole('link', { name: /Matches/ });
     expect(link).not.toHaveTextContent(/new/);
+  });
+
+  it('collapses to icons and expands again, announcing its state', async () => {
+    const user = userEvent.setup();
+    renderWithApp(<Sidebar />);
+    const toggle = await screen.findByRole('button', { name: 'Collapse sidebar' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await user.click(toggle);
+    const expand = screen.getByRole('button', { name: 'Expand sidebar' });
+    expect(expand).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('complementary')).toHaveAttribute('data-collapsed', 'true');
+    await user.click(expand);
+    expect(screen.getByRole('complementary')).toHaveAttribute('data-collapsed', 'false');
+  });
+
+  it('remembers the choice', async () => {
+    const user = userEvent.setup();
+    const first = renderWithApp(<Sidebar />);
+    await user.click(await screen.findByRole('button', { name: 'Collapse sidebar' }));
+    first.unmount();
+    renderWithApp(<Sidebar />);
+    expect(await screen.findByRole('button', { name: 'Expand sidebar' })).toBeInTheDocument();
+  });
+
+  it('opens expanded when storage throws', async () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked'); });
+    const user = userEvent.setup();
+    renderWithApp(<Sidebar />);
+    await user.click(await screen.findByRole('button', { name: 'Collapse sidebar' }));
+    expect(screen.getByRole('button', { name: 'Expand sidebar' })).toBeInTheDocument();
+  });
+
+  it('keeps names, titles and counts when collapsed', async () => {
+    const user = userEvent.setup();
+    renderWithApp(<Sidebar />);
+    await user.click(await screen.findByRole('button', { name: 'Collapse sidebar' }));
+    const inbox = screen.getByRole('link', { name: /Inbox/ });
+    expect(inbox).toHaveAttribute('title', 'Inbox');
+    expect(await within(inbox).findByLabelText(/need a decision/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Usage & limits' })).toHaveAttribute('title', 'Usage & limits');
+  });
+
+  it('lists the pages in order with the current one marked', async () => {
+    window.location.hash = '#/applications';
+    renderWithApp(<Sidebar />);
+    const nav = await screen.findByRole('navigation', { name: 'Primary' });
+    expect(within(nav).getAllByRole('link').map((a) => a.getAttribute('title'))).toEqual(['Inbox', 'Matches', 'Get jobs', 'Applications', 'Profile', 'Usage & limits', 'Settings']);
+    expect(within(nav).getByRole('link', { name: 'Applications' })).toHaveAttribute('aria-current', 'page');
+    window.location.hash = '';
+  });
+
+  it('links the logo home', async () => {
+    renderWithApp(<Sidebar />);
+    expect(await screen.findByRole('link', { name: 'Applio, home' })).toHaveAttribute('href', '#/inbox');
+  });
+
+  it('names the counts for screen readers, open or collapsed', async () => {
+    const user = userEvent.setup();
+    const api = createMockApi({ latencyMs: 0 });
+    const lastRun = { at: '2000-01-01T00:00:00.000Z', found: 2, newAfterDedup: 2, passedFilters: 2, drafted: 0 };
+    renderWithApp(<Sidebar />, { ...api, getStatus: async () => ({ ...(await api.getStatus()), lastRun }) });
+    expect(await screen.findByRole('link', { name: /Inbox.*need a decision/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Collapse sidebar' }));
+    expect(await screen.findByRole('link', { name: /Inbox, \d+ need a decision/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Matches, 2 new' })).toBeInTheDocument();
+  });
+
+  it('renders the logo as a 34px tile with a 10px corner', async () => {
+    const { container } = renderWithApp(<Sidebar />);
+    await screen.findByRole('link', { name: 'Applio, home' });
+    const svg = container.querySelector('svg.logo')!;
+    expect(svg).toHaveAttribute('width', '34');
+    expect(svg.querySelector('rect')).toHaveAttribute('rx', '10');
   });
 });
