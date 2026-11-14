@@ -18,6 +18,10 @@ const PATHS = {
   external: <path d="M8 4H4v12h12v-4M11 3h6v6M17 3l-8 8" />,
   search: <><circle cx="9" cy="9" r="5" /><path d="M13 13l4 4" /></>,
   edit: <path d="M4 16h3l9-9-3-3-9 9zM12 5l3 3" />,
+  chevronLeft: <path d="M12 5l-5 5 5 5" />,
+  chevronRight: <path d="m8 5 5 5-5 5" />,
+  close: <path d="M5 5l10 10M15 5 5 15" />,
+  home: <path d="M3 9.5 10 4l7 5.5V16a1 1 0 0 1-1 1h-3.5v-4.5h-5V17H4a1 1 0 0 1-1-1z" />,
   doneCircle: <><circle cx="10" cy="10" r="8" /><path d="M6.5 10l2.5 2.5 4.5-5" /></>,
 } as const;
 
@@ -44,12 +48,16 @@ export function Icon({ name, size = 16, strokeWidth = 1.6, ...rest }: { name: Ic
   );
 }
 
-/** Applio mark: dark tile with a rising line. */
-export function Logo() {
+/**
+ * Applio mark (v5): an A whose crossbar becomes a lavender arrow, on a rounded tile.
+ * `tone="light"` is a white tile for the dark rail; `"dark"` an ink tile for light surfaces.
+ */
+export function Logo({ tone = 'dark', size = 34 }: { tone?: 'light' | 'dark'; size?: number }) {
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
-      <rect width="24" height="24" rx="6" fill="#15171C" />
-      <path d="M6 15l4-7 3 5 2-3 3 5" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width={size} height={size} viewBox="0 0 34 34" aria-hidden="true" className="logo" style={{ flex: 'none' }}>
+      <rect width="34" height="34" rx="10" fill={tone === 'light' ? '#FFFFFF' : '#141519'} />
+      <path d="M7 26 14 8l7 18" fill="none" stroke={tone === 'light' ? '#141519' : '#FFFFFF'} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10.5 19H27M24 16l3 3-3 3" fill="none" stroke="#7C83E6" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
