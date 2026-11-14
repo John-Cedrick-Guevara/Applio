@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
 import type { Job } from '../../../shared/types';
 import { Callout, StepList, Stepper } from '../../components/job-state';
 import { ProgressBar } from '../../components/progress-bar';
+import { useElapsed } from '../../hooks/use-elapsed';
 import { stalledLine } from '../../lib/waits';
 import { jobSteps } from './review-model';
 
@@ -14,12 +14,10 @@ const clock = (ms: number) => `${Math.floor(ms / 60_000)}:${String(Math.floor(ms
  * comes from when main started the draft, so it survives a reload.
  */
 export function DraftingPanel({ job, since }: { job?: Job; since?: string }) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-  const elapsed = since ? Math.max(0, now - Date.parse(since)) : undefined;
+  const start = since ? Date.parse(since) : undefined;
+  const ticking = useElapsed(Boolean(since), start);
+  // No readable start time: no clock and no slow note, rather than "NaN".
+  const elapsed = since && Number.isFinite(start) ? ticking : undefined;
   const slow = elapsed !== undefined ? stalledLine('draft', elapsed) : undefined;
 
   return (

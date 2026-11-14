@@ -152,7 +152,8 @@ const PHASES: { phase: ScanPhase; label: string }[] = [
 /** A scan in progress, phase by phase as main reports it, with a stop between phases. */
 function Running({ phase, draft, stopping, onStop }: { phase?: ScanPhase; draft: boolean; stopping: boolean; onStop: () => void }) {
   const elapsed = useElapsed(true);
-  const slow = stalledLine('scan', elapsed);
+  // Not while stopping: the footer already says so, and "you can stop it" would contradict it.
+  const slow = stopping ? undefined : stalledLine(draft ? 'scanDraft' : 'scan', elapsed);
   const at = Math.max(0, PHASES.findIndex((p) => p.phase === phase));
   // Only the phases this scan reaches; drafting is listed when asked for, so nothing shows as skipped.
   const steps = PHASES.filter((p) => draft || p.phase !== 'drafting').slice(0, phase ? undefined : 1).map((p, i) => ({

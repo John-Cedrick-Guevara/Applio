@@ -416,6 +416,15 @@ describe('ReviewPage', () => {
     expect(slow).toHaveTextContent('The usual time is 2. Nothing has been sent and the tokens used so far are logged.');
   });
 
+  it('says nothing slow, and no NaN, when the draft start time is unreadable', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const status = await api.getStatus();
+    vi.spyOn(api, 'getStatus').mockResolvedValue({ ...status, drafting: ['j5'], draftingSince: { j5: 'not a date' } });
+    renderWithApp(<ReviewPage params={{ id: 'j5' }} />, api);
+    const panel = await screen.findByRole('region', { name: 'Drafting' });
+    expect(panel).not.toHaveTextContent(/NaN|taking longer/);
+  });
+
   it('shows a job Claude is drafting in the background, live, until its draft lands', async () => {
     const api = createMockApi({ latencyMs: 0 });
     const status = await api.getStatus();

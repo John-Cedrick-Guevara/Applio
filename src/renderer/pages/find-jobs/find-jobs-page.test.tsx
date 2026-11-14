@@ -147,5 +147,30 @@ describe('FindJobsPage', () => {
       expect(running).toHaveTextContent('Everything found so far is kept, and you can stop it.');
       expect(within(running).getByRole('button', { name: 'Stop scan' })).toBeEnabled();
     });
+
+    it('does not tell the operator they can stop a scan that is already stopping', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const api = createMockApi({ latencyMs: 0 });
+      renderWithApp(<FindJobsPage />, { ...api, runDiscovery: () => new Promise(() => {}) });
+      await userEvent.click(await screen.findByRole('button', { name: 'Start scan' }));
+      const running = await screen.findByRole('region', { name: 'Scan in progress' });
+      await act(async () => void vi.advanceTimersByTime(3 * 60_000));
+      await userEvent.click(within(running).getByRole('button', { name: 'Stop scan' }));
+      expect(running).toHaveTextContent('Stopping after this step.');
+      expect(within(running).queryByText('The scan is taking longer than usual.')).not.toBeInTheDocument();
+    });
+
+    it('waits three times longer before calling a scan that also drafts slow', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const api = createMockApi({ latencyMs: 0 });
+      renderWithApp(<FindJobsPage />, { ...api, runDiscovery: () => new Promise(() => {}) });
+      await userEvent.click(await screen.findByRole('checkbox', { name: /Also draft strong matches/ }));
+      await userEvent.click(screen.getByRole('button', { name: 'Start scan' }));
+      const running = await screen.findByRole('region', { name: 'Scan in progress' });
+      await act(async () => void vi.advanceTimersByTime(4 * 60_000));
+      expect(within(running).queryByText('The scan is taking longer than usual.')).not.toBeInTheDocument();
+      await act(async () => void vi.advanceTimersByTime(5 * 60_000));
+      expect(within(running).getByText('The scan is taking longer than usual.')).toBeInTheDocument();
+    });
   });
 });

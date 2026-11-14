@@ -30,7 +30,6 @@ const ANALYZE_TOKENS = 8_000;
 export default function AddJobPage() {
   const api = useApi();
   const analyze = useAction();
-  const slowAnalyze = stalledLine('analyze', useElapsed(analyze.pending));
   const { data: settings } = useAsync(() => api.getSettings(), [api]);
   // Analysis spends tokens, so a used-up budget disables it up front, with the reason, instead of failing on click.
   const { data: status } = useAsync(() => api.getStatus(), [api]);
@@ -118,9 +117,7 @@ export default function AddJobPage() {
 
       {analyze.pending ? (
         <section className="card" role="status" aria-busy="true">
-          <div className="analyzing row"><span className="spinner" aria-hidden="true" />Claude is reading and scoring the post against your fact bank. This usually takes 20–40 seconds.</div>
-          <ProgressBar />
-          {slowAnalyze ? <Callout tone="needs" title={slowAnalyze.title}>{slowAnalyze.body}</Callout> : null}
+          <Analyzing />
           {/* Shaped like the result card, so nothing jumps when it arrives. */}
           <div className="skeleton-stack" aria-hidden="true">
             <div className="skeleton skeleton-line" style={{ width: '30%' }} />
@@ -251,12 +248,7 @@ function DraftProgress({ job, onDone, onAnother }: { job: Job; onDone: (done: bo
   const version = useJobsVersion();
   const { data: current } = useAsync(() => api.getJob(job.id), [api, job.id, version]);
   const [drafting, setDrafting] = useState<{ ids: string[]; since: Record<string, string> }>({ ids: [], since: {} });
-  const [now, setNow] = useState(() => Date.now());
   useEffect(() => window.applioEvents?.onStatus((s) => setDrafting({ ids: s.drafting ?? [], since: s.draftingSince ?? {} })), []);
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   const shown = current ?? job;
   const busy = drafting.ids.includes(job.id);
@@ -264,7 +256,11 @@ function DraftProgress({ job, onDone, onAnother }: { job: Job; onDone: (done: bo
   const ready = !busy && files?.kind === 'ready';
   useEffect(() => onDone(ready), [ready, onDone]);
   const since = drafting.since[job.id];
-  const slowDraft = since ? stalledLine('draft', Math.max(0, now - Date.parse(since))) : undefined;
+  const start = since ? Date.parse(since) : undefined;
+  const ticking = useElapsed(busy && Boolean(since), start);
+  // No readable start time: no clock and no slow note, rather than "NaN".
+  const elapsed = busy && since && Number.isFinite(start) ? ticking : undefined;
+  const slowDraft = elapsed !== undefined ? stalledLine('draft', elapsed) : undefined;
 
   return (
     <section className="preview-progress" aria-label="Draft progress">
@@ -272,7 +268,7 @@ function DraftProgress({ job, onDone, onAnother }: { job: Job; onDone: (done: bo
         <>
           <div className="spread">
             <strong>Drafting</strong>
-            <span className="mono cell-sub">{since ? `${clock(Math.max(0, now - Date.parse(since)))} elapsed · ` : ''}usually 1–2 minutes</span>
+            <span className="mono cell-sub">{elapsed !== undefined ? `${clock(elapsed)} elapsed · ` : ''}usually 1–2 minutes</span>
           </div>
           <StepList label="Drafting steps" steps={[{ label: 'Claude is writing the résumé and letter from your fact bank', state: 'active', note: 'In progress' }, { label: 'Save the PDFs', state: 'pending' }]} />
           <ProgressBar />
@@ -294,5 +290,20 @@ function DraftProgress({ job, onDone, onAnother }: { job: Job; onDone: (done: bo
         <a className={buttonClass(ready ? 'primary' : 'secondary')} href={`#/inbox/${job.id}`}>{ready ? 'Review and approve' : 'Open in Inbox'}</a>
       </div>
     </section>
+  );
+}
+
+/**
+ * The reading-and-scoring wait: words, the moving bar and, at about three times the usual,
+ * a plain note. It owns the clock, so only this card re-renders each second.
+ */
+function Analyzing() {
+  const slow = stalledLine('analyze', useElapsed(true));
+  return (
+    <>
+      <div className="analyzing row"><span className="spinner" aria-hidden="true" />Claude is reading and scoring the post against your fact bank. This usually takes 20–40 seconds.</div>
+      <ProgressBar />
+      {slow ? <Callout tone="needs" title={slow.title}>{slow.body}</Callout> : null}
+    </>
   );
 }

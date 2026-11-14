@@ -1,20 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 /**
  * Milliseconds a wait has run, ticking once a second while `active`; 0 otherwise, and a fresh
- * count each time it becomes active. Pass `from` (a start time in ms) to count from a real start,
- * so a reload shows the true elapsed time.
+ * count each time it becomes active (0 on the very first render of a run, never the last run's
+ * value). Pass `from` (a start time in ms) to count from a real start, so a reload shows the
+ * true elapsed time; an unreadable `from` is ignored.
  */
 export function useElapsed(active: boolean, from?: number): number {
-  const [startedAt, setStartedAt] = useState(() => from ?? Date.now());
-  const [now, setNow] = useState(startedAt);
+  const started = useRef<number | undefined>(undefined);
+  const [, tick] = useState(0);
+  // Set while rendering, so the first render of a run already counts from its start.
+  if (!active) started.current = undefined;
+  else if (started.current === undefined) started.current = Date.now();
   useEffect(() => {
     if (!active) return;
-    const start = from ?? Date.now();
-    setStartedAt(start);
-    setNow(Date.now());
-    const timer = setInterval(() => setNow(Date.now()), 1000);
+    const timer = setInterval(() => tick((n) => n + 1), 1000);
     return () => clearInterval(timer);
-  }, [active, from]);
-  return active ? Math.max(0, now - startedAt) : 0;
+  }, [active]);
+  if (!active) return 0;
+  const begin = from !== undefined && Number.isFinite(from) ? from : started.current!;
+  return Math.max(0, Date.now() - begin);
 }

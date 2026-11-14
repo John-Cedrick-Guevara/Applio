@@ -32,4 +32,19 @@ describe('useElapsed', () => {
     const { result } = renderHook(() => useElapsed(true, from));
     expect(result.current).toBeGreaterThanOrEqual(90_000);
   });
+
+  it('starts at 0 on the very first render after becoming active again, with no stale value', () => {
+    const { result, rerender } = renderHook(({ on }) => useElapsed(on), { initialProps: { on: true } });
+    act(() => void vi.advanceTimersByTime(100_000));
+    expect(result.current).toBe(100_000);
+    rerender({ on: false });
+    rerender({ on: true });
+    expect(result.current).toBe(0);
+  });
+
+  it('ignores a start time that is not a number and counts from now', () => {
+    const { result } = renderHook(() => useElapsed(true, Number.NaN));
+    act(() => void vi.advanceTimersByTime(2000));
+    expect(result.current).toBe(2000);
+  });
 });
