@@ -166,7 +166,7 @@ function Handoff({ job, draft, assisted, onJob }: { job: Job; draft: Draft | nul
           <section className="handoff-tip">
             <div className="handoff-tip-title">Want this filled for you?</div>
             <p>Turn on assisted fill for {job.channel === 'custom' ? 'company career sites' : `${platform} and other platforms`}. Applio opens the form in its own window and fills it in. You still click Submit.</p>
-            <a href="#/settings">Channel settings</a>
+            <a href="#/settings/channels">Channel settings</a>
           </section>
         )}
       </div>

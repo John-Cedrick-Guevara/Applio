@@ -101,7 +101,7 @@ export default function AddJobPage() {
           {error ? (
             <span className="field-error" role="alert">{error}</span>
           ) : budgetStop ? (
-            <span className="field-error">{budgetStop} <a href="#/settings">Raise budget</a></span>
+            <span className="field-error">{budgetStop} <a href="#/settings/guard">Raise budget</a></span>
           ) : (
             <span className="cell-sub add-job-cost">
               <span>Reading and scoring: {status ? costLine(ANALYZE_TOKENS, status) : `≈ ${formatTokens(ANALYZE_TOKENS)} tokens`}</span>

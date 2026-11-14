@@ -86,8 +86,8 @@ export function ActivityBar() {
         </div>
       </details>
       <div className="activity-actions">
-        {m.engine ? <a href="#/settings" className="activity-alert">{m.engine}</a> : null}
-        {status.budgetStop ? <a href="#/settings">Raise budget</a> : null}
+        {m.engine ? <a href="#/settings/conn" className="activity-alert">{m.engine}</a> : null}
+        {status.budgetStop ? <a href="#/settings/guard">Raise budget</a> : null}
         {status.scan ? <Button size="sm" busy={stop.pending} onClick={() => stop.run('stop the scan', () => api.stopScan())}>Stop scan</Button> : null}
         <Button size="sm" busy={pause.pending} onClick={togglePause}>{status.paused ? 'Resume auto-send' : 'Pause auto-send'}</Button>
       </div>

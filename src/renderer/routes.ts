@@ -14,6 +14,7 @@ export interface RouteDef {
 const InboxView = lazy(() => import('./pages/review/review-page'));
 const MatchesView = lazy(() => import('./pages/matches/matches-page'));
 const GetJobsView = lazy(() => import('./pages/get-jobs/get-jobs-page'));
+const SettingsView = lazy(() => import('./pages/settings/settings-page'));
 
 export const ROUTES: RouteDef[] = [
   { pattern: '/dashboard', view: lazy(() => import('./pages/dashboard/dashboard-page')) },
@@ -27,7 +28,8 @@ export const ROUTES: RouteDef[] = [
   { pattern: '/applications', view: lazy(() => import('./pages/applications/applications-page')) },
   { pattern: '/profile', view: lazy(() => import('./pages/profile/profile-page')) },
   { pattern: '/usage', view: lazy(() => import('./pages/usage/usage-page')) },
-  { pattern: '/settings', view: lazy(() => import('./pages/settings/settings-page')) },
+  { pattern: '/settings', view: SettingsView },
+  { pattern: '/settings/:tab', view: SettingsView },
 ];
 
 export const DEFAULT_PATH = '/dashboard';

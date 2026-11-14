@@ -223,7 +223,7 @@ describe('ReviewPage', () => {
 
   it('offers Set up Gmail instead of Approve while Gmail is not set up', async () => {
     open('j1');
-    expect(await screen.findByRole('link', { name: 'Set up Gmail to send' })).toHaveAttribute('href', '#/settings');
+    expect(await screen.findByRole('link', { name: 'Set up Gmail to send' })).toHaveAttribute('href', '#/settings/conn');
     expect(screen.queryByRole('button', { name: 'Approve & send email' })).not.toBeInTheDocument();
     expect(screen.getByText("Gmail isn't set up, so approving can't send this email.")).toBeInTheDocument();
   });

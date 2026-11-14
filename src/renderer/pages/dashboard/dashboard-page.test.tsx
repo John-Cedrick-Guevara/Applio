@@ -45,7 +45,7 @@ describe('DashboardPage', () => {
     renderWithApp(<DashboardPage />, { ...api, getStatus: async () => ({ ...(await api.getStatus()), budgetStop: 'Daily budget used', tokensToday: 150_000, dailyTokenBudget: 150_000 }) });
     const card = (await screen.findByRole('heading', { name: 'AI budget today' })).closest('section')!;
     expect(card).toHaveTextContent('AI is paused: Daily budget used');
-    expect(within(card).getByRole('link', { name: 'Raise budget' })).toHaveAttribute('href', '#/settings');
+    expect(within(card).getByRole('link', { name: 'Raise budget' })).toHaveAttribute('href', '#/settings/guard');
   });
 
   it('names each bar and switches range', async () => {

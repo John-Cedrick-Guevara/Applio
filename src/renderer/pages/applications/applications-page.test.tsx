@@ -134,7 +134,7 @@ describe('ApplicationsPage', () => {
     await userEvent.click(await screen.findByRole('button', { name: /Tessellate/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Draft follow-up' }));
     expect(screen.getByRole('button', { name: 'Send follow-up' })).toBeDisabled();
-    expect(screen.getByRole('link', { name: 'Open Settings' })).toHaveAttribute('href', '#/settings');
+    expect(screen.getByRole('link', { name: 'Open Settings' })).toHaveAttribute('href', '#/settings/files');
   });
 
   it('lets the operator correct a status, offering only the moves the rules allow', async () => {

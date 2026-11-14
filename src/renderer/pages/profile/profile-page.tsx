@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Profile, ResumeImport } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { AsyncView } from '../../components/async-view';
+import { TabList, TabPanel } from '../../components/tabs';
 import { Button } from '../../components/button';
 import { PageHeader } from '../../components/page-header';
 import { useAsync } from '../../hooks/use-async';
@@ -51,51 +52,29 @@ function ProfileBody({ profile, onChange }: { profile: Profile; onChange: (patch
   const [imported, setImported] = useState<ResumeImport | null>(null);
   const [addedCount, setAddedCount] = useState(0);
   const counts: Partial<Record<Tab, number>> = { facts: profile.facts.length, answers: profile.answers.length };
-  const pick = (next: Tab) => setTab(next);
-  /** Arrow keys, Home and End move between tabs, wrapping at the ends. */
-  const onTabKeys = (e: React.KeyboardEvent) => {
-    const at = TAB_LIST.findIndex((t) => t.id === tab);
-    const to = e.key === 'ArrowRight' ? (at + 1) % TAB_LIST.length : e.key === 'ArrowLeft' ? (at + TAB_LIST.length - 1) % TAB_LIST.length : e.key === 'Home' ? 0 : e.key === 'End' ? TAB_LIST.length - 1 : -1;
-    if (to < 0) return;
-    e.preventDefault();
-    const next = TAB_LIST[to]!.id;
-    setTab(next);
-    document.getElementById(`profile-tab-${next}`)?.focus();
-  };
-  // Every panel stays mounted and only the chosen one shows, so an open editor or the résumé suggestions survive a look at another tab.
-  const panel = (id: Tab, children: React.ReactNode) => (
-    <div role="tabpanel" id={`profile-${id}`} aria-labelledby={`profile-tab-${id}`} hidden={tab !== id} className="profile-panel">{children}</div>
-  );
-
   return (
     <>
       <div className="profile-tabrow">
-        <div className="tabs" role="tablist" aria-label="Profile sections" onKeyDown={onTabKeys}>
-          {TAB_LIST.map((t) => (
-            <button key={t.id} id={`profile-tab-${t.id}`} type="button" role="tab" className="tab" tabIndex={tab === t.id ? 0 : -1} aria-selected={tab === t.id} aria-controls={`profile-${t.id}`} onClick={() => pick(t.id)}>
-              {t.label}{counts[t.id] !== undefined ? <span className="tab-count">{counts[t.id]}</span> : null}
-            </button>
-          ))}
-        </div>
+        <TabList label="Profile sections" idPrefix="profile" tabs={TAB_LIST.map((t) => ({ ...t, count: counts[t.id] }))} value={tab} onChange={setTab} />
         {(tab === 'facts' || tab === 'answers') && !adding[tab] ? (
           <Button variant="strong" onClick={() => setAddingFor(tab, true)}>{tab === 'facts' ? 'Add fact' : 'Add answer'}</Button>
         ) : null}
       </div>
 
-      {panel('facts', (
+      <TabPanel idPrefix="profile" id="facts" active={tab === 'facts'}>
         <section className="card card-flush" aria-label="Fact bank">
           <FactBank profile={profile} adding={adding.facts} onCloseAdd={() => setAddingFor('facts', false)} onChange={(facts) => onChange({ facts })} onGroupsChange={(factGroups) => onChange({ factGroups })} />
         </section>
-      ))}
-      {panel('answers', (
+      </TabPanel>
+      <TabPanel idPrefix="profile" id="answers" active={tab === 'answers'}>
         <section className="card card-flush" aria-label="Answer bank">
           <AnswerBank answers={profile.answers} adding={adding.answers} onCloseAdd={() => setAddingFor('answers', false)} onChange={(answers) => onChange({ answers })} />
         </section>
-      ))}
-      {panel('prefs', (
+      </TabPanel>
+      <TabPanel idPrefix="profile" id="prefs" active={tab === 'prefs'}>
         <PreferencesCard key={profile.contact.location} preferences={profile.preferences} location={profile.contact.location} onSaved={(preferences) => onChange({ preferences })} />
-      ))}
-      {panel('resume', (
+      </TabPanel>
+      <TabPanel idPrefix="profile" id="resume" active={tab === 'resume'}>
         <>
           <ReferenceResumeCard
             resume={profile.referenceResume}
@@ -124,7 +103,7 @@ function ProfileBody({ profile, onChange }: { profile: Profile; onChange: (patch
           <ContactCard contact={profile.contact} onSaved={(contact) => onChange({ contact })} />
           {templateOpen ? <TemplatePreview profile={profile} /> : null}
         </>
-      ))}
+      </TabPanel>
     </>
   );
 }

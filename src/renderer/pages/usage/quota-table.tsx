@@ -23,7 +23,7 @@ export function QuotaTable({ quotas }: { quotas: Quota[] }) {
           <h2 id="guard-title">Free-limit guard</h2>
           <p>Warns on Telegram at 80%. Stops at 100%.</p>
         </div>
-        <a href="#/settings" className="edit-limits">Edit limits</a>
+        <a href="#/settings/guard" className="edit-limits">Edit limits</a>
       </div>
       <div className="table-scroll">
         <table className="table guard-table" aria-labelledby="guard-title">
