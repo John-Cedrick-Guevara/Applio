@@ -77,4 +77,19 @@ describe('HandoffPage', () => {
     renderWithApp(<HandoffPage params={{ id: 'j3' }} />, api);
     expect(await screen.findByText('This proposal costs 16 Connects on Upwork.')).toBeInTheDocument();
   });
+
+  it('names the company in bold and links back to the Inbox hand-off list', async () => {
+    open();
+    const heading = await screen.findByRole('heading', { name: 'Apply to Ledgerly on LinkedIn' });
+    expect(heading.querySelector('strong')).toHaveTextContent('Ledgerly');
+    expect(screen.getByRole('link', { name: /Inbox · Hand off/ })).toHaveAttribute('href', '#/inbox/j3');
+  });
+
+  it('puts a job strip above the steps instead of a side column', async () => {
+    open();
+    const strip = await screen.findByRole('region', { name: 'Job' });
+    expect(strip).toHaveTextContent(/\d+/);
+    expect(strip).toHaveTextContent('tokens used');
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+  });
 });
