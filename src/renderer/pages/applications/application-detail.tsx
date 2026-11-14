@@ -194,7 +194,7 @@ function FollowUpPanel({ job, ownerName, onCancel, onSent }: { job: Job; ownerNa
       </div>
       {problem ? (
         <p id="follow-problem" className="field-hint">
-          {problem} {problem.startsWith('Add your name') ? <a href="#/settings">Open Settings</a> : null}
+          {problem} {problem.startsWith('Add your name') ? <a href="#/settings/files">Open Settings</a> : null}
         </p>
       ) : null}
     </div>

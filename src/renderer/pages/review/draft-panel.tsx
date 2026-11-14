@@ -235,7 +235,7 @@ function DraftDetail({ job, draft, send, saving, onSkip, onDecided, thresholds, 
             {primary.handoff ? (
               <a className={buttonClass('primary')} href={`#/handoff/${job.id}`}>{primary.label}</a>
             ) : needsGmail ? (
-              <a className={buttonClass('primary')} href="#/settings">{needsGmail.action}</a>
+              <a className={buttonClass('primary')} href="#/settings/conn">{needsGmail.action}</a>
             ) : (
               <Button id="approve-primary" variant="primary" busy={sending.pending} disabled={!!approveBlock} aria-describedby={approveBlock ? blockId : undefined} onClick={job.suspicious && !confirming ? () => setConfirming(true) : approve}>{sending.pending ? (job.channel === 'email' ? 'Sending…' : 'Submitting…') : primary.label}</Button>
             )}
@@ -273,7 +273,7 @@ function CardActions({ kind, job, folder, busy, onRetrySend, onSaveFiles, onRedr
       return (
         <>
           <Button size="sm" variant="primary" busy={busy} onClick={onRetrySend}>{busy ? (email ? 'Sending…' : 'Submitting…') : email ? 'Retry send' : 'Retry form'}</Button>
-          {email ? <a href="#/settings">Check Gmail settings</a> : kind === 'not-sent' ? <Button size="sm" busy={busy} onClick={onMarkApplied}>I finished it myself</Button> : null}
+          {email ? <a href="#/settings/conn">Check Gmail settings</a> : kind === 'not-sent' ? <Button size="sm" busy={busy} onClick={onMarkApplied}>I finished it myself</Button> : null}
         </>
       );
     case 'files-failed':

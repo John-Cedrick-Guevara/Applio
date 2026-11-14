@@ -60,7 +60,7 @@ describe('ActivityBar', () => {
     await bar();
     events.push({ ...(await api.getStatus()), tokensToday: 160_000, dailyTokenBudget: 150_000, budgetStop: "Today's Claude token budget is used up." });
     expect(await bar()).toHaveTextContent('AI paused · budget used');
-    expect(screen.getByRole('link', { name: 'Raise budget' })).toHaveAttribute('href', '#/settings');
+    expect(screen.getByRole('link', { name: 'Raise budget' })).toHaveAttribute('href', '#/settings/guard');
     expect(screen.getByRole('meter', { name: 'Tokens used today' })).toHaveAttribute('aria-valuenow', '100');
   });
 
@@ -80,7 +80,7 @@ describe('ActivityBar', () => {
     const { api } = renderWithApp(<ActivityBar />);
     await bar();
     events.push({ ...(await api.getStatus()), engineReady: false });
-    expect(screen.getByRole('link', { name: 'Claude needs setup' })).toHaveAttribute('href', '#/settings');
+    expect(screen.getByRole('link', { name: 'Claude needs setup' })).toHaveAttribute('href', '#/settings/conn');
   });
 
   it('says it could not load, with Retry, instead of vanishing', async () => {

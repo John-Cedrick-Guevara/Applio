@@ -781,3 +781,35 @@ a.btn-secondary:hover { color: var(--text); }
 
 /* Inside the side panel a detail card drops its own frame: the panel is the frame. */
 .side-panel .card { padding: 0; border: 0; }
+
+/* Pill tabs: count bubble and panels (shared by Profile and Settings). */
+.tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  margin-left: var(--space-2);
+  padding: 0 6px;
+  border-radius: 11px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.tab[aria-selected='true'] .tab-count {
+  background: var(--ink-hover);
+  color: var(--on-ink);
+}
+
+.tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.tab-panel[hidden] {
+  display: none;
+}
+

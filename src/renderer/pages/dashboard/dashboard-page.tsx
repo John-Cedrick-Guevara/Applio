@@ -160,7 +160,7 @@ function DashboardView({ jobs, questions, status, settings, sources }: Data) {
           <Blocks filled={budget.blocks.filled} total={budget.blocks.total} tone="ice" gap={6} />
           <p className="dash-line">
             {budget.stopped
-              ? <>AI is paused: {budget.stopReason}. <a href="#/settings">Raise budget</a></>
+              ? <>AI is paused: {budget.stopReason}. <a href="#/settings/guard">Raise budget</a></>
               : `Hard stop at ${formatTokens(budget.total)}. Resets at midnight.`}
           </p>
         </section>
