@@ -50,6 +50,10 @@ function Scan({ status, sources }: { status: AppStatus; sources: { id: string; n
   const [phase, setPhase] = useState<ScanPhase>();
   const [stopping, setStopping] = useState(false);
   useEffect(() => window.applioEvents?.onStatus((s) => setPhase(s.scan?.phase)), []);
+  // Scoring is a known small cost; drafting spends up to what is left, so it fills the meter.
+  const left = Math.max(0, status.dailyTokenBudget - status.tokensToday);
+  const use = SCAN_SCORE_TOKENS + (draft ? left : 0);
+  const filled = left === 0 ? 10 : Math.min(10, Math.ceil((use / left) * 10));
   const chosen = sources.filter((s) => !skipped.has(s.id)).map((s) => s.id);
   const toggle = (id: string) => setSkipped((prev) => {
     const next = new Set(prev);
@@ -115,6 +119,9 @@ function Scan({ status, sources }: { status: AppStatus; sources: { id: string; n
             </div>
           ) : null}
           <div className="find-jobs-foot">
+            <div className="find-jobs-meter" aria-hidden="true">
+              {Array.from({ length: 10 }, (_, i) => <span key={i} className={i < filled ? 'on' : undefined} />)}
+            </div>
             <dl className="find-jobs-cost">
               <div><dt>Fetch and filters</dt><dd>Free</dd></div>
               <div><dt>Scoring</dt><dd>{costLine(SCAN_SCORE_TOKENS, status)}</dd></div>

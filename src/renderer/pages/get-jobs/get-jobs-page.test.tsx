@@ -45,4 +45,27 @@ describe('GetJobsPage', () => {
     expect(await screen.findByRole('region', { name: 'Scan in progress' })).toBeInTheDocument();
     await act(async () => finish());
   });
+
+  it('is headed "Get jobs" with the v5 pill tabs', async () => {
+    renderWithApp(<GetJobsPage params={{}} />);
+    expect(screen.getByRole('heading', { level: 1, name: 'Get jobs' })).toBeInTheDocument();
+    expect(screen.getByRole('tablist', { name: 'How to get jobs' })).toBeInTheDocument();
+  });
+
+  it('shows what a scan costs as a share of what is left today, with a block meter', async () => {
+    const { container } = renderWithApp(<GetJobsPage params={{}} />);
+    await screen.findByRole('list', { name: 'Sources this scan checks' });
+    const meter = container.querySelector('.find-jobs-meter')!;
+    expect(meter.querySelectorAll('span')).toHaveLength(10);
+    // Scoring alone is a small share of what is left, so only a block or two fill.
+    const filled = meter.querySelectorAll('span.on').length;
+    expect(filled).toBeGreaterThanOrEqual(1);
+    expect(filled).toBeLessThanOrEqual(3);
+  });
+
+  it('fills the whole meter when drafting is on, since drafting spends up to what is left', async () => {
+    const { container } = renderWithApp(<GetJobsPage params={{}} />);
+    await userEvent.click(await screen.findByRole('checkbox', { name: /Also draft strong matches/ }));
+    expect(container.querySelectorAll('.find-jobs-meter span.on')).toHaveLength(10);
+  });
 });
