@@ -285,9 +285,23 @@ button {
 }
 
 .activity-block-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 8px;
   height: 8px;
   border-radius: 50%;
+}
+
+/* A blocked or paused state carries a glyph, so it is not told by colour alone. */
+.activity-block-dot-warn,
+.activity-block-dot-stop {
+  width: 16px;
+  height: 16px;
+  color: var(--ink);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1;
 }
 
 .activity-block-dot-ok { background: #4fb27c; }
@@ -359,7 +373,3 @@ button {
 
 }
 
-
-.engine-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-.engine-dot-ok { background: var(--success); }
-.engine-dot-stop { background: var(--danger-text); }

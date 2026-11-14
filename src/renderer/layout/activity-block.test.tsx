@@ -127,5 +127,43 @@ describe('ActivityBlock', () => {
       view.unmount();
       expect(listeners.size).toBe(0);
     });
+  
+    it('still leads with the budget stop while a scan runs, and says the scan is running', async () => {
+      show({ budgetStop: 'Daily budget used', tokensToday: 100_000, scan: { phase: 'scoring', startedAt: new Date().toISOString() } });
+      const link = await screen.findByRole('link', { name: /AI paused/ });
+      expect(link).toHaveAttribute('href', '#/settings/guard');
+      expect(link).toHaveTextContent('A scan is running');
+    });
+
+    it('leads with Claude needing setup even while a scan runs, and says so', async () => {
+      show({ engineReady: false, scan: { phase: 'fetching', startedAt: new Date().toISOString() } });
+      const link = await screen.findByRole('link', { name: /Claude needs setup/ });
+      expect(link).toHaveTextContent('A scan is running');
+    });
+
+    it('fills a block for tiny use and not all ten just below the limit', async () => {
+      const tiny = show({ tokensToday: 500, dailyTokenBudget: 150_000 });
+      await screen.findByText('Nothing running');
+      expect(tiny.container.querySelectorAll('.activity-block-tok .on')).toHaveLength(1);
+      tiny.unmount();
+      const near = show({ tokensToday: 149_400, dailyTokenBudget: 150_000 });
+      await screen.findByText('Nothing running');
+      expect(near.container.querySelectorAll('.activity-block-tok .on')).toHaveLength(9);
+    });
+
+    it('marks a paused or blocked state with a glyph, not colour alone', async () => {
+      const { container } = show({ paused: true });
+      await screen.findByText('Auto-send paused');
+      expect(container.querySelector('.activity-block-dot-warn')).toHaveTextContent('!');
+    });
+
+    it('follows a settings change on the same page without navigation', async () => {
+      const api = createMockApi({ latencyMs: 0 });
+      renderWithApp(<ActivityBlock />, { ...api, getStatus: async () => ({ ...base, tokensToday: 0 }) });
+      expect(await screen.findByText('Auto-send off')).toBeInTheDocument();
+      await api.updateSource('remotive', { enabled: true, autonomy: 'autonomous' });
+      act(() => void window.dispatchEvent(new Event('applio:settings-changed')));
+      expect(await screen.findByText(/^Auto-send on/)).toBeInTheDocument();
+    });
   });
 });

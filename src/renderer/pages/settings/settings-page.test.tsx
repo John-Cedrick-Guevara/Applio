@@ -1,6 +1,7 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import type { AppStatus } from '../../../shared/types';
 import { createMockApi } from '../../../shared/mock/mock-api';
 import { renderWithApp } from '../../../test/render';
 import { App } from '../../app';
@@ -265,6 +266,45 @@ describe('SettingsPage', () => {
       renderWithApp(<SettingsPage params={{}} />, api);
       await go(/^Guardrails/);
       expect(await screen.findByRole('switch', { name: 'Pause auto-send' })).toBeChecked();
+    });
+
+    it('follows a pause made elsewhere (the tray) while Settings is open', async () => {
+      const listeners = new Set<(s: AppStatus) => void>();
+      window.applioEvents = { onStatus: (l) => { listeners.add(l); return () => listeners.delete(l); } };
+      const api = createMockApi({ latencyMs: 0 });
+      renderWithApp(<SettingsPage params={{}} />, api);
+      await go(/^Guardrails/);
+      expect(await screen.findByRole('switch', { name: 'Pause auto-send' })).not.toBeChecked();
+      const status = await api.getStatus();
+      act(() => listeners.forEach((l) => l({ ...status, paused: true })));
+      await waitFor(() => expect(screen.getByRole('switch', { name: 'Pause auto-send' })).toBeChecked());
+      delete window.applioEvents;
+    });
+
+    it('still shows every setting when the status cannot be read, with the pause switch off and explained', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const api = createMockApi({ latencyMs: 0 });
+      renderWithApp(<SettingsPage params={{}} />, { ...api, getStatus: async () => { throw new Error('down'); } });
+      await go(/^Connections/);
+      expect(await screen.findByRole('radiogroup', { name: 'AI engine' })).toBeInTheDocument();
+      await go(/^Guardrails/);
+      expect(screen.getByRole('switch', { name: 'Pause auto-send' })).toBeDisabled();
+      expect(screen.getByText(/Couldn't read whether auto-send is paused/)).toBeInTheDocument();
+    });
+
+    it('says before the switch is on that scans and drafts keep working', async () => {
+      renderWithApp(<SettingsPage params={{}} />);
+      await go(/^Guardrails/);
+      expect(await screen.findByText(/Scans and drafts keep working/)).toBeInTheDocument();
+    });
+
+    it('tells the rail a setting changed, so it can refresh', async () => {
+      const heard = vi.fn();
+      window.addEventListener('applio:settings-changed', heard);
+      renderWithApp(<SettingsPage params={{}} />);
+      await userEvent.click(await screen.findByRole('switch', { name: 'Use Jobicy' }));
+      await waitFor(() => expect(heard).toHaveBeenCalled());
+      window.removeEventListener('applio:settings-changed', heard);
     });
 
     it('says why a pause fails and leaves the switch where it was', async () => {

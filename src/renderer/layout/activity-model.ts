@@ -54,3 +54,11 @@ export function activityModel(status: AppStatus, ctx: { autoSendThreshold: numbe
 
   return { running, auto, budget, ...(status.engineReady ? {} : { engine: 'Claude needs setup' }) };
 }
+
+/** How many enabled sources may send on their own: the one rule behind "auto-send on" (SPEC F6), used by the rail and Settings. */
+export function autonomousSourceCount(sources: readonly { enabled: boolean; autonomy: string }[]): number {
+  return sources.filter((s) => s.enabled && s.autonomy === 'autonomous').length;
+}
+
+/** The event Settings sends after a source or guardrail changes, so the rail's auto-send line refreshes without a navigation. */
+export const SETTINGS_CHANGED = 'applio:settings-changed';

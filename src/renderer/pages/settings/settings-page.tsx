@@ -6,6 +6,7 @@ import { PageHeader } from '../../components/page-header';
 import { TabList, TabPanel } from '../../components/tabs';
 import { useAsync } from '../../hooks/use-async';
 import { navigate, type RouteParams } from '../../lib/router';
+import { autonomousSourceCount, SETTINGS_CHANGED } from '../../layout/activity-model';
 import { AutoSendSection } from './auto-send-section';
 import { ChannelsSection } from './channels-section';
 import { ConnectionsSection } from './connections-section';
@@ -42,13 +43,24 @@ export default function SettingsPage({ params }: { params: RouteParams }) {
     navigate(`/settings/${id}`);
   };
   const state = useAsync(async () => {
-    const [settings, sources, status] = await Promise.all([api.getSettings(), api.listSources(), api.getStatus()]);
-    return { settings, sources, paused: status.paused };
+    // The pause state loads on its own: a failed status read must not hide every other setting.
+    const [settings, sources, status] = await Promise.all([api.getSettings(), api.listSources(), api.getStatus().catch(() => undefined)]);
+    return { settings, sources, paused: status?.paused };
   }, [api]);
 
-  const setSettings = (settings: Settings) => state.setData((d) => ({ ...d, settings }));
+  // The rail shows auto-send from these settings, so tell it when one changes.
+  const changed = () => window.dispatchEvent(new Event(SETTINGS_CHANGED));
+  const setSettings = (settings: Settings) => {
+    state.setData((d) => ({ ...d, settings }));
+    changed();
+  };
   const setPaused = (paused: boolean) => state.setData((d) => ({ ...d, paused }));
-  const setSource = (source: Source) => state.setData((d) => ({ ...d, sources: d.sources.map((s) => (s.id === source.id ? source : s)) }));
+  const setSource = (source: Source) => {
+    state.setData((d) => ({ ...d, sources: d.sources.map((s) => (s.id === source.id ? source : s)) }));
+    changed();
+  };
+  // A pause made elsewhere (the tray) shows here too, so the switch never lies.
+  useEffect(() => window.applioEvents?.onStatus((s) => state.setData((d) => (d ? { ...d, paused: s.paused } : d))), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="settings">
@@ -64,7 +76,7 @@ export default function SettingsPage({ params }: { params: RouteParams }) {
               <ChannelsSection settings={settings} onChange={setSettings} />
             </TabPanel>
             <TabPanel idPrefix="settings" id="guard" active={tab === 'guard'}>
-              <AutoSendSection paused={paused} autoSendThreshold={settings.autoSendThreshold} autonomousSources={sources.filter((s) => s.enabled && s.autonomy === 'autonomous').length} onChange={setPaused} />
+              <AutoSendSection paused={paused} autoSendThreshold={settings.autoSendThreshold} autonomousSources={autonomousSourceCount(sources)} onChange={setPaused} />
               <GuardrailsSection settings={settings} onChange={setSettings} />
             </TabPanel>
             <TabPanel idPrefix="settings" id="conn" active={tab === 'conn'}>

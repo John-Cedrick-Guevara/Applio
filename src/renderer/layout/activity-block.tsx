@@ -4,7 +4,7 @@ import { useApi } from '../api/api-context';
 import { useAsync } from '../hooks/use-async';
 import { shareBlocks } from '../lib/cost';
 import { usePath } from '../lib/router';
-import { activityModel } from './activity-model';
+import { activityModel, autonomousSourceCount, SETTINGS_CHANGED } from './activity-model';
 
 /**
  * The rail's activity block: what is running right now, whether anything sends on its own,
@@ -18,8 +18,14 @@ export function ActivityBlock() {
   const path = usePath();
   const state = useAsync(async () => {
     const [status, settings, sources] = await Promise.all([api.getStatus(), api.getSettings(), api.listSources()]);
-    return { status, autoSendThreshold: settings.autoSendThreshold, autonomousSources: sources.filter((s) => s.enabled && s.autonomy === 'autonomous').length };
+    return { status, autoSendThreshold: settings.autoSendThreshold, autonomousSources: autonomousSourceCount(sources) };
   }, [api, path]);
+  // Settings tells the rail when a source or guardrail changed, so "Auto-send on/off" never lags the page it is edited on.
+  useEffect(() => {
+    const refresh = () => state.reload();
+    window.addEventListener(SETTINGS_CHANGED, refresh);
+    return () => window.removeEventListener(SETTINGS_CHANGED, refresh);
+  }, [state.reload]); // eslint-disable-line react-hooks/exhaustive-deps
   const setStatus = (status: AppStatus) => state.setData((d) => (d ? { ...d, status } : d));
   useEffect(() => window.applioEvents?.onStatus(setStatus), []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -48,22 +54,25 @@ export function ActivityBlock() {
   // The scan clock is the last part; it ticks every second, so it stays out of the live region.
   const clock = m.running.kind === 'scan' ? rest.pop() : undefined;
   const runSub = rest.join(' · ');
-  const stopped = m.running.kind === 'stopped';
+  // A budget stop outranks a running scan in what the rail leads with (the model ranks the scan first for its own line).
+  const stopped = !!status.budgetStop;
+  const scanNote = status.scan ? ' · A scan is running' : '';
   // The most urgent thing leads; a blocked AI or missing Claude is a link to the fix, not just a colour.
   const lead = m.engine
-    ? { text: m.engine, sub: 'Open Settings to set it up', to: '#/settings/conn' }
+    ? { text: m.engine, sub: `Open Settings to set it up${scanNote}`, to: '#/settings/conn' }
     : stopped
-    ? { text: runText, sub: 'Raise the budget in Settings', to: '#/settings/guard' }
+    ? { text: 'AI paused', sub: `Raise the budget in Settings${scanNote}`, to: '#/settings/guard' }
     : { text: runText, sub: runSub, to: m.running.kind === 'scan' ? '#/get-jobs' : '#/usage' };
   const busy = m.running.kind === 'scan' || m.running.kind === 'drafting';
   const auto = m.auto.text.split(' · ')[0] ?? '';
-  const on = shareBlocks(m.budget.pct / 100, 10);
+  // From the raw share: the model's rounded percent would read tiny use as 0 and 99.6% as full.
+  const on = shareBlocks(status.tokensToday / Math.max(1, status.dailyTokenBudget), 10);
 
   return (
     <div role="status" aria-live="polite" className="activity-block">
       <a href={lead.to} title={`${lead.text}. ${lead.sub}. ${auto}.`} className="activity-block-link">
         <span className="activity-block-icon" aria-hidden="true">
-          {busy ? <span className="spinner" /> : <span className={`activity-block-dot activity-block-dot-${stopped || m.engine ? 'stop' : m.auto.kind === 'paused' ? 'warn' : 'ok'}`} />}
+          {busy ? <span className="spinner" /> : <span className={`activity-block-dot activity-block-dot-${stopped || m.engine ? 'stop' : m.auto.kind === 'paused' ? 'warn' : 'ok'}`}>{stopped || m.engine || m.auto.kind === 'paused' ? '!' : null}</span>}
         </span>
         <span className="activity-block-text">
           <strong>{lead.text}</strong>

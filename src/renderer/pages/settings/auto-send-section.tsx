@@ -7,7 +7,7 @@ import { useAction } from '../../hooks/use-action';
  * Pause auto-send (SPEC F6). Scans and drafts still run when the operator starts them; only
  * sends that would go out on their own wait, so every draft needs a click while it is on.
  */
-export function AutoSendSection({ paused, autoSendThreshold, autonomousSources, onChange }: { paused: boolean; autoSendThreshold: number; autonomousSources: number; onChange: (paused: boolean) => void }) {
+export function AutoSendSection({ paused, autoSendThreshold, autonomousSources, onChange }: { paused: boolean | undefined; autoSendThreshold: number; autonomousSources: number; onChange: (paused: boolean) => void }) {
   const api = useApi();
   const action = useAction();
   const toggle = async (on: boolean) => {
@@ -23,9 +23,9 @@ export function AutoSendSection({ paused, autoSendThreshold, autonomousSources, 
       <div className="settings-row">
         <Toggle
           label="Pause auto-send"
-          description={paused ? 'Nothing goes out on its own while this is on. Scans and drafts still work when you start them.' : 'Turn on to hold every send for your click, without changing any source.'}
-          checked={paused}
-          disabled={action.pending}
+          description={paused === undefined ? "Couldn't read whether auto-send is paused. Reopen Settings to try again." : paused ? 'Nothing goes out on its own while this is on. Scans and drafts still work when you start them.' : 'Turn on to hold every send for your click, without changing any source. Scans and drafts keep working.'}
+          checked={paused ?? false}
+          disabled={action.pending || paused === undefined}
           onChange={toggle}
         />
       </div>
