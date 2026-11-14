@@ -399,6 +399,32 @@ describe('ReviewPage', () => {
     expect(within(steps).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Claude writes the résumé and letter from your fact bankIn progress', 'Save the PDFs']);
   });
 
+  it('moves a slow draft from "usually 1-2 minutes" to a plain "taking longer" note at about three times the usual', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const status = await api.getStatus();
+    const drafting = (ms: number) => vi.spyOn(api, 'getStatus').mockResolvedValue({ ...status, drafting: ['j5'], draftingSince: { j5: new Date(Date.now() - ms).toISOString() } });
+    drafting(5 * 60_000);
+    const first = renderWithApp(<ReviewPage params={{ id: 'j5' }} />, api);
+    const panel = await screen.findByRole('region', { name: 'Drafting' });
+    expect(panel.querySelector('.indet')).not.toBeNull();
+    expect(within(panel).queryByText('Drafting is taking longer than usual.')).not.toBeInTheDocument();
+    first.unmount();
+    drafting(7 * 60_000);
+    renderWithApp(<ReviewPage params={{ id: 'j5' }} />, api);
+    const slow = await screen.findByRole('region', { name: 'Drafting' });
+    expect(within(slow).getByText('Drafting is taking longer than usual.')).toBeInTheDocument();
+    expect(slow).toHaveTextContent('The usual time is 2. Nothing has been sent and the tokens used so far are logged.');
+  });
+
+  it('says nothing slow, and no NaN, when the draft start time is unreadable', async () => {
+    const api = createMockApi({ latencyMs: 0 });
+    const status = await api.getStatus();
+    vi.spyOn(api, 'getStatus').mockResolvedValue({ ...status, drafting: ['j5'], draftingSince: { j5: 'not a date' } });
+    renderWithApp(<ReviewPage params={{ id: 'j5' }} />, api);
+    const panel = await screen.findByRole('region', { name: 'Drafting' });
+    expect(panel).not.toHaveTextContent(/NaN|taking longer/);
+  });
+
   it('shows a job Claude is drafting in the background, live, until its draft lands', async () => {
     const api = createMockApi({ latencyMs: 0 });
     const status = await api.getStatus();

@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react';
 import type { Job } from '../../../shared/types';
 import { Callout, StepList, Stepper } from '../../components/job-state';
+import { ProgressBar } from '../../components/progress-bar';
+import { useElapsed } from '../../hooks/use-elapsed';
+import { stalledLine } from '../../lib/waits';
 import { jobSteps } from './review-model';
-
-/** Past this, the panel says drafting is slow; it still ends in a draft or a note. */
-const SLOW_MS = 3 * 60_000;
 
 /** "1:30" from milliseconds. */
 const clock = (ms: number) => `${Math.floor(ms / 60_000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
@@ -15,12 +14,11 @@ const clock = (ms: number) => `${Math.floor(ms / 60_000)}:${String(Math.floor(ms
  * comes from when main started the draft, so it survives a reload.
  */
 export function DraftingPanel({ job, since }: { job?: Job; since?: string }) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-  const elapsed = since ? Math.max(0, now - Date.parse(since)) : undefined;
+  const start = since ? Date.parse(since) : undefined;
+  const ticking = useElapsed(Boolean(since), start);
+  // No readable start time: no clock and no slow note, rather than "NaN".
+  const elapsed = since && Number.isFinite(start) ? ticking : undefined;
+  const slow = elapsed !== undefined ? stalledLine('draft', elapsed) : undefined;
 
   return (
     <section className="card draft-panel drafting-panel" aria-label="Drafting" aria-busy="true">
@@ -42,14 +40,8 @@ export function DraftingPanel({ job, since }: { job?: Job; since?: string }) {
           { label: 'Save the PDFs', state: 'pending' },
         ]}
       />
-      {elapsed !== undefined && elapsed > SLOW_MS ? (
-        <Callout tone="needs" title="Taking longer than usual.">It still ends with a draft, or a note here saying what went wrong.</Callout>
-      ) : null}
-      <div className="skeleton-stack" aria-hidden="true">
-        <div className="skeleton skeleton-line" style={{ width: '40%' }} />
-        <div className="skeleton skeleton-line" style={{ width: '95%' }} />
-        <div className="skeleton skeleton-line" style={{ width: '88%' }} />
-      </div>
+      <ProgressBar />
+      {slow ? <Callout tone="needs" title={slow.title}>{slow.body}</Callout> : null}
       <p className="cell-sub">You can leave this page. It moves to Ready to send when the PDFs are saved.</p>
     </section>
   );

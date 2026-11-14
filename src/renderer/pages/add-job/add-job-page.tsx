@@ -4,12 +4,15 @@ import { useApi } from '../../api/api-context';
 import { Button, buttonClass } from '../../components/button';
 import { Callout, StepList, Stepper, type StepState } from '../../components/job-state';
 import { ScoreBlock } from '../../components/score-block';
+import { ProgressBar } from '../../components/progress-bar';
 import { useAction } from '../../hooks/use-action';
+import { useElapsed } from '../../hooks/use-elapsed';
 import { useAsync } from '../../hooks/use-async';
 import { useJobsVersion } from '../../hooks/use-jobs-version';
 import { costLine } from '../../lib/cost';
 import { formatTokens } from '../../lib/format';
 import { filesState, pendingReason } from '../../lib/job-progress';
+import { stalledLine } from '../../lib/waits';
 import { REVIEW_STATUSES } from '../../lib/job-lists';
 import { AUTONOMY_LABEL, LIFECYCLE, STATUS_LABEL } from '../../lib/labels';
 import { EXAMPLES, inputError } from './add-job-model';
@@ -114,7 +117,7 @@ export default function AddJobPage() {
 
       {analyze.pending ? (
         <section className="card" role="status" aria-busy="true">
-          <div className="analyzing row"><span className="spinner" aria-hidden="true" />Claude is reading and scoring the post against your fact bank. This usually takes 20–40 seconds.</div>
+          <Analyzing />
           {/* Shaped like the result card, so nothing jumps when it arrives. */}
           <div className="skeleton-stack" aria-hidden="true">
             <div className="skeleton skeleton-line" style={{ width: '30%' }} />
@@ -245,12 +248,7 @@ function DraftProgress({ job, onDone, onAnother }: { job: Job; onDone: (done: bo
   const version = useJobsVersion();
   const { data: current } = useAsync(() => api.getJob(job.id), [api, job.id, version]);
   const [drafting, setDrafting] = useState<{ ids: string[]; since: Record<string, string> }>({ ids: [], since: {} });
-  const [now, setNow] = useState(() => Date.now());
   useEffect(() => window.applioEvents?.onStatus((s) => setDrafting({ ids: s.drafting ?? [], since: s.draftingSince ?? {} })), []);
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   const shown = current ?? job;
   const busy = drafting.ids.includes(job.id);
@@ -258,6 +256,11 @@ function DraftProgress({ job, onDone, onAnother }: { job: Job; onDone: (done: bo
   const ready = !busy && files?.kind === 'ready';
   useEffect(() => onDone(ready), [ready, onDone]);
   const since = drafting.since[job.id];
+  const start = since ? Date.parse(since) : undefined;
+  const ticking = useElapsed(busy && Boolean(since), start);
+  // No readable start time: no clock and no slow note, rather than "NaN".
+  const elapsed = busy && since && Number.isFinite(start) ? ticking : undefined;
+  const slowDraft = elapsed !== undefined ? stalledLine('draft', elapsed) : undefined;
 
   return (
     <section className="preview-progress" aria-label="Draft progress">
@@ -265,9 +268,11 @@ function DraftProgress({ job, onDone, onAnother }: { job: Job; onDone: (done: bo
         <>
           <div className="spread">
             <strong>Drafting</strong>
-            <span className="mono cell-sub">{since ? `${clock(Math.max(0, now - Date.parse(since)))} elapsed · ` : ''}usually 1–2 minutes</span>
+            <span className="mono cell-sub">{elapsed !== undefined ? `${clock(elapsed)} elapsed · ` : ''}usually 1–2 minutes</span>
           </div>
           <StepList label="Drafting steps" steps={[{ label: 'Claude is writing the résumé and letter from your fact bank', state: 'active', note: 'In progress' }, { label: 'Save the PDFs', state: 'pending' }]} />
+          <ProgressBar />
+          {slowDraft ? <Callout tone="needs" title={slowDraft.title}>{slowDraft.body}</Callout> : null}
         </>
       ) : ready ? (
         <Callout tone="done" title="Ready to review.">The résumé and letter are saved and wait for your approval.</Callout>
@@ -285,5 +290,20 @@ function DraftProgress({ job, onDone, onAnother }: { job: Job; onDone: (done: bo
         <a className={buttonClass(ready ? 'primary' : 'secondary')} href={`#/inbox/${job.id}`}>{ready ? 'Review and approve' : 'Open in Inbox'}</a>
       </div>
     </section>
+  );
+}
+
+/**
+ * The reading-and-scoring wait: words, the moving bar and, at about three times the usual,
+ * a plain note. It owns the clock, so only this card re-renders each second.
+ */
+function Analyzing() {
+  const slow = stalledLine('analyze', useElapsed(true));
+  return (
+    <>
+      <div className="analyzing row"><span className="spinner" aria-hidden="true" />Claude is reading and scoring the post against your fact bank. This usually takes 20–40 seconds.</div>
+      <ProgressBar />
+      {slow ? <Callout tone="needs" title={slow.title}>{slow.body}</Callout> : null}
+    </>
   );
 }

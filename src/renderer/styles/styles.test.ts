@@ -163,6 +163,12 @@ describe('v5 foundation', () => {
     expect(usage).toMatch(/\.day-bar-today\s*\{[^}]*background:\s*var\(--lavender-ink\)/);
   });
 
+  it('draws the wait bar moving, and still under reduced motion', () => {
+    const components = readFileSync(new URL('./components.css', import.meta.url), 'utf8');
+    expect(components).toMatch(/\.indet::after\s*\{[^}]*animation:\s*indet-slide/);
+    expect(components).toMatch(/prefers-reduced-motion[^}]*\{[^}]*\.indet::after\s*\{[^}]*animation:\s*none/);
+  });
+
   it('keeps light shadows under 8% opacity', () => {
     // Shadows only: a dialog's dimmed backdrop is a scrim, not a shadow.
     const shadows = [...all.matchAll(/(?:box-shadow|--shadow-[\w-]+):([^;]*);/g)].map((m) => m[1]).join(' ');

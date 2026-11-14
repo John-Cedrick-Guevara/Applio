@@ -5,6 +5,9 @@ import { AsyncView } from '../../components/async-view';
 import { Blocks } from '../../components/blocks';
 import { Button } from '../../components/button';
 import { Callout, StepList } from '../../components/job-state';
+import { ProgressBar } from '../../components/progress-bar';
+import { useElapsed } from '../../hooks/use-elapsed';
+import { stalledLine } from '../../lib/waits';
 import { useAction } from '../../hooks/use-action';
 import { useAsync } from '../../hooks/use-async';
 import { costBlocks, costLine } from '../../lib/cost';
@@ -148,12 +151,9 @@ const PHASES: { phase: ScanPhase; label: string }[] = [
 
 /** A scan in progress, phase by phase as main reports it, with a stop between phases. */
 function Running({ phase, draft, stopping, onStop }: { phase?: ScanPhase; draft: boolean; stopping: boolean; onStop: () => void }) {
-  const [startedAt] = useState(() => Date.now());
-  const [now, setNow] = useState(startedAt);
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+  const elapsed = useElapsed(true);
+  // Not while stopping: the footer already says so, and "you can stop it" would contradict it.
+  const slow = stopping ? undefined : stalledLine(draft ? 'scanDraft' : 'scan', elapsed);
   const at = Math.max(0, PHASES.findIndex((p) => p.phase === phase));
   // Only the phases this scan reaches; drafting is listed when asked for, so nothing shows as skipped.
   const steps = PHASES.filter((p) => draft || p.phase !== 'drafting').slice(0, phase ? undefined : 1).map((p, i) => ({
@@ -165,10 +165,12 @@ function Running({ phase, draft, stopping, onStop }: { phase?: ScanPhase; draft:
     <section className="card" aria-label="Scan in progress" aria-busy="true">
       <div className="find-jobs-running">
         <h2 className="find-jobs-title">Scanning</h2>
-        <span className="mono cell-sub">{clock(now - startedAt)} elapsed</span>
+        <span className="mono cell-sub">{clock(elapsed)} elapsed</span>
         <Button disabled={stopping} onClick={onStop}>Stop scan</Button>
       </div>
       <StepList label="Scan steps" steps={steps} />
+      <ProgressBar />
+      {slow ? <Callout tone="needs" title={slow.title}>{slow.body}</Callout> : null}
       <p className="cell-sub" role="status">{stopping ? 'Stopping after this step. Everything found so far is kept.' : 'You can leave this page. Results land in Matches.'}</p>
     </section>
   );
