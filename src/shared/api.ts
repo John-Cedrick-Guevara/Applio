@@ -3,6 +3,7 @@ import type {
   AppStatus,
   ConnectionKind,
   Draft,
+  RedraftInput,
   Fact,
   InterviewPrep,
   Job,
@@ -56,8 +57,12 @@ export interface ApplioApi {
   draftJob(jobId: string): Promise<Job>;
   /** Scores one job a scan left unscored, now, through the quota guard. @returns The scored job. @throws When it isn't unscored, the budget is used up, or scoring failed. */
   scoreJob(jobId: string): Promise<Job>;
-  /** Drops a waiting draft and drafts the job again from the current profile, in the background. */
-  redraft(jobId: string): Promise<Job>;
+  /**
+   * Redrafts the part the operator chose (résumé, letter or both) in the background, with their
+   * instruction and an optional fact added to the bank first. The old draft stays until the new part saves.
+   * @throws when the job isn't waiting in Review or is already being redrafted.
+   */
+  redraft(jobId: string, input: RedraftInput): Promise<Job>;
   /** Prints a draft's résumé and letter again (no AI, no tokens), after a failed save. @throws when the job has no draft or printing fails. */
   saveDraftFiles(jobId: string): Promise<Job>;
   skipJob(jobId: string): Promise<Job>;

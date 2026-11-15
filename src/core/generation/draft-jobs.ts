@@ -1,4 +1,4 @@
-import type { Autonomy, Draft, Job, QuestionAnswer } from '../../shared/types';
+import type { Autonomy, Draft, Job, QuestionAnswer, RedraftRequest } from '../../shared/types';
 import { QuotaExceededError, type AiRequest } from '../ai/ai-service';
 import { budgetTokens, type AiReply } from '../ai/engine';
 
@@ -105,6 +105,8 @@ export interface DraftPorts {
   hasDraft: (jobId: string) => boolean;
   /** True while Claude's questions for the job wait on the operator. */
   hasQuestions: (jobId: string) => boolean;
+  /** The operator's pending redraft of a job that already has a draft; undefined once its new part is saved (or when none is asked). */
+  redraft: (jobId: string) => RedraftRequest | undefined;
   /** The operator's answers to Claude's questions, for drafting again; empty when there are none. */
   answers: (jobId: string) => readonly Pick<QuestionAnswer, 'question' | 'answer'>[];
   job: (jobId: string) => Pick<Job, 'employmentType' | 'platform' | 'sourceId'> | undefined;
@@ -112,8 +114,11 @@ export interface DraftPorts {
   note: (jobId: string, text: string) => void;
   /** Adds a call's tokens to the job's running total. */
   addTokens: (jobId: string, tokens: number) => void;
-  /** Called once per saved draft, e.g. to write its files. Its own failures are its to handle. */
-  onDrafted: (jobId: string) => Promise<void>;
+  /**
+   * Called once per saved draft, e.g. to write its files. Its own failures are its to handle.
+   * `redrafted`: the operator asked for it by hand, so it must wait for their approval, never auto-send.
+   */
+  onDrafted: (jobId: string, info: { redrafted: boolean }) => Promise<void>;
 }
 
 export interface DraftResult {
@@ -131,6 +136,18 @@ export const draftKind = (job: Pick<Job, 'employmentType' | 'platform'>): Draft[
 const kindOf = (job: Pick<Job, 'employmentType' | 'platform'>) => (draftKind(job) === 'proposal' ? 'proposal' : 'cover letter');
 
 /**
+ * The prompt for a redraft the operator asked for: only the part they chose is written,
+ * so no tokens go to the part they kept. Their instruction is theirs, so trusted, unlike the posting.
+ */
+function redraftPrompt(id: string, job: Pick<Job, 'employmentType' | 'platform'>, { part, instruction }: RedraftRequest): string {
+  const letter = kindOf(job);
+  const what = part === 'resume' ? 'résumé' : part === 'letter' ? letter : `résumé and the ${letter}`;
+  const skip = part === 'resume' ? `\nDo not write the ${letter}: the operator keeps the current one.` : part === 'letter' ? '\nDo not write the résumé: the operator keeps the current one.' : '';
+  const asked = instruction ? `\nThe operator's instruction for this redraft (theirs, not from the post):\n${instruction}` : '';
+  return `Redraft the ${what} for job ${id}.${skip}${asked}`;
+}
+
+/**
  * Drafts each strong match in its own AI call (SPEC F4). Claude saves the draft
  * through `save_draft`, which enforces the fact citations; a job with no saved
  * draft after the call gets one more try, then a note. A budget stop ends
@@ -145,7 +162,10 @@ export async function draftJobs(
 
   for (const id of jobIds) {
     const job = ports.job(id);
-    if (!job || ports.hasDraft(id)) continue;
+    const redraft = ports.redraft(id);
+    if (!job || (ports.hasDraft(id) && !redraft)) continue;
+    // A redraft is done when its request is cleared (the new part saved), not when a draft exists: the old one is still there.
+    const saved = () => (redraft ? ports.redraft(id) === undefined : ports.hasDraft(id));
     // A job waiting on answers is never drafted, so nothing can be sent before the operator replies.
     if (ports.hasQuestions(id)) {
       result.asked++;
@@ -163,8 +183,9 @@ export async function draftJobs(
     let failure = "Claude didn't save a draft that passed the fact checks.";
     // The operator's own answers, so they're trusted, unlike the posting.
     const answered = ports.answers(id).map((a) => `\nQ: ${a.question}\nA: ${a.answer}`).join('');
-    const prompt = `Draft a ${kindOf(job)} application for job ${id}.${answered ? `\nThe operator answered your questions; use these as facts for this job:${answered}` : ''}`;
-    for (let attempt = 0; attempt < 2 && !ports.hasDraft(id) && !ports.hasQuestions(id) && !result.stopped; attempt++) {
+    const answers = answered ? `\nThe operator answered your questions; use these as facts for this job:${answered}` : '';
+    const prompt = (redraft ? redraftPrompt(id, job, redraft) : `Draft a ${kindOf(job)} application for job ${id}.`) + answers;
+    for (let attempt = 0; attempt < 2 && !saved() && !ports.hasQuestions(id) && !result.stopped; attempt++) {
       try {
         const reply = await ports.ai({
           step: 'tailor', system: DRAFT_SYSTEM, prompt, jobIds: [id],
@@ -177,9 +198,9 @@ export async function draftJobs(
       }
     }
 
-    if (ports.hasDraft(id)) {
+    if (saved()) {
       result.drafted++;
-      await ports.onDrafted(id);
+      await ports.onDrafted(id, { redrafted: redraft !== undefined });
     }
     else if (ports.hasQuestions(id)) result.asked++;
     else {

@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import type { Autonomy, Draft, Job, SendRecord } from '../../../shared/types';
+import type { Autonomy, Draft, Job, RedraftInput, SendRecord } from '../../../shared/types';
 import { useApi } from '../../api/api-context';
 import { AsyncView } from '../../components/async-view';
 import { Button, buttonClass } from '../../components/button';
@@ -13,6 +13,7 @@ import { formatRelative, formatTokens } from '../../lib/format';
 import { CHANNEL_LABEL } from '../../lib/labels';
 import type { DocumentOwner } from '../../../shared/templates/application-documents';
 import { DraftDocument, type DocTab } from './draft-document';
+import { RedraftForm } from './redraft-form';
 import { filesState } from '../../lib/job-progress';
 import { draftCard, nextLine, type DraftCardKind } from './job-card';
 import { jobSteps, modeLabel, primaryAction, sendState, effortLevel } from './review-model';
@@ -82,6 +83,7 @@ function DraftDetail({ job, draft, send, saving, onSkip, onDecided, thresholds, 
   const sending = useAction();
   const [tab, setTab] = useState<DocTab>('letter');
   const [editing, setEditing] = useState(false);
+  const [redrafting, setRedrafting] = useState(false);
   // A suspicious post needs a second, explicit click to send (QA 2026-11-07 #7).
   const [confirming, setConfirming] = useState(false);
   const blockId = useId();
@@ -123,13 +125,16 @@ function DraftDetail({ job, draft, send, saving, onSkip, onDecided, thresholds, 
   };
 
   /** Why Approve is off, said beside it (never a silent disabled button). */
-  const approveBlock = files.kind !== 'ready' ? 'Approve turns on once the PDFs are saved.'
+  const approveBlock = saving && files.kind === 'ready' ? 'Approve turns on once the redraft lands.'
+    : files.kind !== 'ready' ? 'Approve turns on once the PDFs are saved.'
     : draft?.check?.placeholders?.length ? 'Replace the placeholders in the letter first.'
     : undefined;
 
-  const redraft = async () => {
-    const next = await action.run('redraft', () => api.redraft(job.id), 'Redrafting from your current profile. It shows under Drafting now.');
-    if (next) onJob(next, send);
+  const redraft = async (input: RedraftInput) => {
+    const next = await action.run('redraft', () => api.redraft(job.id, input), 'Redrafting. Your current draft stays until the new one lands.');
+    if (!next) return;
+    setRedrafting(false);
+    onJob(next, send);
   };
 
   return (
@@ -154,13 +159,15 @@ function DraftDetail({ job, draft, send, saving, onSkip, onDecided, thresholds, 
           busy={action.pending || sending.pending}
           onRetrySend={approve}
           onSaveFiles={saveFiles}
-          onRedraft={redraft}
+          onRedraft={() => setRedrafting(true)}
           onEditLetter={() => { setTab('letter'); setEditing(true); }}
           onMarkApplied={markApplied}
           onSkip={() => onSkip(job)}
           onOpenFolder={() => action.run('open the folder', () => api.openJobFolder(job.id))}
         />
       </JobStateCard>
+
+      {redrafting && waiting ? <RedraftForm kind={draft?.kind ?? 'cover-letter'} busy={action.pending} onStart={(input) => void redraft(input)} onCancel={() => setRedrafting(false)} /> : null}
 
       <div className="draft-fit">
         <div>
@@ -231,7 +238,8 @@ function DraftDetail({ job, draft, send, saving, onSkip, onDecided, thresholds, 
         {waiting ? (
           <div className="row">
             <Button busy={action.pending || sending.pending} onClick={() => onSkip(job)}>Skip job</Button>
-            <Button disabled={!draft} onClick={() => { setTab('letter'); setEditing(true); }}>Edit</Button>
+            <Button disabled={!draft || saving || redrafting} title={saving ? 'Claude is redrafting this.' : undefined} onClick={() => { setRedrafting(false); setTab('letter'); setEditing(true); }}>Edit</Button>
+            <Button disabled={!draft || saving} onClick={() => setRedrafting(true)}>Redraft…</Button>
             {primary.handoff ? (
               <a className={buttonClass('primary')} href={`#/handoff/${job.id}`}>{primary.label}</a>
             ) : needsGmail ? (
@@ -281,7 +289,7 @@ function CardActions({ kind, job, folder, busy, onRetrySend, onSaveFiles, onRedr
     case 'placeholders':
       return <Button size="sm" onClick={onEditLetter}>Edit letter</Button>;
     case 'stale':
-      return <Button size="sm" busy={busy} onClick={onRedraft}>Redraft (≈ 25–40k tokens)</Button>;
+      return <Button size="sm" busy={busy} onClick={onRedraft}>Redraft from current profile</Button>;
     case 'unconfirmed':
       return (
         <>

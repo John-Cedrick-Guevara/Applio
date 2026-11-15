@@ -3,7 +3,7 @@ import { profileVersion } from '../shared/draft-check';
 import { AppError } from '../shared/errors';
 import { draftKind } from '../core/generation/draft-jobs';
 import { essentialText } from '../core/scoring/job-card';
-import type { Answer, Draft, Job, Profile } from '../shared/types';
+import type { Answer, Draft, Job, Profile, RedraftRequest } from '../shared/types';
 
 /** What Claude sent doesn't fit the tool, or targets something it may not touch. The message is for Claude. */
 export class ToolInputError extends AppError {
@@ -24,6 +24,10 @@ export interface ToolPorts {
   saveMatch: (jobId: string, match: Match) => void;
   /** `reusedAnswerIds`: answer-bank entries the draft reused, so their reuse counts go up. */
   saveDraft: (draft: Draft, reusedAnswerIds: string[]) => void;
+  /** The operator's pending redraft of this job, so a save can keep the part they didn't ask to change. */
+  redraft: (jobId: string) => RedraftRequest | undefined;
+  /** The job's current draft, kept (in part) by a redraft. */
+  draft: (jobId: string) => Draft | undefined;
   /** Questions for the operator in place of a draft; the job waits until they answer (SPEC F4). */
   saveQuestions: (jobId: string, questions: string[]) => void;
   /** A note on the job's timeline; its status stays as it is. */
@@ -66,6 +70,21 @@ const DraftInput = z.strictObject({
   // A bank answer is cited by id and stored with the bank's own text; anything else is a new, AI-written answer.
   answers: z.array(z.union([z.strictObject({ question: text(300), answerId: text(64) }), z.strictObject({ question: text(300), answer: text(2000) })])).max(20).default([]),
 });
+
+/** A redraft of one part needs only that part; Applio keeps the other from the current draft. */
+const redraftInput = (part: RedraftRequest['part']) =>
+  part === 'resume' ? DraftInput.partial({ coverLetter: true }) : part === 'letter' ? DraftInput.partial({ headline: true, summary: true, resume: true }) : DraftInput;
+
+/**
+ * The new part from Claude's save; the other part, the screening answers and the fields that belong
+ * to the other part (subject with the letter, keywords with the résumé) exactly as the operator last saw them.
+ */
+function keepOtherPart(made: Draft, kept: Draft, part: 'resume' | 'letter'): Draft {
+  const { subject, keywords, ...own } = made;
+  return part === 'resume'
+    ? { ...own, ...(keywords ? { keywords } : {}), coverLetter: kept.coverLetter, edited: kept.edited, answers: kept.answers, ...(kept.subject ? { subject: kept.subject } : {}) }
+    : { ...own, headline: kept.headline, summary: kept.summary, resume: kept.resume, answers: kept.answers, ...(kept.keywords ? { keywords: kept.keywords } : {}), ...((subject ?? kept.subject) ? { subject: subject ?? kept.subject } : {}) };
+}
 
 /** Instead of a draft: up to 5 questions, when a truthful draft needs something the facts don't say. */
 const QuestionsInput = z.strictObject({ ...JobRef, questions: z.array(text(300)).min(1).max(5) });
@@ -146,7 +165,12 @@ export function createTools(ports: ToolPorts): McpTool[] {
 
     tool('save_draft', 'Save a job\'s draft (résumé lines cite fact ids), or up to 5 questions when facts are missing or conflict.', z.unknown(), (raw) => {
       // Routed by shape rather than parsed as a union, so a rejection names the field to fix.
-      const input = raw && typeof raw === 'object' && 'questions' in raw ? parse(QuestionsInput, raw) : parse(DraftInput, raw);
+      const asking = raw && typeof raw === 'object' && 'questions' in raw;
+      const jobId = raw && typeof raw === 'object' && 'jobId' in raw && typeof raw.jobId === 'string' ? raw.jobId : '';
+      const redraft = asking ? undefined : ports.redraft(jobId);
+      // A redraft of one part may leave the other out; the save below keeps the operator's current one.
+      const draftSchema: z.ZodType<Partial<z.infer<typeof DraftInput>> & { jobId: string; kind: Draft['kind']; answers: z.infer<typeof DraftInput>['answers'] }> = redraft ? redraftInput(redraft.part) : DraftInput;
+      const input = asking ? parse(QuestionsInput, raw) : parse(draftSchema, raw);
       if ('questions' in input) {
         scoped(input.jobId);
         if (input.questions.some((q) => SECRET_ASK.test(q))) throw new ToolInputError("Applio never asks for passwords, keys or tokens. Ask only about the operator's experience.");
@@ -155,12 +179,15 @@ export function createTools(ports: ToolPorts): McpTool[] {
       }
       const d = input;
       const job = scoped(d.jobId);
-      const items = d.resume.flatMap((s) => s.items);
+      const kept = redraft && redraft.part !== 'both' ? ports.draft(d.jobId) : undefined;
+      if (redraft && redraft.part !== 'both' && !kept) throw new ToolInputError('There is no draft to keep the other part from. Ask the operator to draft the job again.');
+      const newResume = d.resume ?? [];
+      const items = newResume.flatMap((s) => s.items);
       requireFacts([...items.map((i) => i.factId), ...(d.keywords?.claimed ?? []).map((k) => k.factId)]);
       const { facts: factBank, factGroups } = ports.profile();
       const kinds = new Map(factGroups.map((g) => [g.name, g.kind]));
       const home = new Map(factBank.map((f) => [f.id, f]));
-      for (const section of d.resume) {
+      for (const section of newResume) {
         if (!kinds.has(section.group)) throw new ToolInputError(`"${section.group}" is not a section in the fact bank. Use a section name from get_profile.`);
         for (const item of section.items) {
           const fact = home.get(item.factId)!;
@@ -174,7 +201,7 @@ export function createTools(ports: ToolPorts): McpTool[] {
           }
         }
       }
-      if (draftKind(job) === 'cover-letter') {
+      if (d.coverLetter !== undefined && draftKind(job) === 'cover-letter') {
         const words = d.coverLetter.split(/\s+/).filter(Boolean).length;
         if (words >= 250) throw new ToolInputError(`The cover letter has ${words} words; keep it under 250.`);
       }
@@ -195,11 +222,14 @@ export function createTools(ports: ToolPorts): McpTool[] {
         return { question: a.question, answer, origin: 'bank' as const, tokens: 0 };
       });
       // The kind is Applio's rule (SPEC F4), whatever Claude sent.
-      const resume = d.resume.map((sec) => ({ heading: sec.group, group: sec.group, items: sec.items }));
+      const resume = newResume.map((sec) => ({ heading: sec.group, group: sec.group, items: sec.items }));
       const { contact } = ports.profile();
       // The profile it was made from, so a later fact or notes change marks it stale.
       const madeFrom = profileVersion({ facts: factBank, groups: factGroups, contact });
-      ports.saveDraft({ ...d, resume, kind: draftKind(job), edited: false, answers, createdAt: ports.now().toISOString(), profileVersion: madeFrom }, reused);
+      // The parts a redraft left out are filled from the kept draft below; a full draft always has them.
+      const made = { ...d, headline: d.headline ?? '', summary: d.summary ?? '', coverLetter: d.coverLetter ?? '', resume, kind: draftKind(job), edited: false, answers, createdAt: ports.now().toISOString(), profileVersion: madeFrom };
+      // A part-only save discards Claude's screening answers, so the bank answers it cited weren't reused.
+      ports.saveDraft(kept && redraft ? keepOtherPart(made, kept, redraft.part === 'resume' ? 'resume' : 'letter') : made, kept ? [] : reused);
       return 'Saved.';
     }, SaveDraftPublished),
 

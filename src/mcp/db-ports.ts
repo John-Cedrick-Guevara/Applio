@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import { createProfileService } from '../core/profile/profile-service';
-import { createDraftsRepo, createJobsRepo, createProfileRepo, createQuestionsRepo, createSettingsRepo, transaction } from '../infra/db';
+import { createDraftsRepo, createJobsRepo, createProfileRepo, createQuestionsRepo, createRedraftsRepo, createSettingsRepo, transaction } from '../infra/db';
 import type { JobStatus } from '../shared/types';
 import type { ToolPorts } from './tools';
 
@@ -14,6 +14,7 @@ export function createToolPorts(db: DatabaseSync, jobIds: readonly string[], now
   const jobs = createJobsRepo(db);
   const drafts = createDraftsRepo(db);
   const store = createProfileRepo(db);
+  const redrafts = createRedraftsRepo(createSettingsRepo(db));
   const profile = createProfileService({ store, kv: createSettingsRepo(db), newId: randomUUID, now });
 
   /** Moves a job forward only from the step before, so a re-score never pulls a sent application back. */
@@ -27,6 +28,8 @@ export function createToolPorts(db: DatabaseSync, jobIds: readonly string[], now
     profile: () => profile.getProfile(),
     answers: () => store.listAnswers(),
     job: (id) => jobs.get(id),
+    redraft: redrafts.get,
+    draft: drafts.get,
     saveMatch: (id, match) =>
       transaction(db, () => {
         jobs.saveMatch(id, match);
@@ -35,6 +38,8 @@ export function createToolPorts(db: DatabaseSync, jobIds: readonly string[], now
     saveDraft: (draft, reusedAnswerIds) =>
       transaction(db, () => {
         drafts.save(draft);
+        // The redraft is done once its new part is saved; draftJobs reads this to know.
+        redrafts.clear(draft.jobId);
         const cited = new Set(draft.resume.flatMap((s) => s.items.map((i) => i.factId)));
         for (const fact of store.listFacts()) if (cited.has(fact.id)) store.saveFact({ ...fact, timesUsed: fact.timesUsed + 1 });
         for (const answer of store.listAnswers()) if (reusedAnswerIds.includes(answer.id)) store.saveAnswer({ ...answer, timesReused: answer.timesReused + 1 });

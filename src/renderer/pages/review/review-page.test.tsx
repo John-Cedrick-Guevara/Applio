@@ -126,8 +126,79 @@ describe('ReviewPage', () => {
     renderWithApp(<ReviewPage params={{ id: 'j1' }} />, api);
     const detail = await screen.findByRole('region', { name: 'Draft detail' });
     expect(await within(detail).findByText('Made from an older profile.')).toBeInTheDocument();
-    await userEvent.click(within(detail).getByRole('button', { name: /Redraft/ }));
+    await userEvent.click(within(detail).getByRole('button', { name: 'Redraft from current profile' }));
+    await userEvent.click(within(detail).getByRole('radio', { name: 'Both' }));
+    await userEvent.click(within(detail).getByRole('button', { name: 'Start redraft' }));
     await waitFor(async () => expect((await api.getDraft('j1'))?.check?.stale).toBe(false));
+  });
+
+  describe('redraft form', () => {
+    const openForm = async (api = createMockApi({ latencyMs: 0 })) => {
+      renderWithApp(<ReviewPage params={{ id: 'j1' }} />, api);
+      const detail = await screen.findByRole('region', { name: 'Draft detail' });
+      await userEvent.click(await within(detail).findByRole('button', { name: 'Redraft…' }));
+      return { api, detail };
+    };
+
+    it('keeps Start off, and says why, until a part is chosen; an empty instruction is fine', async () => {
+      const { detail } = await openForm();
+      const start = within(detail).getByRole('button', { name: 'Start redraft' });
+      expect(start).toBeDisabled();
+      expect(within(detail).getByText('Choose what to redraft.')).toBeInTheDocument();
+      await userEvent.click(within(detail).getByRole('radio', { name: 'Cover letter' }));
+      expect(start).toBeEnabled();
+    });
+
+    it('sends the chosen part, the instruction and the added fact, and nothing the operator left empty', async () => {
+      const api = createMockApi({ latencyMs: 0 });
+      const redraft = vi.spyOn(api, 'redraft');
+      const { detail } = await openForm(api);
+      await userEvent.click(within(detail).getByRole('radio', { name: 'Cover letter' }));
+      await userEvent.type(within(detail).getByLabelText('What should change? (optional)'), 'Make it warmer');
+      await userEvent.type(within(detail).getByLabelText('Add a fact (optional)'), 'Led a team of 5');
+      await within(detail).findByRole('option', { name: '[Previous Company] — Senior Software Engineer' });
+      await userEvent.selectOptions(within(detail).getByLabelText('Section'), '[Previous Company] — Senior Software Engineer');
+      await userEvent.click(within(detail).getByRole('button', { name: 'Start redraft' }));
+      await waitFor(() => expect(redraft).toHaveBeenCalledWith('j1', { part: 'letter', instruction: 'Make it warmer', fact: { group: '[Previous Company] — Senior Software Engineer', text: 'Led a team of 5' } }));
+      expect(within(detail).queryByRole('button', { name: 'Start redraft' })).not.toBeInTheDocument();
+    });
+
+    it('sends only the part when both boxes are empty', async () => {
+      const api = createMockApi({ latencyMs: 0 });
+      const redraft = vi.spyOn(api, 'redraft');
+      const { detail } = await openForm(api);
+      await userEvent.click(within(detail).getByRole('radio', { name: 'Résumé' }));
+      await userEvent.click(within(detail).getByRole('button', { name: 'Start redraft' }));
+      await waitFor(() => expect(redraft).toHaveBeenCalledWith('j1', { part: 'resume' }));
+    });
+
+    it('does not start with a fact typed but no section', async () => {
+      const { detail } = await openForm();
+      await userEvent.click(within(detail).getByRole('radio', { name: 'Both' }));
+      await userEvent.type(within(detail).getByLabelText('Add a fact (optional)'), 'Led a team of 5');
+      expect(within(detail).getByRole('button', { name: 'Start redraft' })).toBeDisabled();
+      expect(within(detail).getByText('Pick the section this fact belongs to.')).toBeInTheDocument();
+    });
+
+    it('closes on Cancel without redrafting', async () => {
+      const api = createMockApi({ latencyMs: 0 });
+      const redraft = vi.spyOn(api, 'redraft');
+      const { detail } = await openForm(api);
+      await userEvent.click(within(detail).getByRole('button', { name: 'Cancel' }));
+      expect(within(detail).queryByRole('button', { name: 'Start redraft' })).not.toBeInTheDocument();
+      expect(redraft).not.toHaveBeenCalled();
+    });
+
+    it('turns Approve, Edit and Redraft off, with the reason, while Claude is redrafting', async () => {
+      const api = await withGmail();
+      const busy: typeof api = { ...api, getStatus: async () => ({ ...(await api.getStatus()), drafting: ['j1'] }) };
+      renderWithApp(<ReviewPage params={{ id: 'j1' }} />, busy);
+      const detail = await screen.findByRole('region', { name: 'Draft detail' });
+      expect(await within(detail).findByRole('button', { name: 'Approve & send email' })).toBeDisabled();
+      expect(within(detail).getByRole('button', { name: 'Edit' })).toBeDisabled();
+      expect(within(detail).getByRole('button', { name: 'Redraft…' })).toBeDisabled();
+      expect(within(detail).getByText('Approve turns on once the redraft lands.')).toBeInTheDocument();
+    });
   });
 
   it('shows one state card and folds the rest into More notes', async () => {

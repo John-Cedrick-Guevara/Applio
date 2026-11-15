@@ -147,6 +147,19 @@ export interface Draft {
   check?: DraftCheck;
 }
 
+/** What the operator asks for when they redraft by hand: which part, and what to change in it. */
+export interface RedraftRequest {
+  /** `resume` = headline, summary, résumé sections, keywords; `letter` = cover letter or proposal and email subject. */
+  part: 'resume' | 'letter' | 'both';
+  /** The operator's own words, for this redraft only. */
+  instruction?: string;
+}
+
+/** A redraft as the operator submits it: the request, plus a fact to add to the bank first. */
+export interface RedraftInput extends RedraftRequest {
+  fact?: { group: string; text: string };
+}
+
 /** A draft's provenance: made from today's profile or not, and what in it no fact backs. */
 export interface DraftCheck {
   /** Made from an older profile (or before Applio tracked it): facts, sections, contact or notes changed since. */

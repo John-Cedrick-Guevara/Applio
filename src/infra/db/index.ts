@@ -6,6 +6,7 @@ export { createJobsRepo, type JobMeta, type JobsRepo } from './jobs';
 export { createPollsRepo, type PollsRepo } from './polls';
 export { createProfileRepo, type ProfileRepo } from './profile';
 export { createQuestionsRepo, type QuestionsRepo } from './questions';
+export { createRedraftsRepo, type RedraftsRepo } from './redrafts';
 export { createSettingsRepo, type SettingsRepo } from './settings';
 export { createSendsRepo, type SendRow, type SendsRepo, type SentRecord } from './sends';
 export { createSourcesRepo, type SourcesRepo } from './sources';

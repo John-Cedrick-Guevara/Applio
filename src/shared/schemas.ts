@@ -107,7 +107,11 @@ export const API_ARGS = {
   draftJob: z.tuple([id]),
   scoreJob: z.tuple([id]),
   restoreJob: z.tuple([id]),
-  redraft: z.tuple([id]),
+  redraft: z.tuple([id, z.strictObject({
+    part: z.enum(['resume', 'letter', 'both']),
+    instruction: z.string().max(1000, 'is too long (1,000 characters max)').optional(),
+    fact: z.strictObject({ group: short.min(1, "section can't be empty"), text: z.string().trim().min(1, "fact can't be empty").max(1000, 'is too long (1,000 characters max)') }).optional(),
+  })]),
   saveDraftFiles: z.tuple([id]),
   skipJob: z.tuple([id]),
   markApplied: z.tuple([id]),
