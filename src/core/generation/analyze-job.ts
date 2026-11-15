@@ -4,6 +4,7 @@ import { AppError } from '../../shared/errors';
 import type { ApplyChannel, Job, JobPreview, JobStatus } from '../../shared/types';
 import type { AiRequest } from '../ai/ai-service';
 import { budgetTokens, type AiReply } from '../ai/engine';
+import { firstJsonObject } from '../ai/first-json';
 import { detectChannel } from '../apply/channel';
 
 const ANALYZE_SYSTEM = `You read one job post a job seeker pasted, and score it for them, using Applio's tools.
@@ -59,16 +60,6 @@ export interface AnalyzePorts {
 /** The job as it will be saved, minus what saving adds (id, source, status, history). */
 export type AnalyzedJob = Omit<Job, 'id' | 'sourceId' | 'status' | 'history' | 'factsUsed' | 'folderPath' | 'sentBy'>;
 
-const firstObject = (text: string): unknown => {
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  try {
-    return start >= 0 && end > start ? JSON.parse(text.slice(start, end + 1)) : undefined;
-  } catch {
-    return undefined;
-  }
-};
-
 /**
  * Reads and scores one pasted post or page (SPEC F2 Clip) in a single operator
  * call: Claude reads the fact bank through the tools and returns the job as
@@ -80,7 +71,7 @@ export async function analyzePost(
   ports: AnalyzePorts,
 ): Promise<{ preview: Omit<JobPreview, 'previewId'>; job: AnalyzedJob }> {
   const reply = await ports.ai({ step: 'score', system: ANALYZE_SYSTEM, prompt: `Analyze this job post.\n<post>\n${text}\n</post>`, jobIds: [] });
-  const parsed = AnalysisSchema.safeParse(firstObject(reply.text));
+  const parsed = AnalysisSchema.safeParse(firstJsonObject(reply.text));
   if (!parsed.success) {
     // The cause names the failing fields (not values, which come from an untrusted post) for the IPC log.
     const cause = parsed.error.issues.map((i) => `${i.path.join('.') || 'answer'}: ${i.code}`).join(', ');
