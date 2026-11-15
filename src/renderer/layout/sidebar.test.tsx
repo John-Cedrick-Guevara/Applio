@@ -125,11 +125,11 @@ describe('Sidebar', () => {
     expect(screen.getByRole('link', { name: 'Matches, 2 new' })).toBeInTheDocument();
   });
 
-  it('renders the logo as a 34px tile with a 10px corner', async () => {
+  it('renders the brand logo image at 34px', async () => {
     const { container } = renderWithApp(<Sidebar />);
     await screen.findByRole('link', { name: 'Applio, home' });
-    const svg = container.querySelector('svg.logo')!;
-    expect(svg).toHaveAttribute('width', '34');
-    expect(svg.querySelector('rect')).toHaveAttribute('rx', '10');
+    const img = container.querySelector('img.logo')!;
+    expect(img).toHaveAttribute('width', '34');
+    expect(img.getAttribute('src')).toMatch(/logo/);
   });
 });
