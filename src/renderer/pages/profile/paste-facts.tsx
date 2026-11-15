@@ -146,11 +146,11 @@ function Review({ result, fromLink, rows, setRows, groups, onChange }: ReviewPro
         {rows.map((r) => (
           <li key={r.id} className="paste-row">
             <label htmlFor={`pf-text-${r.id}`} className="visually-hidden">Fact</label>
-            <textarea id={`pf-text-${r.id}`} className="textarea" rows={2} value={r.text} disabled={r.added} onChange={(e) => patch(r.id, { text: e.target.value })} />
+            <textarea id={`pf-text-${r.id}`} className="textarea" rows={2} value={r.text} disabled={r.added || action.pending} onChange={(e) => patch(r.id, { text: e.target.value })} />
             <label htmlFor={`pf-group-${r.id}`} className="visually-hidden">Section</label>
-            <input id={`pf-group-${r.id}`} className="input" list="paste-facts-groups" value={r.group} disabled={r.added} onChange={(e) => patch(r.id, { group: e.target.value })} />
+            <input id={`pf-group-${r.id}`} className="input" list="paste-facts-groups" value={r.group} disabled={r.added || action.pending} onChange={(e) => patch(r.id, { group: e.target.value })} />
             <label htmlFor={`pf-kind-${r.id}`} className="visually-hidden">Kind</label>
-            <select id={`pf-kind-${r.id}`} className="select select-auto" value={r.kind} disabled={r.added} onChange={(e) => patch(r.id, { kind: e.target.value as FactGroupKind })}>
+            <select id={`pf-kind-${r.id}`} className="select select-auto" value={r.kind} disabled={r.added || action.pending} onChange={(e) => patch(r.id, { kind: e.target.value as FactGroupKind })}>
               {KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
             </select>
             {r.added ? (
