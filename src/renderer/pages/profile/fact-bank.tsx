@@ -177,7 +177,7 @@ function FactEditor({ fact, onCancel, onSaved, onDeleted }: { fact: Fact; onCanc
   );
 }
 
-const KINDS: { value: FactGroupKind; label: string }[] = [
+export const KINDS: { value: FactGroupKind; label: string }[] = [
   { value: 'experience', label: 'Experience' },
   { value: 'project', label: 'Project' },
   { value: 'skills', label: 'Skills' },

@@ -283,3 +283,16 @@
   color: var(--text-muted);
   cursor: pointer;
 }
+
+.paste-review {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.paste-row {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border);
+}

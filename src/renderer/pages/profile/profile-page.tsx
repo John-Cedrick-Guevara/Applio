@@ -9,6 +9,7 @@ import { useAsync } from '../../hooks/use-async';
 import { AnswerBank } from './answer-bank';
 import { ContactCard } from './contact-card';
 import { FactBank } from './fact-bank';
+import { PasteFacts } from './paste-facts';
 import { PreferencesCard } from './preferences-card';
 import { ReferenceResumeCard } from './reference-resume-card';
 import { ResumeSuggestions } from './resume-suggestions';
@@ -100,6 +101,7 @@ function ProfileBody({ profile, onChange }: { profile: Profile; onChange: (patch
               onDone={() => setImported(null)}
             />
           ) : null}
+          <PasteFacts profile={profile} onChange={onChange} />
           {addedCount > 0 ? <p className="cell-sub" role="status">{addedCount} added to your Fact bank.</p> : null}
           <ContactCard contact={profile.contact} onSaved={(contact) => onChange({ contact })} />
           {templateOpen ? <TemplatePreview profile={profile} /> : null}

@@ -322,6 +322,7 @@ export function createMockApi({ latencyMs = 250, now = () => new Date(), sendFai
         if (!input.text.trim()) throw new Error('Write the fact first');
         const fact = { ...input, id: `f${nextId++}`, tags: [], timesUsed: 0 };
         profile.facts.unshift(fact);
+        if (!profile.factGroups.some((g) => g.name === fact.group)) profile.factGroups.push({ name: fact.group });
         return fact;
       }),
 
