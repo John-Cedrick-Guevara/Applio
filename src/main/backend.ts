@@ -264,6 +264,8 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       return;
     }
     redrafts.clear(id);
+    // After questions the job waited in `scored` with its draft; a failed follow-up puts it back in Review.
+    if (jobs.get(id)?.status === 'scored' && drafts.get(id)) jobs.transition(id, { status: 'drafted', at: new Date().toISOString(), note: 'Redraft failed. Your current draft is back in Review.' });
     if (stopped) note(id, `Not redrafted: ${stopped}`);
   };
   const draftInBackground = (id: string) => {

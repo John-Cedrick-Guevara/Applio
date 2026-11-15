@@ -245,6 +245,24 @@ describe('MCP tools', () => {
       expect(saved(ports)).toMatchObject({ coverLetter: 'A warmer letter.', subject: 'New subject', edited: false, headline: 'Old headline', summary: 'Old summary.', resume: old.resume, keywords: old.keywords });
     });
 
+    it('leaves the keywords and screening answers as they were on a letter-only save, even if Claude sends them', () => {
+      const bare: Draft = { ...old };
+      delete bare.keywords;
+      const { call, ports } = setup({ part: 'letter' }, bare);
+      call('save_draft', { ...letterOnly, keywords: draftInput.keywords, answers: [{ question: 'Why us?', answer: 'Your API work.' }, { question: 'Notice period?', answerId: 'a1' }] });
+      expect(saved(ports)).not.toHaveProperty('keywords');
+      expect(saved(ports).answers).toEqual([]);
+      expect(vi.mocked(ports.saveDraft).mock.calls[0]![1]).toEqual([]);
+    });
+
+    it('leaves the subject as it was on a résumé-only save, even if Claude sends one', () => {
+      const bare: Draft = { ...old };
+      delete bare.subject;
+      const { call, ports } = setup({ part: 'resume' }, bare);
+      call('save_draft', { ...resumeOnly, subject: 'A new subject' });
+      expect(saved(ports)).not.toHaveProperty('subject');
+    });
+
     it('keeps the old subject when a new letter brings none', () => {
       const { call, ports } = setup({ part: 'letter' }, old);
       call('save_draft', { jobId: inScope.id, kind: 'cover-letter', coverLetter: 'A warmer letter.' });

@@ -75,11 +75,15 @@ const DraftInput = z.strictObject({
 const redraftInput = (part: RedraftRequest['part']) =>
   part === 'resume' ? DraftInput.partial({ coverLetter: true }) : part === 'letter' ? DraftInput.partial({ headline: true, summary: true, resume: true }) : DraftInput;
 
-/** The new part from Claude's save, the other part (and the screening answers) exactly as the operator last saw them. */
+/**
+ * The new part from Claude's save; the other part, the screening answers and the fields that belong
+ * to the other part (subject with the letter, keywords with the résumé) exactly as the operator last saw them.
+ */
 function keepOtherPart(made: Draft, kept: Draft, part: 'resume' | 'letter'): Draft {
+  const { subject, keywords, ...own } = made;
   return part === 'resume'
-    ? { ...made, coverLetter: kept.coverLetter, edited: kept.edited, answers: kept.answers, ...(kept.subject ? { subject: kept.subject } : {}) }
-    : { ...made, headline: kept.headline, summary: kept.summary, resume: kept.resume, answers: kept.answers, ...(kept.keywords ? { keywords: kept.keywords } : {}), ...(made.subject ?? kept.subject ? { subject: made.subject ?? kept.subject } : {}) };
+    ? { ...own, ...(keywords ? { keywords } : {}), coverLetter: kept.coverLetter, edited: kept.edited, answers: kept.answers, ...(kept.subject ? { subject: kept.subject } : {}) }
+    : { ...own, headline: kept.headline, summary: kept.summary, resume: kept.resume, answers: kept.answers, ...(kept.keywords ? { keywords: kept.keywords } : {}), ...((subject ?? kept.subject) ? { subject: subject ?? kept.subject } : {}) };
 }
 
 /** Instead of a draft: up to 5 questions, when a truthful draft needs something the facts don't say. */
@@ -224,7 +228,8 @@ export function createTools(ports: ToolPorts): McpTool[] {
       const madeFrom = profileVersion({ facts: factBank, groups: factGroups, contact });
       // The parts a redraft left out are filled from the kept draft below; a full draft always has them.
       const made = { ...d, headline: d.headline ?? '', summary: d.summary ?? '', coverLetter: d.coverLetter ?? '', resume, kind: draftKind(job), edited: false, answers, createdAt: ports.now().toISOString(), profileVersion: madeFrom };
-      ports.saveDraft(kept && redraft ? keepOtherPart(made, kept, redraft.part === 'resume' ? 'resume' : 'letter') : made, reused);
+      // A part-only save discards Claude's screening answers, so the bank answers it cited weren't reused.
+      ports.saveDraft(kept && redraft ? keepOtherPart(made, kept, redraft.part === 'resume' ? 'resume' : 'letter') : made, kept ? [] : reused);
       return 'Saved.';
     }, SaveDraftPublished),
 

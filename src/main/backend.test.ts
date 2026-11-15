@@ -818,6 +818,21 @@ describe('createBackend discovery', () => {
       await vi.waitFor(async () => expect((await b.api.getStatus()).drafting).toEqual([]));
     });
 
+    it('puts the job back in Review, draft intact, when the follow-up after Claude\'s questions fails', async () => {
+      const b = await draftedBackend();
+      await redrafting(b, (call, prompt, jobId) => {
+        if (!prompt.includes('answered')) call({ jobId, questions: ['Did you lead the migration?'] });
+        else throw new Error('Claude Code couldn\'t finish: 429');
+      });
+      await b.api.redraft(b.job.id, { part: 'resume' });
+      await vi.waitFor(async () => expect(await b.api.listQuestions()).toHaveLength(1));
+      await b.api.answerQuestions(b.job.id, [{ question: 'Did you lead the migration?', answer: 'Yes.' }]);
+      await vi.waitFor(async () => expect((await b.api.getStatus()).drafting).toEqual([]));
+      expect(await b.api.getDraft(b.job.id)).toMatchObject({ headline: 'Backend engineer' });
+      expect((await b.api.getJob(b.job.id)).status).toBe('drafted');
+      expect(await b.api.listQuestions()).toEqual([]);
+    });
+
     it('refuses a job that is not waiting in Review', async () => {
       const b = await draftedBackend();
       await b.api.skipJob(b.job.id);
