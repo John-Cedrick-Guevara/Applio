@@ -35,9 +35,9 @@ describe('draftJobs', () => {
   it("follows the operator's résumé-strategist instructions, with every personal fact left to the fact bank", () => {
     for (const rule of [
       'resume strategist', 'past AI/ATS screening', '30-second read', 'Never invent skills, tools, metrics, titles, or dates',
-      'action verb + what I built + result/scale', 'Mirror the job post', 'SUMMARY: 3 lines max', 'Under 250 words',
+      'strong action verb + what I built or changed + how (the mechanism) + result/scale', 'Mirror the job post', '3 lines max, one sentence each', 'Under 250 words',
       'Hook', 'Proof', 'Value', 'Close', 'get_profile', 'untrusted', 'Never tell me to skip a job',
-      'ask me before writing', 'Max 5 questions', 'about 16–20 bullets in total', 'availability, start date, notice period, time zone',
+      'ask me before writing', 'Max 5 questions', 'about 18–22 bullets in total', 'Never fill a Gap with invented content', 'Never restate the context line', 'availability, start date, notice period, time zone',
     ]) expect(DRAFT_SYSTEM).toContain(rule);
     // Personal facts come from get_profile at run time, never from text built into Applio.
     for (const personal of ['Guevara', 'Afterhours', 'Zentari', 'Octivia', '+63', 'guevix']) expect(DRAFT_SYSTEM).not.toContain(personal);
