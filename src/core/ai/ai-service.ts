@@ -20,6 +20,8 @@ export interface AiRequest {
   jobIds: readonly string[];
   /** False for a one-turn call that answers in text (scoring); Applio's tools are offered otherwise. */
   tools?: boolean;
+  /** True for the one call that may read a web page the operator pasted: Claude Code's web read only, no other tool. */
+  webRead?: boolean;
 }
 
 /** One AI call's spend, as the usage table stores it (SPEC F10). */
@@ -92,7 +94,7 @@ export function createAi(ports: AiPorts) {
         );
       }
 
-      const reply = await ports.engine().complete({ system: request.system, prompt: request.prompt, jobIds: request.jobIds, ...(request.tools === false ? { tools: false } : {}) });
+      const reply = await ports.engine().complete({ system: request.system, prompt: request.prompt, jobIds: request.jobIds, ...(request.tools === false ? { tools: false } : {}), ...(request.webRead ? { webRead: true } : {}) });
       ports.record({
         at: ports.now().toISOString(),
         step: request.step,

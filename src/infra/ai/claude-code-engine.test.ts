@@ -134,4 +134,20 @@ describe('Claude Code engine', () => {
     expect(args[args.indexOf('--mcp-config') + 1]).toBe('{"mcpServers":{}}');
     expect(args).not.toContain('--allowedTools');
   });
+
+  it('reads a web page with the web read tool alone: no Applio server, no other tool, hooks off', async () => {
+    await engine().complete({ prompt: 'Read https://jane.dev', jobIds: [], tools: false, webRead: true });
+    const { args } = seen();
+    expect(args[args.indexOf('--tools') + 1]).toBe('WebFetch');
+    expect(args[args.indexOf('--allowedTools') + 1]).toBe('WebFetch');
+    expect(args.filter((a) => a === '--allowedTools')).toHaveLength(1);
+    expect(args[args.indexOf('--mcp-config') + 1]).toBe('{"mcpServers":{}}');
+    expect(JSON.parse(args[args.indexOf('--settings') + 1]!)).toEqual({ disableAllHooks: true });
+  });
+
+  it('keeps every other call free of built-in tools', async () => {
+    await engine().complete({ prompt: 'x', jobIds: ['j1'] });
+    await engine().complete({ prompt: 'x', jobIds: [], tools: false });
+    expect(seen().args[seen().args.indexOf('--tools') + 1]).toBe('');
+  });
 });
