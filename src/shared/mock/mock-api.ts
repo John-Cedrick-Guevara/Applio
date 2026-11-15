@@ -368,6 +368,13 @@ export function createMockApi({ latencyMs = 250, now = () => new Date(), sendFai
         return profile.factGroups;
       }),
 
+    saveSkills: (input) =>
+      run(() => {
+        const seen = new Set<string>();
+        profile.skills = input.map((x) => x.trim()).filter((x) => x && !seen.has(x.toLowerCase()) && seen.add(x.toLowerCase()));
+        return profile.skills;
+      }),
+
     importResume: () =>
       run(() => {
         const suggestions = [

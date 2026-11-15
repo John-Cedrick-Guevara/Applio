@@ -119,4 +119,23 @@ describe('profile service', () => {
     expect(profile.getProfile().facts).toHaveLength(1);
     expect(profile.getProfile().referenceResume).toEqual(result.resume);
   });
+
+  describe('saveSkills', () => {
+    it('stores trimmed skills and returns them', () => {
+      const svc = setup();
+      expect(svc.saveSkills([' Node.js ', 'Go'])).toEqual(['Node.js', 'Go']);
+      expect(svc.getProfile().skills).toEqual(['Node.js', 'Go']);
+    });
+
+    it('drops blanks and case-insensitive duplicates, keeping the first spelling', () => {
+      expect(setup().saveSkills(['Node.js', 'node.js', '  ', 'Go'])).toEqual(['Node.js', 'Go']);
+    });
+
+    it('leaves facts and sections untouched', () => {
+      const svc = setup();
+      const fact = svc.saveFact({ group: 'Projects', text: 'Built X' });
+      svc.saveSkills(['Go']);
+      expect(svc.getProfile().facts).toEqual([fact]);
+    });
+  });
 });

@@ -21,7 +21,7 @@ export interface ProfilePorts {
   now: () => Date;
 }
 
-type ProfileMethods = 'getProfile' | 'saveFact' | 'deleteFact' | 'saveAnswer' | 'deleteAnswer' | 'savePreferences' | 'saveContact' | 'saveFactGroup';
+type ProfileMethods = 'getProfile' | 'saveFact' | 'deleteFact' | 'saveAnswer' | 'deleteAnswer' | 'savePreferences' | 'saveContact' | 'saveFactGroup' | 'saveSkills';
 /** The profile API methods, synchronously, plus recording a résumé the backend has already read. */
 export type ProfileService = { [M in ProfileMethods]: (...args: Parameters<ApplioApi[M]>) => Awaited<ReturnType<ApplioApi[M]>> } & {
   /** Records the reference résumé and returns fact suggestions; adds nothing to the bank. */
@@ -69,6 +69,13 @@ export function createProfileService({ store, kv, newId, now }: ProfilePorts): P
       }
       store.replaceFactGroups(groups.map((g) => (g.name === input.name ? next : g)));
       return store.listFactGroups();
+    },
+
+    saveSkills: (input) => {
+      const seen = new Set<string>();
+      const skills = input.map((s) => s.trim()).filter((s) => s && !seen.has(s.toLowerCase()) && seen.add(s.toLowerCase()));
+      kv.set('skills', skills);
+      return skills;
     },
 
     saveFact: (input) => {

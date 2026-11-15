@@ -147,6 +147,14 @@ describe('drafts', () => {
   });
 });
 
+describe('skills', () => {
+  it('changing skills leaves an existing draft as it was', async () => {
+    const before = await api.getDraft('j1');
+    await api.saveSkills(['Go']);
+    expect(await api.getDraft('j1')).toEqual(before);
+  });
+});
+
 describe('follow-ups', () => {
   it('logs a follow-up on an application still waiting', async () => {
     const job = await api.sendFollowUp('j10', 'Following up');

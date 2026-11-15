@@ -79,6 +79,11 @@ describe('API argument schemas', () => {
       expect(rejects('saveFact', [{ group: 'Projects', text: '' }])).toThrow(InvalidRequestError);
     });
 
+    it('accepts a skill list and rejects an over-long skill', () => {
+      expect(parseApiArgs('saveSkills', [['Go', 'Rust']])).toHaveLength(1);
+      expect(rejects('saveSkills', [['x'.repeat(81)]])).toThrow(InvalidRequestError);
+    });
+
     it('accepts preferences and rejects an unknown employment type', () => {
       const prefs = { targetRoles: ['Backend'], seniority: 'Senior', employmentTypes: ['full-time'], remoteOnly: true, hoursOverlap: '4h', minimumPay: '$80k' };
       expect(parseApiArgs('savePreferences', [prefs])).toHaveLength(1);
