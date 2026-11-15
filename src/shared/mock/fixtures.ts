@@ -242,8 +242,8 @@ export function seedUsage(now: Date, period: UsagePeriod): Usage {
       ? { tokens: 82_000, tokenBudget: 150_000, sent: 6, sentLimit: 20, sentBreakdown: { autonomous: 3, approved: 2, manual: 1 }, avgTokensPerApplication: 7_900, avgNote: 'Scoring + tailoring + answers', savedByAnswerBank: { tokens: 4_100, answersReused: 11 } }
       : { tokens: 1_210_000, tokenBudget: 3_000_000, sent: 38, sentBreakdown: { autonomous: 17, approved: 14, manual: 7 }, avgTokensPerApplication: 9_400, avgNote: 'Down from 13k in week 1', savedByAnswerBank: { tokens: 61_000, answersReused: 142 } },
     tokensByStep: (today
-      ? [['tailor', 26_400], ['score', 9_100], ['answers', 3_200], ['prep', 2_500], ['follow-up', 0]]
-      : [['tailor', 742_000], ['score', 268_000], ['answers', 96_000], ['prep', 71_000], ['follow-up', 33_000]]
+      ? [['tailor', 26_400], ['score', 9_100], ['answers', 3_200], ['prep', 2_500], ['follow-up', 0], ['facts', 0]]
+      : [['tailor', 742_000], ['score', 268_000], ['answers', 96_000], ['prep', 71_000], ['follow-up', 33_000], ['facts', 0]]
     ).map(([step, tokens]) => ({ step: step as UsageStep, tokens: tokens as number })),
     prefilter: today
       ? { found: 83, duplicates: 0, passed: 19, dropped: [{ reason: 'seniority', count: 42 }, { reason: 'location', count: 18 }, { reason: 'role', count: 4 }] }

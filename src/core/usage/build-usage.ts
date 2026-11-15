@@ -2,7 +2,7 @@ import type { ApplyChannel, Quota, SentBy, Settings, Usage, UsagePeriod, UsageSt
 
 /** Tokens a reused bank answer would have cost to write. ponytail: one estimate; per-answer cost isn't recorded separately. */
 const TOKENS_PER_ANSWER = 200;
-const STEPS: readonly UsageStep[] = ['tailor', 'score', 'answers', 'prep', 'follow-up'];
+const STEPS: readonly UsageStep[] = ['tailor', 'score', 'answers', 'prep', 'follow-up', 'facts'];
 const SENDING_CHANNELS = 2; // email and ATS: the only channels Applio sends on
 
 export interface UsageInput {

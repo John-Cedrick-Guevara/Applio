@@ -14,7 +14,9 @@ import type {
   Contact,
   OpenQuestions,
   QuestionAnswer,
+  FactExtraction,
   FactGroup,
+  FactSource,
   ResumeImport,
   RunSummary, ScanOptions,
   SecretKey,
@@ -117,6 +119,12 @@ export interface ApplioApi {
   /** Replaces the skill list (trimmed, blanks and case-insensitive duplicates dropped); returns what was stored. */
   saveSkills(skills: string[]): Promise<string[]>;
   /**
+   * Reads pasted résumé or portfolio text, or one portfolio link (Claude Code reads it itself), into
+   * suggested facts. Adds nothing to the bank; each suggestion joins it only when the operator accepts it.
+   * Spends tokens through the quota guard. Rejects with the reason and next step when it can't run.
+   */
+  extractFacts(source: FactSource): Promise<FactExtraction>;
+  /**
    * Opens a file picker in main, reads the chosen PDF/DOCX résumé and suggests facts from it; null if cancelled.
    * Suggestions join the bank only when the operator accepts each one (via `saveFact`).
    */
@@ -148,7 +156,7 @@ export const API_METHODS = [
   'getStatus', 'runDiscovery', 'stopScan', 'setAutomationPaused',
   'openExternal', 'openJobFolder', 'openDraftFile', 'assistFill', 'chooseFolder', 'openOutputFolder',
   'analyzeJob', 'addJob',
-  'getProfile', 'saveFact', 'deleteFact', 'saveAnswer', 'deleteAnswer', 'savePreferences', 'listQuestions', 'answerQuestions', 'saveContact', 'saveFactGroup', 'saveSkills', 'importResume',
+  'getProfile', 'saveFact', 'deleteFact', 'saveAnswer', 'deleteAnswer', 'savePreferences', 'listQuestions', 'answerQuestions', 'saveContact', 'saveFactGroup', 'saveSkills', 'extractFacts', 'importResume',
   'listSources', 'updateSource',
   'getUsage',
   'getSettings', 'saveSettings', 'setSecret', 'testConnection',

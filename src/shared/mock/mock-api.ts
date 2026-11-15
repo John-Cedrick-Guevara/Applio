@@ -375,6 +375,15 @@ export function createMockApi({ latencyMs = 250, now = () => new Date(), sendFai
         return profile.skills;
       }),
 
+    extractFacts: (source) =>
+      run(() => {
+        if (!source.value.trim()) throw new Error('Paste your résumé or portfolio text first.');
+        const lines = source.value.split(/\r?\n/).map((l) => l.replace(/^[-•*]\s+/, '').trim()).filter((l) => l.length > 40);
+        const taken = new Set(profile.facts.map((f) => f.text.toLowerCase()));
+        const fresh = lines.filter((l) => !taken.has(l.toLowerCase()));
+        return { suggestions: fresh.map((text) => ({ group: 'Imported', kind: 'other' as const, text })), dropped: 0, alreadyInBank: lines.length - fresh.length, tokensUsed: 0 };
+      }),
+
     importResume: () =>
       run(() => {
         const suggestions = [
