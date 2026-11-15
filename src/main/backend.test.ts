@@ -285,7 +285,7 @@ describe('createBackend extractFacts', () => {
   const answer = JSON.stringify({ items: [{ section: 'Acme Corp - Senior Engineer', kind: 'experience', text: 'Cut p95 query time from 900 ms to 120 ms by redesigning the invoicing schema.' }] });
   const withEngine = (text = answer) => {
     const b = backendIn();
-    const complete = vi.fn(async (_request: { webRead?: boolean }) => ({ text, inputTokens: 800, outputTokens: 100 }));
+    const complete = vi.fn(async (_request: { webRead?: string }) => ({ text, inputTokens: 800, outputTokens: 100 }));
     b.deps.engines['claude-code'] = { check: async () => ({ ready: true, message: 'ok' }), complete };
     return { ...b, complete };
   };
@@ -309,7 +309,7 @@ describe('createBackend extractFacts', () => {
   it('lets Claude Code read a link, and refuses LinkedIn before any call', async () => {
     const { api, complete } = withEngine();
     await api.extractFacts({ kind: 'link', value: 'https://jane.dev' });
-    expect(complete).toHaveBeenCalledWith(expect.objectContaining({ webRead: true }));
+    expect(complete).toHaveBeenCalledWith(expect.objectContaining({ webRead: 'https://jane.dev' }));
     await expect(api.extractFacts({ kind: 'link', value: 'https://www.linkedin.com/in/jane' })).rejects.toThrow(/paste/i);
     expect(complete).toHaveBeenCalledTimes(1);
   });

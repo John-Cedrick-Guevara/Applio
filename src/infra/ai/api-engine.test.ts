@@ -81,7 +81,7 @@ describe('Anthropic API engine', () => {
 
   it('refuses a web read, which only Claude Code can do, without calling the API', async () => {
     const { engine, sent } = setup();
-    await expect(engine.complete({ prompt: 'x', jobIds: [], tools: false, webRead: true })).rejects.toThrow('Claude Code');
+    await expect(engine.complete({ prompt: 'x', jobIds: [], tools: false, webRead: 'https://jane.dev' })).rejects.toThrow('Claude Code');
     expect(sent).toHaveLength(0);
   });
 

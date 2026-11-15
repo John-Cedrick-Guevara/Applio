@@ -40,6 +40,18 @@ describe('extractFacts from pasted text', () => {
     expect(result.dropped).toBe(1);
   });
 
+  it('does not accept a skill that only appears inside another word', async () => {
+    const { ports } = setup(reply([{ section: 'Skills', kind: 'skills', text: 'Rust' }, { section: 'Skills', kind: 'skills', text: 'C' }]));
+    const result = await extractFacts({ kind: 'text', value: 'I do not trust cache layers.' }, ports);
+    expect(result.suggestions).toEqual([]);
+    expect(result.dropped).toBe(2);
+  });
+
+  it('accepts a skill written with symbols, next to punctuation', async () => {
+    const { ports } = setup(reply([{ section: 'Skills', kind: 'skills', text: 'C++' }]));
+    expect((await extractFacts({ kind: 'text', value: 'Skills: Rust, C++, Go.' }, ports)).suggestions).toHaveLength(1);
+  });
+
   it('keeps a suggestion that differs from the source only in case, spacing and bullets', async () => {
     const { ports } = setup(reply([{ section: 'Acme', kind: 'experience', text: 'led  ON-CALL for payments across three time zones.' }]));
     expect((await extractFacts({ kind: 'text', value: SOURCE }, ports)).suggestions).toHaveLength(1);
@@ -107,7 +119,7 @@ describe('extractFacts from a link', () => {
   it('lets Claude read the page itself, with the web read on and Applio tools off', async () => {
     const { ai, ports } = setup(reply(good));
     const result = await extractFacts(link, ports);
-    expect(ai.mock.calls[0]![0]).toMatchObject({ step: 'facts', webRead: true, tools: false });
+    expect(ai.mock.calls[0]![0]).toMatchObject({ step: 'facts', webRead: link.value, tools: false });
     expect(ai.mock.calls[0]![0].prompt).toContain(link.value);
     expect(result.suggestions).toHaveLength(2);
   });
@@ -126,6 +138,12 @@ describe('extractFacts from a link', () => {
   it('refuses platform links before any call and says to paste the text', async () => {
     const { ai, ports } = setup(reply(good), { isBlockedLink: () => true });
     await expect(extractFacts({ kind: 'link', value: 'https://www.linkedin.com/in/jane' }, ports)).rejects.toThrow(/paste/i);
+    expect(ai).not.toHaveBeenCalled();
+  });
+
+  it('refuses a link longer than any real address before any call', async () => {
+    const { ai, ports } = setup(reply(good));
+    await expect(extractFacts({ kind: 'link', value: `https://jane.dev/${'a'.repeat(2100)}` }, ports)).rejects.toThrow('https');
     expect(ai).not.toHaveBeenCalled();
   });
 

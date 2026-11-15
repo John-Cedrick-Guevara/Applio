@@ -136,10 +136,11 @@ describe('Claude Code engine', () => {
   });
 
   it('reads a web page with the web read tool alone: no Applio server, no other tool, hooks off', async () => {
-    await engine().complete({ prompt: 'Read https://jane.dev', jobIds: [], tools: false, webRead: true });
+    await engine().complete({ prompt: 'Read https://jane.dev', jobIds: [], tools: false, webRead: 'https://jane.dev/portfolio' });
     const { args } = seen();
     expect(args[args.indexOf('--tools') + 1]).toBe('WebFetch');
-    expect(args[args.indexOf('--allowedTools') + 1]).toBe('WebFetch');
+    // The harness, not the prompt, keeps Claude on the pasted page's host.
+    expect(args[args.indexOf('--allowedTools') + 1]).toBe('WebFetch(domain:jane.dev)');
     expect(args.filter((a) => a === '--allowedTools')).toHaveLength(1);
     expect(args[args.indexOf('--mcp-config') + 1]).toBe('{"mcpServers":{}}');
     expect(JSON.parse(args[args.indexOf('--settings') + 1]!)).toEqual({ disableAllHooks: true });

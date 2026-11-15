@@ -62,7 +62,7 @@ export function createApiEngine({ apiKey, client = (key) => new Anthropic({ apiK
   };
 
   return {
-    async complete({ system, prompt, jobIds, tools: useTools = true, webRead = false }) {
+    async complete({ system, prompt, jobIds, tools: useTools = true, webRead }) {
       // The API has no page reading here; refusing early beats a call that can't do what was asked.
       if (webRead) throw new EngineError('Reading a link needs Claude Code as the AI engine (Settings). Paste the page text instead.');
       const api = connect();

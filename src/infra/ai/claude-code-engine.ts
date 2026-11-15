@@ -72,7 +72,7 @@ const count = (v: unknown) => (typeof v === 'number' ? v : 0);
  */
 export function createClaudeCodeEngine(options: Options): AiEngine {
   return {
-    async complete({ system, prompt, jobIds, tools = true, webRead = false }) {
+    async complete({ system, prompt, jobIds, tools = true, webRead }) {
       const args = [
         '-p', '--output-format', 'stream-json', '--verbose', '--strict-mcp-config',
         // A tool-free call (scoring) loads no MCP server at all: one turn, and no tool definitions to pay for.
@@ -80,7 +80,7 @@ export function createClaudeCodeEngine(options: Options): AiEngine {
         // Built-in tools stay off, except the web read for the one call that names a page for it.
         '--tools', webRead ? 'WebFetch' : '',
         // Print mode denies any tool needing a permission prompt, so pre-allow Applio's server (`applio`) and nothing else.
-        ...(tools ? ['--allowedTools', 'mcp__applio'] : webRead ? ['--allowedTools', 'WebFetch'] : []),
+        ...(tools ? ['--allowedTools', 'mcp__applio'] : webRead ? ['--allowedTools', `WebFetch(domain:${new URL(webRead).hostname})`] : []),
         // The operator's own hooks (from their Claude Code settings and plugins) must not run inside
         // Applio's calls: they add tokens, change behavior, and can run commands.
         '--settings', JSON.stringify({ disableAllHooks: true }),
