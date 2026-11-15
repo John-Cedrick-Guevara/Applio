@@ -180,13 +180,13 @@ export function createMockApi({ latencyMs = 250, now = () => new Date(), sendFai
         return transition(job, statusBeforeTrash(job.history), 'Restored from the Trash');
       }),
 
-    redraft: (jobId) =>
+    redraft: (jobId, { part }) =>
       run(() => {
         const job = findJob(jobId);
         if (job.status !== 'drafted') throw new Error('Only a draft waiting in Review can be redrafted.');
         const draft = drafts.find((d) => d.jobId === jobId);
         if (draft) draft.profileVersion = versionNow();
-        return transition(job, 'drafted', 'Redrafted from your current profile');
+        return transition(job, 'drafted', `Redrafted the ${part === 'resume' ? 'résumé' : part === 'letter' ? 'letter' : 'résumé and letter'}`);
       }),
 
     saveDraftFiles: (jobId) =>

@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { createJobsRepo, createProfileRepo, createQuestionsRepo, createSettingsRepo, openDatabase } from '../infra/db';
+import { createJobsRepo, createProfileRepo, createQuestionsRepo, createRedraftsRepo, createSettingsRepo, openDatabase } from '../infra/db';
 import { seedJobs } from '../shared/mock/fixtures';
 import type { Job } from '../shared/types';
 import { createToolPorts } from './db-ports';
@@ -39,6 +39,17 @@ describe('tools over the Applio database', () => {
     const profile = createProfileRepo(db);
     expect(profile.listFacts()[0]?.timesUsed).toBe(1);
     expect(profile.listAnswers()[0]?.timesReused).toBe(3);
+  });
+
+  it('replace only the redrafted part, clear the pending request, and keep the job drafted', () => {
+    const { call, db, jobs, job } = setup();
+    call('save_draft', { jobId: job.id, kind: 'cover-letter', headline: 'h', summary: 's', resume: [{ group: 'Acme', items: [{ text: 'Cut API latency 40%', factId: 'f1' }] }], coverLetter: 'Dear team' });
+    const redrafts = createRedraftsRepo(createSettingsRepo(db));
+    redrafts.save(job.id, { part: 'letter', instruction: 'Warmer' });
+    call('save_draft', { jobId: job.id, kind: 'cover-letter', coverLetter: 'Hello Acme' });
+    expect(db.prepare('SELECT headline, cover_letter FROM drafts').get()).toEqual({ headline: 'h', cover_letter: 'Hello Acme' });
+    expect(redrafts.get(job.id)).toBeUndefined();
+    expect(jobs.get(job.id)?.status).toBe('drafted');
   });
 
   it("log a note without changing the job's status", () => {

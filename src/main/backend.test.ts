@@ -719,9 +719,141 @@ describe('createBackend discovery', () => {
     expect((await api.getDraft(job.id))?.check).toMatchObject({ stale: false, unverified: [], forbidden: [] });
     await api.saveFact({ group: 'Acme — Engineer', text: 'Led the billing migration' });
     expect((await api.getDraft(job.id))?.check?.stale).toBe(true);
-    await api.redraft(job.id);
-    await vi.waitFor(async () => expect((await api.getJob(job.id)).status).toBe('drafted'));
-    expect((await api.getDraft(job.id))?.check?.stale).toBe(false);
+    await api.redraft(job.id, { part: 'both' });
+    await vi.waitFor(async () => expect((await api.getDraft(job.id))?.check?.stale).toBe(false));
+    expect((await api.getJob(job.id)).status).toBe('drafted');
+  });
+
+  describe('redrafting by hand, with the operator\'s instructions', () => {
+    type Drafted = Awaited<ReturnType<typeof draftedBackend>>;
+    /** A fake Claude for redrafts: records prompts and lets each test decide what it saves. */
+    const redrafting = async (b: Drafted, on: (call: (input: unknown) => string, prompt: string, jobId: string, factId: string) => unknown) => {
+      const factId = (await b.api.getProfile()).facts[0]!.id;
+      const prompts: string[] = [];
+      b.deps.engines['claude-code'] = {
+        check: async () => ({ ready: true, message: 'ok' }),
+        complete: async ({ prompt, jobIds }) => {
+          prompts.push(prompt);
+          const tools = createTools(createToolPorts(b.deps.db, jobIds, () => new Date()));
+          for (const jobId of jobIds) await on((input) => tools.find((t) => t.name === 'save_draft')!.call(input), prompt, jobId, factId);
+          return { text: 'done', inputTokens: 900, outputTokens: 100 };
+        },
+      };
+      return prompts;
+    };
+    const newResume = (jobId: string, factId: string) => ({ jobId, kind: 'cover-letter', headline: 'New headline', summary: 'New summary', resume: [{ group: 'Acme — Engineer', items: [{ text: 'Cut latency 40%', factId }] }] });
+
+    it('writes only the letter when only the letter is chosen, with the instruction, and keeps the résumé', async () => {
+      const b = await draftedBackend();
+      const prompts = await redrafting(b, (call, _p, jobId) => call({ jobId, kind: 'cover-letter', coverLetter: 'A warmer letter.' }));
+      await b.api.redraft(b.job.id, { part: 'letter', instruction: 'Make it warmer' });
+      await vi.waitFor(async () => expect((await b.api.getDraft(b.job.id))?.coverLetter).toBe('A warmer letter.'));
+      expect(await b.api.getDraft(b.job.id)).toMatchObject({ headline: 'Backend engineer', summary: 's' });
+      expect(prompts[0]).toContain('Do not write the résumé');
+      expect(prompts[0]).toContain('Make it warmer');
+      expect((await b.api.getJob(b.job.id)).status).toBe('drafted');
+      expect((await b.api.getJob(b.job.id)).tokensUsed).toBeGreaterThanOrEqual(1000);
+    });
+
+    it("keeps the operator's own edit of the letter when only the résumé is redrafted, and prints the files again", async () => {
+      const b = await draftedBackend();
+      await b.api.updateCoverLetter(b.job.id, 'My own words.');
+      await redrafting(b, (call, _p, jobId, factId) => call(newResume(jobId, factId)));
+      const prints = vi.mocked(b.deps.printPdf).mock.calls.length;
+      await b.api.redraft(b.job.id, { part: 'resume' });
+      await vi.waitFor(async () => expect((await b.api.getDraft(b.job.id))?.headline).toBe('New headline'));
+      expect(await b.api.getDraft(b.job.id)).toMatchObject({ coverLetter: 'My own words.', edited: true });
+      await vi.waitFor(() => expect(vi.mocked(b.deps.printPdf).mock.calls.length).toBeGreaterThan(prints));
+    });
+
+    it('adds the fact the operator gives to the bank before Claude is called, so it can be cited', async () => {
+      const b = await draftedBackend();
+      const seen: string[] = [];
+      await redrafting(b, async (call, _p, jobId) => {
+        const added = (await b.api.getProfile()).facts.find((f) => f.text === 'Led a team of 5');
+        seen.push(added?.group ?? 'missing');
+        call({ jobId, kind: 'cover-letter', headline: 'h2', summary: 's2', resume: [{ group: 'Acme — Engineer', items: [{ text: 'Led a team of 5', factId: added!.id }] }] });
+      });
+      await b.api.redraft(b.job.id, { part: 'resume', fact: { group: 'Acme — Engineer', text: ' Led a team of 5 ' } });
+      await vi.waitFor(async () => expect((await b.api.getDraft(b.job.id))?.headline).toBe('h2'));
+      expect(seen).toEqual(['Acme — Engineer']);
+    });
+
+    it('keeps the old draft, drafted and approvable, when the redraft fails, and allows another try', async () => {
+      const b = await draftedBackend();
+      await redrafting(b, () => {
+        throw new Error('Claude Code couldn\'t finish: 429');
+      });
+      await b.api.redraft(b.job.id, { part: 'both' });
+      await vi.waitFor(async () => expect((await b.api.getJob(b.job.id)).history.at(-1)?.note).toContain('Not drafted'));
+      expect(await b.api.getDraft(b.job.id)).toMatchObject({ headline: 'Backend engineer', coverLetter: 'Dear team' });
+      expect((await b.api.getJob(b.job.id)).status).toBe('drafted');
+      await expect(b.api.redraft(b.job.id, { part: 'letter' })).resolves.toBeDefined();
+    });
+
+    it('refuses to approve, and to redraft again, while a redraft is running', async () => {
+      const b = await draftedBackend();
+      let finish = () => {};
+      const gate = new Promise<void>((resolve) => { finish = resolve; });
+      await redrafting(b, async (call, _p, jobId) => {
+        await gate;
+        call({ jobId, kind: 'cover-letter', coverLetter: 'Later' });
+      });
+      await b.api.redraft(b.job.id, { part: 'letter' });
+      await expect(b.api.approveDraft(b.job.id)).rejects.toThrow(/being redrafted/);
+      await expect(b.api.redraft(b.job.id, { part: 'letter' })).rejects.toThrow(/already being redrafted/);
+      finish();
+      await vi.waitFor(async () => expect((await b.api.getDraft(b.job.id))?.coverLetter).toBe('Later'));
+    });
+
+    it('makes no AI call past the daily budget, keeps the old draft, and says why', async () => {
+      const b = await draftedBackend();
+      const prompts = await redrafting(b, (call, _p, jobId) => call({ jobId, kind: 'cover-letter', coverLetter: 'Never written' }));
+      await b.api.saveSettings({ dailyTokenBudget: 1000 });
+      await b.api.redraft(b.job.id, { part: 'letter' });
+      await vi.waitFor(async () => expect((await b.api.getJob(b.job.id)).history.at(-1)?.note).toMatch(/^Not redrafted/));
+      expect(prompts).toEqual([]);
+      expect(await b.api.getDraft(b.job.id)).toMatchObject({ coverLetter: 'Dear team' });
+      expect((await b.api.getJob(b.job.id)).status).toBe('drafted');
+      await vi.waitFor(async () => expect((await b.api.getStatus()).drafting).toEqual([]));
+    });
+
+    it('refuses a job that is not waiting in Review', async () => {
+      const b = await draftedBackend();
+      await b.api.skipJob(b.job.id);
+      await expect(b.api.redraft(b.job.id, { part: 'both' })).rejects.toThrow('Only a draft waiting in Review can be redrafted.');
+    });
+
+    it('keeps the old draft while Claude asks, then resumes the same part with the answers', async () => {
+      const b = await draftedBackend();
+      const prompts = await redrafting(b, (call, prompt, jobId, factId) => {
+        if (!prompt.includes('answered')) call({ jobId, questions: ['Did you lead the migration?'] });
+        else call(newResume(jobId, factId));
+      });
+      await b.api.redraft(b.job.id, { part: 'resume' });
+      await vi.waitFor(async () => expect(await b.api.listQuestions()).toHaveLength(1));
+      expect(await b.api.getDraft(b.job.id)).toMatchObject({ headline: 'Backend engineer' });
+      await b.api.answerQuestions(b.job.id, [{ question: 'Did you lead the migration?', answer: 'Yes.' }]);
+      await vi.waitFor(async () => expect((await b.api.getDraft(b.job.id))?.headline).toBe('New headline'));
+      expect(prompts.at(-1)).toContain('Do not write the cover letter');
+      expect(await b.api.getDraft(b.job.id)).toMatchObject({ coverLetter: 'Dear team' });
+      expect((await b.api.getJob(b.job.id)).status).toBe('drafted');
+    });
+
+    it('never sends on its own after a redraft, even from an Autonomous source: the operator approves it', async () => {
+      const b = await draftedBackend();
+      await b.api.updateSource('remotive', { autonomy: 'autonomous' });
+      await b.api.saveSettings({ gmailAddress: 'sam@gmail.com' });
+      await b.api.setSecret('gmailAppPassword', PASSWORD);
+      b.deps.db.prepare("UPDATE jobs SET channel = 'email', apply_target = 'jobs@acme.com' WHERE id = ?").run(b.job.id);
+      await redrafting(b, (call, _p, jobId) => call({ jobId, kind: 'cover-letter', coverLetter: 'Redone' }));
+      const before = outbox.length;
+      await b.api.redraft(b.job.id, { part: 'letter' });
+      await vi.waitFor(async () => expect((await b.api.getDraft(b.job.id))?.coverLetter).toBe('Redone'));
+      await vi.waitFor(async () => expect((await b.api.getStatus()).drafting).toEqual([]));
+      expect(outbox).toHaveLength(before);
+      expect((await b.api.getJob(b.job.id)).status).toBe('drafted');
+    });
   });
 
   it('flags cover-letter lines that state something no fact does', async () => {

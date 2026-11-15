@@ -12,7 +12,7 @@ import { interviewPrep } from '../core/apply/interview-prep';
 import { silentApplications } from '../core/apply/no-reply';
 import { trackReplies } from '../core/apply/track-replies';
 import { gmailImap, readInbox, type InboxClient } from '../infra/email/inbox';
-import { approveDraft, sendByAts, sendByEmail, type ApplyPorts, type AtsOutcome } from '../core/apply/send-application';
+import { approveDraft, sendByAts, sendByEmail, SendBlockedError, type ApplyPorts, type AtsOutcome } from '../core/apply/send-application';
 import type { FillInput } from '../core/apply/ats-plan';
 import { folderFor, jobMarkdown } from '../core/generation/application-folder';
 import { describeRoute } from '../shared/apply-route';
@@ -38,7 +38,7 @@ import { fetchPublicPage, isPlatformUrl } from '../infra/web/fetch-page';
 import { CHECKS_KEY, createSettingsService } from '../core/settings/settings-service';
 import { checkDraft, profileVersion } from '../shared/draft-check';
 import {
-  createActivityRepo, createDraftsRepo, createJobsRepo, createSendsRepo, createPollsRepo, createProfileRepo, createSettingsRepo, createSourcesRepo, createQuestionsRepo, transaction,
+  createActivityRepo, createDraftsRepo, createJobsRepo, createSendsRepo, createPollsRepo, createProfileRepo, createSettingsRepo, createSourcesRepo, createQuestionsRepo, createRedraftsRepo, transaction,
 } from '../infra/db';
 import { createGmail, type MailTransport } from '../infra/email/gmail';
 import { findJobFolder, writeApplication } from '../infra/fs/application-files';
@@ -100,6 +100,8 @@ const GMAIL_DAILY_CAP = 100;
 /** A one-page PDF prints in under a second; a minute means the print hung. */
 const PRINT_DEADLINE_MS = 60_000;
 /** Statuses a job can be skipped from: anything before it was sent. */
+/** What a redraft's part is called in the job's timeline. */
+const REDRAFT_PART = { resume: 'résumé', letter: 'letter', both: 'résumé and letter' } as const;
 const SKIPPABLE = new Set(['found', 'scored', 'drafted', 'approved']);
 /** Statuses the operator can log a manual application from (SPEC F5 manual handoff). */
 const MANUAL_APPLY_FROM = new Set(['scored', 'drafted', 'approved']);
@@ -113,6 +115,7 @@ const MANUAL_APPLY_FROM = new Set(['scored', 'drafted', 'approved']);
 export function createBackend(getWindow: () => BrowserWindow | null, { db, secrets, sources, httpFor, onStatus, setLaunchAtLogin, printPdf, mailTransport, submitAts, fillPlatformForm, inbox = gmailImap, telegramFetch = (url, init) => fetch(url, init), showRoute = () => {}, pageFetch = (url, init) => fetch(url, init), engines }: BackendDeps): Backend {
   const kv = createSettingsRepo(db);
   const questions = createQuestionsRepo(kv);
+  const redrafts = createRedraftsRepo(kv);
   /** The operator's answers for one job's next draft, kept so a later re-draft still has them. */
   const answersKey = (jobId: string) => `answers:${jobId}`;
   const jobs = createJobsRepo(db);
@@ -150,6 +153,12 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     },
   });
 
+  /** Approval from the app or Telegram. Never while a redraft runs: the draft on screen is about to change. */
+  const approve = async (jobId: string, by?: 'you-telegram') => {
+    if (draftingNow.has(jobId)) throw new SendBlockedError('This draft is being redrafted. Approve it once the new one lands.');
+    return approveDraft(jobId, applyPorts, by);
+  };
+
   // Telegram (SPEC F9): built from the saved token and chat each time, so a settings change applies at once.
   const telegram = () => {
     const chatId = settings.getSettings().telegramChatId;
@@ -163,7 +172,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       wasNotified: (key) => kv.get(`notified:${key}`) === true,
       markNotified: (key) => kv.set(`notified:${key}`, true),
       approve: async (jobId) => {
-        const job = await approveDraft(jobId, applyPorts, 'you-telegram');
+        const job = await approve(jobId, 'you-telegram');
         if (job.status === 'applied') return job.channel === 'email' ? `Sent to ${job.applyTarget}.` : 'Form submitted.';
         // Platform and career-site jobs are never sent from here (MNB-1): the operator finishes them in the app.
         showRoute(`/handoff/${jobId}`);
@@ -243,11 +252,29 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
    * their click returns at once; open pages see it in `drafting` until it lands.
    */
   const draftingNow = new Map<string, string>();
+  /**
+   * Ends a hand redraft that didn't save: the old draft stays as it was, ready to approve, and the
+   * next redraft starts clean. If Claude asked questions instead, the job moves to the questions
+   * list (its draft kept) and the redraft waits for the answers.
+   */
+  const settleRedraft = (id: string, stopped?: string) => {
+    if (!redrafts.get(id)) return;
+    if (questions.get(id)) {
+      jobs.transition(id, { status: 'scored', at: new Date().toISOString(), note: 'Waiting on your answers. Your current draft is kept.' });
+      return;
+    }
+    redrafts.clear(id);
+    if (stopped) note(id, `Not redrafted: ${stopped}`);
+  };
   const draftInBackground = (id: string) => {
     draftingNow.set(id, new Date().toISOString());
     pushStatus();
     void draftJobs([id], {}, draftPorts)
-      .catch((err: unknown) => note(id, `Not drafted: ${err instanceof Error ? err.message : String(err)}`))
+      .then((result) => settleRedraft(id, result.stopped))
+      .catch((err: unknown) => {
+        note(id, `Not drafted: ${err instanceof Error ? err.message : String(err)}`);
+        settleRedraft(id);
+      })
       .finally(() => {
         draftingNow.delete(id);
         pushStatus();
@@ -259,13 +286,14 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     ai: (request) => ai.run(request),
     hasDraft: (id) => drafts.get(id) !== undefined,
     hasQuestions: (id) => questions.get(id) !== undefined,
+    redraft: (id) => redrafts.get(id),
     answers: (id) => (kv.get(answersKey(id)) as QuestionAnswer[] | undefined) ?? [],
     job: (id) => jobs.get(id),
     autonomy: (sourceId) => sourcesRepo.get(sourceId)?.autonomy ?? 'draft',
     note: (id, text) => note(id, text),
     addTokens: (id, tokens) => jobs.update(id, { tokensUsed: (jobs.get(id)?.tokensUsed ?? 0) + tokens }),
     // The draft stands even if its files fail; the note says why, and Review can retry later.
-    onDrafted: async (id) => {
+    onDrafted: async (id, { redrafted }) => {
       try {
         await saveFiles(id);
         // The folder is set now; tell open pages so Approve and Open PDF come on without a reload.
@@ -274,7 +302,8 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
         note(id, `Couldn't save the files: ${err instanceof Error ? err.message : String(err)}`);
         return;
       }
-      await sendOnItsOwn(id);
+      // A hand redraft is shown to the operator again; nothing goes out until they approve it.
+      if (!redrafted) await sendOnItsOwn(id);
     },
   };
 
@@ -674,13 +703,17 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       return withCheck(next);
     },
 
-    redraft: later((jobId) => {
+    redraft: later((jobId, { part, instruction, fact }) => {
       const job = getJob(jobId);
       if (job.status !== 'drafted') throw new Error('Only a draft waiting in Review can be redrafted.');
-      // Back to scored, so the drafting run treats it like any other match; the old draft goes, so it can't be sent by mistake.
+      if (draftingNow.has(jobId)) throw new Error('This job is already being redrafted.');
+      if (!drafts.get(jobId)) throw new Error('This job has no draft to redraft.');
+      const said = instruction?.trim();
+      // The old draft stays until the new part saves; the fact joins the bank first so Claude can cite it.
       transaction(db, () => {
-        drafts.remove(jobId);
-        jobs.transition(jobId, { status: 'scored', at: new Date().toISOString(), note: 'Redrafting from your current profile' });
+        if (fact) profile.saveFact({ group: fact.group, text: fact.text.trim() });
+        redrafts.save(jobId, { part, ...(said ? { instruction: said } : {}) });
+        jobs.transition(jobId, { status: job.status, at: new Date().toISOString(), note: `Redrafting the ${REDRAFT_PART[part]}${fact ? ' with a fact you added to Profile' : ''}` });
       });
       draftInBackground(jobId);
       return getJob(jobId);
@@ -738,7 +771,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
       return settings.getSettings();
     },
 
-    approveDraft: (jobId) => approveDraft(jobId, applyPorts),
+    approveDraft: (jobId) => approve(jobId),
 
     scoreJob: async (jobId) => {
       if (getJob(jobId).status !== 'found') throw new Error('Only jobs not scored yet can be scored.');

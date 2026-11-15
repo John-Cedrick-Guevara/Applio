@@ -300,3 +300,17 @@
 .doc-unverified ul {
   margin-top: var(--space-2);
 }
+
+/* Redraft: which part, what to change, an optional fact. Sits above the role summary, like the state card. */
+.redraft-form {
+  display: grid;
+  gap: 16px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.redraft-form fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}

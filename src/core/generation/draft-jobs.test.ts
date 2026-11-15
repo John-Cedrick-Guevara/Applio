@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Autonomy, EmploymentType } from '../../shared/types';
+import type { Autonomy, EmploymentType, RedraftRequest } from '../../shared/types';
 import { QuotaExceededError, type AiRequest } from '../ai/ai-service';
 import { DRAFT_SYSTEM, draftJobs, type DraftPorts } from './draft-jobs';
 
@@ -10,17 +10,22 @@ const setup = (jobs: Record<string, Fake>, autonomy: Record<string, Autonomy> = 
   const drafted = new Set<string>();
   const asked = new Set<string>(Object.keys(jobs).filter((id) => jobs[id]?.waiting));
   const requests: AiRequest[] = [];
+  const redrafts = new Map<string, RedraftRequest>();
   const ports: DraftPorts = {
     ai: vi.fn(async (req: AiRequest) => {
       requests.push(req);
       for (const id of req.jobIds) {
         if (jobs[id]?.asks) asked.add(id);
-        else if (jobs[id]?.saves !== false) drafted.add(id);
+        else if (jobs[id]?.saves !== false) {
+          drafted.add(id);
+          redrafts.delete(id);
+        }
       }
       return { text: 'done', inputTokens: 3000, outputTokens: 1000 };
     }),
     hasDraft: (id) => drafted.has(id),
     hasQuestions: (id) => asked.has(id),
+    redraft: (id) => redrafts.get(id),
     answers: () => [],
     job: (id) => jobs[id],
     autonomy: (sourceId) => autonomy[sourceId] ?? 'draft',
@@ -28,7 +33,7 @@ const setup = (jobs: Record<string, Fake>, autonomy: Record<string, Autonomy> = 
     addTokens: vi.fn(),
     onDrafted: vi.fn(async () => {}),
   };
-  return { ports, requests };
+  return { ports, requests, drafted, redrafts };
 };
 
 describe('draftJobs', () => {
@@ -89,7 +94,7 @@ describe('draftJobs', () => {
     const { ports } = setup({ j1: { employmentType: 'full-time', sourceId: 'r' }, j2: { employmentType: 'full-time', sourceId: 'r', saves: false } });
     await draftJobs(['j1', 'j2'], {}, ports);
     expect(ports.onDrafted).toHaveBeenCalledTimes(1);
-    expect(ports.onDrafted).toHaveBeenCalledWith('j1');
+    expect(ports.onDrafted).toHaveBeenCalledWith('j1', { redrafted: false });
   });
 
   it('never drafts a job from a Notify-only source', async () => {
@@ -125,5 +130,73 @@ describe('draftJobs', () => {
     expect(await draftJobs(['j1', 'j2'], {}, ports)).toEqual({ drafted: 0, notDrafted: 2, notifyOnly: 0, asked: 0, stopped: 'Budget used up.' });
     expect(ports.ai).toHaveBeenCalledTimes(1);
     expect(ports.note).not.toHaveBeenCalled();
+  });
+
+  describe('redrafting for the operator', () => {
+    const full = { employmentType: 'full-time', sourceId: 'remotive' } as const;
+
+    it('redrafts a job that already has a draft, asking for only the résumé when that is the part chosen', async () => {
+      const { ports, requests, drafted, redrafts } = setup({ j1: full });
+      drafted.add('j1');
+      redrafts.set('j1', { part: 'resume' });
+      expect(await draftJobs(['j1'], {}, ports)).toMatchObject({ drafted: 1, notDrafted: 0 });
+      expect(requests[0]!.prompt).toContain('Redraft the résumé');
+      expect(requests[0]!.prompt).toContain('Do not write the cover letter');
+      expect(ports.onDrafted).toHaveBeenCalledWith('j1', { redrafted: true });
+    });
+
+    it('asks for only the proposal when the letter is chosen on a freelance job', async () => {
+      const { ports, requests, drafted, redrafts } = setup({ j1: { employmentType: 'freelance', sourceId: 'remotive' } });
+      drafted.add('j1');
+      redrafts.set('j1', { part: 'letter' });
+      await draftJobs(['j1'], {}, ports);
+      expect(requests[0]!.prompt).toContain('Redraft the proposal');
+      expect(requests[0]!.prompt).toContain('Do not write the résumé');
+    });
+
+    it('asks for everything when both parts are chosen', async () => {
+      const { ports, requests, drafted, redrafts } = setup({ j1: full });
+      drafted.add('j1');
+      redrafts.set('j1', { part: 'both' });
+      await draftJobs(['j1'], {}, ports);
+      expect(requests[0]!.prompt).toContain('Redraft the résumé and the cover letter');
+      expect(requests[0]!.prompt).not.toContain('Do not write');
+    });
+
+    it("passes the operator's instruction as theirs, and nothing when there is none", async () => {
+      const { ports, requests, drafted, redrafts } = setup({ j1: full, j2: full });
+      for (const id of ['j1', 'j2']) drafted.add(id);
+      redrafts.set('j1', { part: 'letter', instruction: 'Make it warmer' });
+      redrafts.set('j2', { part: 'letter' });
+      await draftJobs(['j1', 'j2'], {}, ports);
+      expect(requests[0]!.prompt).toContain("The operator's instruction for this redraft (theirs, not from the post):\nMake it warmer");
+      expect(requests[1]!.prompt).not.toContain('instruction');
+    });
+
+    it("keeps the operator's answers to Claude's questions when a redraft resumes after them", async () => {
+      const { ports, requests, drafted, redrafts } = setup({ j1: full });
+      drafted.add('j1');
+      redrafts.set('j1', { part: 'resume' });
+      ports.answers = () => [{ question: 'Which stack?', answer: 'Go' }];
+      await draftJobs(['j1'], {}, ports);
+      expect(requests[0]!.prompt).toContain('Q: Which stack?\nA: Go');
+    });
+
+    it('notes a redraft that never saved, so the old draft is not mistaken for a new one', async () => {
+      const { ports, drafted, redrafts } = setup({ j1: { ...full, saves: false } });
+      drafted.add('j1');
+      redrafts.set('j1', { part: 'both' });
+      expect(await draftJobs(['j1'], {}, ports)).toMatchObject({ drafted: 0, notDrafted: 1 });
+      expect(ports.note).toHaveBeenCalledWith('j1', expect.stringContaining('Not drafted'));
+      expect(ports.onDrafted).not.toHaveBeenCalled();
+    });
+
+    it('waits for answers when Claude asks during a redraft, without a second try', async () => {
+      const { ports, requests, drafted, redrafts } = setup({ j1: { ...full, asks: true } });
+      drafted.add('j1');
+      redrafts.set('j1', { part: 'resume' });
+      expect(await draftJobs(['j1'], {}, ports)).toMatchObject({ asked: 1, drafted: 0 });
+      expect(requests).toHaveLength(1);
+    });
   });
 });

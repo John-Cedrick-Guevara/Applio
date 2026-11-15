@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_PREFERENCES } from '../shared/defaults';
 import { seedJobs } from '../shared/mock/fixtures';
-import type { Draft, Job } from '../shared/types';
+import type { Draft, Job, RedraftRequest } from '../shared/types';
 import { createTools, type ToolPorts } from './tools';
 
 const NOW = new Date('2026-11-06T09:00:00.000Z');
 const [inScope, outOfScope] = seedJobs(NOW) as [Job, Job, ...Job[]];
 
-const setup = () => {
+const setup = (redraft?: RedraftRequest, old?: Draft) => {
   const ports: ToolPorts = {
     scope: new Set([inScope.id]),
     profile: () => ({
@@ -24,6 +24,8 @@ const setup = () => {
     job: (id) => [inScope, outOfScope].find((j) => j.id === id),
     saveMatch: vi.fn(),
     saveDraft: vi.fn(),
+    redraft: () => redraft,
+    draft: () => old,
     saveQuestions: vi.fn(),
     logEvent: vi.fn(),
     now: () => NOW,
@@ -218,5 +220,67 @@ describe('MCP tools', () => {
     ports.job = (id) => (id === inScope.id ? { ...inScope, description: 'The role\nBuild APIs.\nWhat we offer\n- Free lunch' } : undefined);
     const [job] = JSON.parse(call('get_jobs')) as { description: string }[];
     expect(job!.description).toBe('The role\nBuild APIs.');
+  });
+
+  describe('save_draft during an operator redraft', () => {
+    const old: Draft = {
+      jobId: inScope.id, kind: 'cover-letter', headline: 'Old headline', summary: 'Old summary.',
+      resume: [{ heading: 'Acme — Engineer', group: 'Acme — Engineer', items: [{ text: 'Cut API latency 40%', factId: 'f1' }] }],
+      coverLetter: 'My own edited letter.', edited: true, subject: 'Old subject', answers: [], createdAt: '2026-11-01T00:00:00.000Z',
+      keywords: { claimed: [], gaps: ['Go'] },
+    };
+    const saved = (ports: ToolPorts) => vi.mocked(ports.saveDraft).mock.calls[0]![0];
+    const resumeOnly = { jobId: inScope.id, kind: 'cover-letter', headline: 'New headline', summary: 'New summary.', resume: draftInput.resume, keywords: draftInput.keywords };
+    const letterOnly = { jobId: inScope.id, kind: 'cover-letter', coverLetter: 'A warmer letter.', subject: 'New subject' };
+
+    it('takes the new résumé and keeps the letter, subject and the operator\'s edit as they were', () => {
+      const { call, ports } = setup({ part: 'resume' }, old);
+      expect(call('save_draft', resumeOnly)).toBe('Saved.');
+      expect(saved(ports)).toMatchObject({ headline: 'New headline', summary: 'New summary.', keywords: draftInput.keywords, coverLetter: 'My own edited letter.', subject: 'Old subject', edited: true, createdAt: NOW.toISOString() });
+    });
+
+    it('takes the new letter and keeps the résumé as it was', () => {
+      const { call, ports } = setup({ part: 'letter' }, old);
+      call('save_draft', letterOnly);
+      expect(saved(ports)).toMatchObject({ coverLetter: 'A warmer letter.', subject: 'New subject', edited: false, headline: 'Old headline', summary: 'Old summary.', resume: old.resume, keywords: old.keywords });
+    });
+
+    it('keeps the old subject when a new letter brings none', () => {
+      const { call, ports } = setup({ part: 'letter' }, old);
+      call('save_draft', { jobId: inScope.id, kind: 'cover-letter', coverLetter: 'A warmer letter.' });
+      expect(saved(ports).subject).toBe('Old subject');
+    });
+
+    it('replaces everything when both parts are chosen, so the full draft is required', () => {
+      const { call, ports } = setup({ part: 'both' }, old);
+      expect(() => call('save_draft', resumeOnly)).toThrow(/coverLetter/);
+      call('save_draft', draftInput);
+      expect(saved(ports)).toMatchObject({ headline: 'Backend engineer', coverLetter: 'Dear team…', edited: false });
+    });
+
+    it('refuses a part-only save that lacks the chosen part, naming what is missing', () => {
+      expect(() => setup({ part: 'resume' }, old).call('save_draft', letterOnly)).toThrow(/headline|summary|resume/);
+      expect(() => setup({ part: 'letter' }, old).call('save_draft', resumeOnly)).toThrow(/coverLetter/);
+    });
+
+    it('still refuses a line citing a fact that is not in the bank, leaving the old draft alone', () => {
+      const { call, ports } = setup({ part: 'resume' }, old);
+      const invented = { ...resumeOnly, resume: [{ group: 'Acme — Engineer', items: [{ text: 'Cut API latency 40%', factId: 'zz' }] }] };
+      expect(() => call('save_draft', invented)).toThrow('These fact IDs are not in the fact bank: zz');
+      expect(ports.saveDraft).not.toHaveBeenCalled();
+    });
+
+    it('still holds a new letter to the 250-word limit', () => {
+      const { call } = setup({ part: 'letter' }, old);
+      expect(() => call('save_draft', { ...letterOnly, coverLetter: 'word '.repeat(251) })).toThrow(/under 250/);
+    });
+
+    it('refuses a part-only save when the job has no draft to keep', () => {
+      expect(() => setup({ part: 'letter' }).call('save_draft', letterOnly)).toThrow(/no draft/i);
+    });
+
+    it('is not affected when no redraft is pending: a partial draft is still refused', () => {
+      expect(() => setup().call('save_draft', letterOnly)).toThrow(/headline/);
+    });
   });
 });
