@@ -105,7 +105,7 @@ export function Sidebar() {
     <aside className="sidebar" data-collapsed={open ? 'false' : 'true'}>
       <div className="sidebar-head">
         <a className="sidebar-brand" href={`#${DEFAULT_PATH}`} aria-label="Applio, home" title="Applio">
-          <Logo tone="light" />
+          <Logo />
           <span className="sidebar-word">applio</span>
         </a>
         <button type="button" className="rail-toggle" aria-label={open ? 'Collapse sidebar' : 'Expand sidebar'} title={open ? 'Collapse sidebar' : 'Expand sidebar'} aria-expanded={open} onClick={toggle}>

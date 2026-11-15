@@ -18,6 +18,7 @@ mac:
   target:
     - target: dir
       arch: arm64
+  icon: build/icon.icns
   category: public.app-category.productivity
   # Ad-hoc signature: runs on this Mac (first launch: right-click → Open). A Developer ID is needed to distribute.
   identity: "-"

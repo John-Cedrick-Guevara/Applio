@@ -1,3 +1,4 @@
+import logoUrl from '../assets/logo.png';
 import type { SVGProps } from 'react';
 
 /**
@@ -48,18 +49,9 @@ export function Icon({ name, size = 16, strokeWidth = 1.6, ...rest }: { name: Ic
   );
 }
 
-/**
- * Applio mark (v5): an A whose crossbar becomes a lavender arrow, on a rounded tile.
- * `tone="light"` is a white tile for the dark rail; `"dark"` an ink tile for light surfaces.
- */
-export function Logo({ tone = 'dark', size = 34 }: { tone?: 'light' | 'dark'; size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 34 34" aria-hidden="true" className="logo" style={{ flex: 'none' }}>
-      <rect width="34" height="34" rx="10" style={{ fill: tone === 'light' ? 'var(--on-ink)' : 'var(--ink)' }} />
-      <path d="M7 26 14 8l7 18" fill="none" style={{ stroke: tone === 'light' ? 'var(--ink)' : 'var(--on-ink)' }} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M10.5 19H27M24 16l3 3-3 3" fill="none" style={{ stroke: 'var(--lavender-mark)' }} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+/** The Applio brand mark (docs/brand/applio-icon-1024.png, margin trimmed). */
+export function Logo({ size = 34 }: { size?: number }) {
+  return <img src={logoUrl} width={size} height={size} alt="" aria-hidden="true" className="logo" style={{ flex: 'none' }} />;
 }
 
 /** A file outline used for resume attachments. */
