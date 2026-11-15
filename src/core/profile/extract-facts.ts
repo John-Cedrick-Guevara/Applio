@@ -51,6 +51,17 @@ const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** Whether `fact` appears in `text` as whole words, so a skill like "C" or "Rust" isn't found inside "cache" or "trust". */
 const appearsIn = (fact: string, text: string) => new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(fact)}(?![\\p{L}\\p{N}])`, 'u').test(text);
 
+/** An https link on a plain domain name (letters, digits, dots, hyphens), so its host can safely scope the web read. */
+function isPlainHttpsLink(value: string): boolean {
+  if (value.length > MAX_LINK || /\s/.test(value)) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
 /** Case, spacing, bullets and curly quotes ignored, so a PDF's line wraps and bullets don't hide a match. */
 const normalize = (s: string) => s.toLowerCase().replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[•▪●◦‣·*]/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -68,7 +79,7 @@ export async function extractFacts(source: FactSource, ports: ExtractPorts): Pro
     if (!value) throw new AppError('source_empty', 'Paste your résumé or portfolio text first.');
     if (value.length > MAX_TEXT) throw new AppError('source_too_long', `That text is too long (${MAX_TEXT.toLocaleString('en-US')} characters max). Paste the most relevant part.`);
   } else {
-    if (value.length > MAX_LINK || !/^https:\/\/\S+$/i.test(value)) throw new AppError('link_invalid', 'Paste an https link, or the page text itself.');
+    if (!isPlainHttpsLink(value)) throw new AppError('link_invalid', 'Paste an https link, or the page text itself.');
     if (ports.isBlockedLink(value)) throw new AppError('platform_link', "Applio doesn't open pages on that site. Paste the text of your profile instead.");
     if (!ports.linksSupported()) throw new AppError('link_unsupported', 'Reading a link needs Claude Code as the AI engine (Settings). Paste the page text instead.');
   }

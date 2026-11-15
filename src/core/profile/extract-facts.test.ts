@@ -147,6 +147,14 @@ describe('extractFacts from a link', () => {
     expect(ai).not.toHaveBeenCalled();
   });
 
+  it('refuses a link whose host is not a plain domain name, before any call', async () => {
+    const { ai, ports } = setup(reply(good));
+    for (const value of ['https://*.com/x', 'https://[', 'https://localhost/x', 'https://a)b.com']) {
+      await expect(extractFacts({ kind: 'link', value }, ports)).rejects.toMatchObject({ code: 'link_invalid' });
+    }
+    expect(ai).not.toHaveBeenCalled();
+  });
+
   it('refuses anything that is not an https link before any call', async () => {
     const { ai, ports } = setup(reply(good));
     await expect(extractFacts({ kind: 'link', value: 'file:///etc/passwd' }, ports)).rejects.toThrow('https');
