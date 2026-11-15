@@ -44,6 +44,62 @@ describe('ProfilePage', () => {
     expect((await api.getProfile()).facts.some((f) => f.text === 'Rewritten fact')).toBe(false);
   });
 
+  describe('fact bank filter', () => {
+    const filter = (name: RegExp) => screen.getByRole('button', { name });
+
+    it('opens on All with counts, and narrows to one kind', async () => {
+      renderWithApp(<ProfilePage />);
+      await screen.findByRole('heading', { name: '[Previous Company] — Senior Software Engineer' });
+      expect(filter(/^All/)).toHaveAttribute('aria-pressed', 'true');
+      expect(filter(/^Projects/)).toHaveAccessibleName('Projects, 1 fact');
+      await userEvent.click(filter(/^Projects/));
+      expect(filter(/^Projects/)).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('heading', { name: 'Projects' })).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: '[Previous Company] — Senior Software Engineer' })).not.toBeInTheDocument();
+    });
+
+    it('says what is missing and what to do when a filter is empty', async () => {
+      const api = createMockApi({ latencyMs: 0 });
+      await api.deleteFact('f6'); // the only project fact
+      renderWithApp(<ProfilePage />, api);
+      await userEvent.click(await screen.findByRole('button', { name: /^Projects/ }));
+      expect(screen.getByText("No projects yet. Set a section's kind to Project with its Edit section button.")).toBeInTheDocument();
+    });
+
+    it('keeps the filter after editing a fact', async () => {
+      renderWithApp(<ProfilePage />);
+      await userEvent.click(await screen.findByRole('button', { name: /^Projects/ }));
+      await userEvent.click(screen.getByRole('button', { name: 'Edit fact' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(filter(/^Projects/)).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('preselects a section of the active kind when adding a fact', async () => {
+      renderWithApp(<ProfilePage />);
+      await userEvent.click(await screen.findByRole('button', { name: /^Projects/ }));
+      await userEvent.click(screen.getByRole('button', { name: 'Add fact' }));
+      expect(screen.getByLabelText('Add to')).toHaveValue('Projects');
+    });
+
+    it('adds, de-duplicates and removes skills', async () => {
+      const { api } = renderWithApp(<ProfilePage />);
+      await userEvent.click(await screen.findByRole('button', { name: /^Skills/ }));
+      await userEvent.type(screen.getByLabelText('New skill'), 'Rust{Enter}');
+      expect(await screen.findByText('Rust')).toBeInTheDocument();
+      await userEvent.type(screen.getByLabelText('New skill'), 'rust{Enter}');
+      expect((await api.getProfile()).skills.filter((x) => x.toLowerCase() === 'rust')).toHaveLength(1);
+      await userEvent.click(screen.getByRole('button', { name: 'Remove Rust' }));
+      await waitFor(async () => expect((await api.getProfile()).skills).not.toContain('Rust'));
+    });
+
+    it('refuses an empty skill', async () => {
+      renderWithApp(<ProfilePage />);
+      await userEvent.click(await screen.findByRole('button', { name: /^Skills/ }));
+      await userEvent.type(screen.getByLabelText('New skill'), '{Enter}');
+      expect(screen.getByRole('alert')).toHaveTextContent('Write a skill first.');
+    });
+  });
+
   it('lists saved answers and adds one', async () => {
     renderWithApp(<ProfilePage />);
     await userEvent.click(await screen.findByRole('tab', { name: /Answer bank/ }));

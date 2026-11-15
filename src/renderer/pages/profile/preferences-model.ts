@@ -1,4 +1,4 @@
-import type { EmploymentType, Fact, FactGroup, Preferences } from '../../../shared/types';
+import type { EmploymentType, Fact, FactGroup, FactGroupKind, Preferences } from '../../../shared/types';
 
 export type PayPeriod = 'hour' | 'month' | 'year';
 export const PAY_PERIODS: readonly PayPeriod[] = ['hour', 'month', 'year'];
@@ -90,6 +90,7 @@ export function fromDraft(d: PreferencesDraft, base: Preferences): { ok: true; v
 
 export interface FactSection {
   name: string;
+  kind?: FactGroupKind;
   meta: string;
   facts: Fact[];
 }
@@ -103,7 +104,21 @@ export function groupFacts(groups: FactGroup[], facts: Fact[]): FactSection[] {
     .map((g: FactGroup) => {
       const items = facts.filter((f) => f.group === g.name);
       const count = `${items.length} ${items.length === 1 ? 'fact' : 'facts'}`;
-      return { name: g.name, meta: g.dates ? `${g.dates} · ${count}` : count, facts: items };
+      return { name: g.name, ...(g.kind ? { kind: g.kind } : {}), meta: g.dates ? `${g.dates} · ${count}` : count, facts: items };
     })
     .filter((s) => s.facts.length > 0);
+}
+
+/** What the fact bank can be narrowed to; sections with no kind (or another kind) show under All only. */
+export type FactFilter = 'all' | 'experience' | 'project' | 'skills';
+
+/** The sections a filter shows. */
+export function filterSections(sections: FactSection[], filter: FactFilter): FactSection[] {
+  return filter === 'all' ? sections : sections.filter((s) => s.kind === filter);
+}
+
+/** Facts behind each filter; the skill chips count toward Skills and All. */
+export function factFilterCounts(sections: FactSection[], skills: readonly string[]): Record<FactFilter, number> {
+  const count = (filter: FactFilter) => filterSections(sections, filter).reduce((n, s) => n + s.facts.length, 0);
+  return { all: count('all') + skills.length, experience: count('experience'), project: count('project'), skills: count('skills') + skills.length };
 }

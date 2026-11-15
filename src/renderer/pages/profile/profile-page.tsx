@@ -64,7 +64,7 @@ function ProfileBody({ profile, onChange }: { profile: Profile; onChange: (patch
 
       <TabPanel idPrefix="profile" id="facts" active={tab === 'facts'}>
         <section className="card card-flush" aria-label="Fact bank">
-          <FactBank profile={profile} adding={adding.facts} onCloseAdd={() => setAddingFor('facts', false)} onChange={(facts) => onChange({ facts })} onGroupsChange={(factGroups) => onChange({ factGroups })} />
+          <FactBank profile={profile} adding={adding.facts} onCloseAdd={() => setAddingFor('facts', false)} onChange={(facts) => onChange({ facts })} onGroupsChange={(factGroups) => onChange({ factGroups })} onSkillsChange={(skills) => onChange({ skills })} />
         </section>
       </TabPanel>
       <TabPanel idPrefix="profile" id="answers" active={tab === 'answers'}>

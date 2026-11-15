@@ -267,3 +267,19 @@
   flex: none;
   width: auto;
 }
+
+.fact-filter {
+  margin: var(--space-3) var(--space-4);
+}
+
+.fact-empty {
+  padding: var(--space-4);
+}
+
+.chip-remove {
+  margin-left: var(--space-2);
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
