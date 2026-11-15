@@ -4,7 +4,7 @@ import { useApi } from '../../api/api-context';
 import { Button } from '../../components/button';
 import { Icon } from '../../components/icons';
 import { useAction } from '../../hooks/use-action';
-import { groupFacts } from './preferences-model';
+import { factFilterCounts, filterSections, groupFacts, type FactFilter } from './preferences-model';
 
 interface FactBankProps {
   profile: Profile;
@@ -12,24 +12,33 @@ interface FactBankProps {
   onCloseAdd: () => void;
   onChange: (facts: Fact[]) => void;
   onGroupsChange: (groups: FactGroup[]) => void;
+  onSkillsChange: (skills: string[]) => void;
 }
 
 /**
  * Fact bank (SPEC F1): facts grouped by role, each with its tags and how often
  * drafts used it. Edit inline; the AI may only select and rephrase these.
  */
-export function FactBank({ profile, adding, onCloseAdd, onChange, onGroupsChange }: FactBankProps) {
+export function FactBank({ profile, adding, onCloseAdd, onChange, onGroupsChange, onSkillsChange }: FactBankProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingGroup, setEditingGroup] = useState<string | null>(null);
-  const sections = groupFacts(profile.factGroups, profile.facts);
+  const [filter, setFilter] = useState<FactFilter>('all');
+  const allSections = groupFacts(profile.factGroups, profile.facts);
+  const sections = filterSections(allSections, filter);
+  const counts = factFilterCounts(allSections, profile.skills);
+  // Adding under a filter offers that kind's sections first; with none, every section stays available.
+  const kindGroups = filter === 'all' ? [] : profile.factGroups.filter((g) => g.kind === filter).map((g) => g.name);
+  const addGroups = kindGroups.length ? kindGroups : profile.factGroups.map((g) => g.name);
 
   const replace = (fact: Fact) => onChange(profile.facts.map((f) => (f.id === fact.id ? fact : f)));
 
   return (
     <div>
+      <FilterRow value={filter} counts={counts} onChange={setFilter} />
       {adding ? (
         <AddFactForm
-          groups={profile.factGroups.map((g) => g.name)}
+          key={filter}
+          groups={addGroups}
           onCancel={onCloseAdd}
           onSaved={(fact) => {
             onChange([fact, ...profile.facts]);
@@ -91,10 +100,17 @@ export function FactBank({ profile, adding, onCloseAdd, onChange, onGroupsChange
           )}
         </section>
       ))}
-      <div className="skills">
-        <div className="skills-title">Skills</div>
-        <div className="tag-row">{profile.skills.map((s) => <span key={s} className="skill-chip">{s}</span>)}</div>
-      </div>
+      {filter !== 'all' && filter !== 'skills' && sections.length === 0 ? (
+        <p className="cell-sub fact-empty">{`No ${FILTER_LABELS[filter].toLowerCase()} yet. Set a section's kind to ${KINDS.find((k) => k.value === filter)?.label} with its Edit section button.`}</p>
+      ) : null}
+      {filter === 'skills' ? (
+        <SkillsEditor skills={profile.skills} onChange={onSkillsChange} />
+      ) : filter === 'all' ? (
+        <div className="skills">
+          <div className="skills-title">Skills</div>
+          <div className="tag-row">{profile.skills.map((s) => <span key={s} className="skill-chip">{s}</span>)}</div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -221,6 +237,62 @@ function GroupEditor({ group, onDone }: { group: FactGroup; onDone: (groups: Fac
       <div className="form-actions">
         <Button variant="ghost" size="sm" onClick={() => onDone(null)}>Cancel</Button>
         <Button variant="strong" size="sm" busy={action.pending} onClick={save}>Save section</Button>
+      </div>
+    </div>
+  );
+}
+
+const FILTER_LABELS: Record<FactFilter, string> = { all: 'All', experience: 'Experience', project: 'Projects', skills: 'Skills' };
+
+/** One row of filter buttons (not tabs: they narrow one list); each says how many facts sit behind it. */
+function FilterRow({ value, counts, onChange }: { value: FactFilter; counts: Record<FactFilter, number>; onChange: (f: FactFilter) => void }) {
+  return (
+    <div className="tabs fact-filter" role="group" aria-label="Filter the fact bank">
+      {(Object.keys(FILTER_LABELS) as FactFilter[]).map((f) => (
+        <button key={f} type="button" className="tab" aria-pressed={value === f} aria-label={`${FILTER_LABELS[f]}, ${counts[f]} ${counts[f] === 1 ? 'fact' : 'facts'}`} onClick={() => onChange(f)}>
+          {FILTER_LABELS[f]}
+          <span className="tab-count" aria-hidden="true">{counts[f]}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** The skill chips, with add and remove. Skills are stored as one list, saved whole on each change. */
+function SkillsEditor({ skills, onChange }: { skills: string[]; onChange: (skills: string[]) => void }) {
+  const api = useApi();
+  const action = useAction();
+  const [draft, setDraft] = useState('');
+  const [error, setError] = useState(false);
+
+  const save = async (next: string[]) => {
+    const saved = await action.run('save the skills', () => api.saveSkills(next));
+    if (saved) onChange(saved);
+    return saved;
+  };
+  const add = async () => {
+    const skill = draft.trim();
+    if (!skill) return setError(true);
+    setDraft('');
+    if (skills.some((s) => s.toLowerCase() === skill.toLowerCase())) return;
+    if (!(await save([...skills, skill]))) setDraft(skill);
+  };
+
+  return (
+    <div className="skills">
+      <div className="tag-row">
+        {skills.map((s) => (
+          <span key={s} className="skill-chip">
+            {s}
+            <button type="button" className="chip-remove" aria-label={`Remove ${s}`} onClick={() => void save(skills.filter((x) => x !== s))}>×</button>
+          </span>
+        ))}
+      </div>
+      <div className="row">
+        <label htmlFor="new-skill" className="visually-hidden">New skill</label>
+        <input id="new-skill" className="input" placeholder="Add a skill, e.g. Rust" value={draft} onChange={(e) => { setDraft(e.target.value); setError(false); }} onKeyDown={(e) => { if (e.key === 'Enter') void add(); }} />
+        <Button size="sm" busy={action.pending} onClick={() => void add()}>Add skill</Button>
+        {error ? <span className="field-error" role="alert">Write a skill first.</span> : null}
       </div>
     </div>
   );

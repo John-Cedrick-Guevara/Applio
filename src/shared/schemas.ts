@@ -150,6 +150,7 @@ export const API_ARGS = {
     kind: z.enum(['experience', 'project', 'skills', 'certifications', 'other']).optional(),
     context: short.optional(), link: z.union([z.literal(''), webUrl]).optional(),
   })]),
+  saveSkills: z.tuple([z.array(z.string().max(80, 'is too long (80 characters max)')).max(200, 'has too many skills (200 max)')]),
   importResume: none,
 
   listSources: none,

@@ -214,6 +214,13 @@ describe('createBackend profile, settings and secrets on disk', () => {
     expect(await api.getSettings()).toMatchObject({ draftThreshold: 70, blocklist: ['Initech'] });
   });
 
+  it('keeps saved skills across a restart', async () => {
+    const first = backendIn();
+    await first.api.saveSkills(['Go', 'go', ' Rust ']);
+    first.deps.db.close();
+    expect((await backendIn(first.folder).api.getProfile()).skills).toEqual(['Go', 'Rust']);
+  });
+
   it('starts a fresh install with the default sources and guardrails', async () => {
     const { api } = backendIn();
     expect(await api.listSources()).toHaveLength(11);

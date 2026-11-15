@@ -706,6 +706,7 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     savePreferences: later(profile.savePreferences),
     saveContact: later(profile.saveContact),
     saveFactGroup: later(profile.saveFactGroup),
+    saveSkills: later(profile.saveSkills),
 
     listSources: later(settings.listSources),
     updateSource: later(settings.updateSource),
