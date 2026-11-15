@@ -103,7 +103,7 @@ describe('fact filters', () => {
     expect(filterSections(sections, 'skills').map((s) => s.name)).toEqual(['Tools']);
   });
 
-  it('counts facts per filter, with skill chips added to Skills and All', () => {
-    expect(factFilterCounts(sections, ['Node', 'Go'])).toEqual({ all: 7, experience: 2, project: 1, skills: 3 });
+  it('counts facts per filter, with skill chips added to Skills only', () => {
+    expect(factFilterCounts(sections, ['Node', 'Go'])).toEqual({ all: 5, experience: 2, project: 1, skills: 3 });
   });
 });

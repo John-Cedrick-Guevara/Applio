@@ -58,6 +58,12 @@ describe('ProfilePage', () => {
       expect(screen.queryByRole('heading', { name: '[Previous Company] — Senior Software Engineer' })).not.toBeInTheDocument();
     });
 
+    it('shows the same total on the Fact bank tab and the All filter', async () => {
+      renderWithApp(<ProfilePage />);
+      const total = (await screen.findByRole('button', { name: /^All/ })).querySelector('.tab-count')!.textContent;
+      expect(screen.getByRole('tab', { name: /^Fact bank/ }).querySelector('.tab-count')).toHaveTextContent(total!);
+    });
+
     it('says what is missing and what to do when a filter is empty', async () => {
       const api = createMockApi({ latencyMs: 0 });
       await api.deleteFact('f6'); // the only project fact

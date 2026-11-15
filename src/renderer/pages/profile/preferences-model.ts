@@ -117,8 +117,8 @@ export function filterSections(sections: FactSection[], filter: FactFilter): Fac
   return filter === 'all' ? sections : sections.filter((s) => s.kind === filter);
 }
 
-/** Facts behind each filter; the skill chips count toward Skills and All. */
+/** Facts behind each filter, so All matches the tab's count; the skill chips count toward Skills only. */
 export function factFilterCounts(sections: FactSection[], skills: readonly string[]): Record<FactFilter, number> {
   const count = (filter: FactFilter) => filterSections(sections, filter).reduce((n, s) => n + s.facts.length, 0);
-  return { all: count('all') + skills.length, experience: count('experience'), project: count('project'), skills: count('skills') + skills.length };
+  return { all: count('all'), experience: count('experience'), project: count('project'), skills: count('skills') + skills.length };
 }
