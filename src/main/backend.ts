@@ -23,6 +23,7 @@ import { discover } from '../core/jobs/discover';
 import { localDay, runSources } from '../core/jobs/run-sources';
 import { createScanRunner } from '../core/jobs/scan-runner';
 import type { HttpGet, JobSource } from '../core/jobs/source';
+import { extractFacts as readFacts } from '../core/profile/extract-facts';
 import { createProfileService } from '../core/profile/profile-service';
 import { draftReady, followUpDue, newMatch, quotaWarning, replyArrived, sentOnItsOwn, type BotMessage } from '../core/notify/messages';
 import { createTelegramBot } from '../core/notify/telegram-bot';
@@ -707,6 +708,13 @@ export function createBackend(getWindow: () => BrowserWindow | null, { db, secre
     saveContact: later(profile.saveContact),
     saveFactGroup: later(profile.saveFactGroup),
     saveSkills: later(profile.saveSkills),
+    extractFacts: (source) => readFacts(source, {
+      ai: (request) => ai.run(request),
+      existingFacts: () => profile.getProfile().facts.map((f) => f.text),
+      existingSkills: () => profile.getProfile().skills,
+      linksSupported: () => settings.getSettings().aiEngine === 'claude-code',
+      isBlockedLink: isPlatformUrl,
+    }),
 
     listSources: later(settings.listSources),
     updateSource: later(settings.updateSource),

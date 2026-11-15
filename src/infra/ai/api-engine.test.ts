@@ -79,6 +79,12 @@ describe('Anthropic API engine', () => {
     await expect(engine.complete({ prompt: 'x', jobIds: [] })).rejects.toThrow('Add your Anthropic API key below.');
   });
 
+  it('refuses a web read, which only Claude Code can do, without calling the API', async () => {
+    const { engine, sent } = setup();
+    await expect(engine.complete({ prompt: 'x', jobIds: [], tools: false, webRead: 'https://jane.dev' })).rejects.toThrow('Claude Code');
+    expect(sent).toHaveLength(0);
+  });
+
   it('checks the key with a model lookup, which spends no tokens', async () => {
     const { engine, retrieve, sent } = setup();
     expect(await engine.check()).toEqual({ ready: true, message: 'The Anthropic API accepted the key.' });

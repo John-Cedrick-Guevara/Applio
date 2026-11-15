@@ -7,6 +7,7 @@ const STEP_LABEL: Record<UsageStep, string> = {
   answers: 'Form answers (new only)',
   prep: 'Interview prep',
   'follow-up': 'Follow-up drafts',
+  facts: 'Reading pasted material for facts',
 };
 
 /** Horizontal bars per pipeline step, scaled to the largest. */

@@ -280,6 +280,48 @@ describe('createBackend profile, settings and secrets on disk', () => {
   });
 });
 
+describe('createBackend extractFacts', () => {
+  const RESUME = 'Acme Corp - Senior Engineer\n- Cut p95 query time from 900 ms to 120 ms by redesigning the invoicing schema.';
+  const answer = JSON.stringify({ items: [{ section: 'Acme Corp - Senior Engineer', kind: 'experience', text: 'Cut p95 query time from 900 ms to 120 ms by redesigning the invoicing schema.' }] });
+  const withEngine = (text = answer) => {
+    const b = backendIn();
+    const complete = vi.fn(async (_request: { webRead?: string }) => ({ text, inputTokens: 800, outputTokens: 100 }));
+    b.deps.engines['claude-code'] = { check: async () => ({ ready: true, message: 'ok' }), complete };
+    return { ...b, complete };
+  };
+
+  it('suggests facts from pasted text, records the usage, and adds nothing to the bank', async () => {
+    const { api } = withEngine();
+    const result = await api.extractFacts({ kind: 'text', value: RESUME });
+    expect(result.suggestions).toEqual([{ group: 'Acme Corp - Senior Engineer', kind: 'experience', text: 'Cut p95 query time from 900 ms to 120 ms by redesigning the invoicing schema.' }]);
+    expect((await api.getProfile()).facts).toEqual([]);
+    expect((await api.getUsage('today')).tokensByStep.find((s) => s.step === 'facts')?.tokens).toBe(900);
+  });
+
+  it('stops at the token budget without calling Claude', async () => {
+    const { api, complete } = withEngine();
+    await api.saveSettings({ dailyTokenBudget: 1000 });
+    await api.extractFacts({ kind: 'text', value: RESUME });
+    await expect(api.extractFacts({ kind: 'text', value: RESUME })).rejects.toThrow(/Claude token budget/);
+    expect(complete).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets Claude Code read a link, and refuses LinkedIn before any call', async () => {
+    const { api, complete } = withEngine();
+    await api.extractFacts({ kind: 'link', value: 'https://jane.dev' });
+    expect(complete).toHaveBeenCalledWith(expect.objectContaining({ webRead: 'https://jane.dev' }));
+    await expect(api.extractFacts({ kind: 'link', value: 'https://www.linkedin.com/in/jane' })).rejects.toThrow(/paste/i);
+    expect(complete).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks for Claude Code when the API-key engine is selected and a link is pasted', async () => {
+    const { api, complete } = withEngine();
+    await api.saveSettings({ aiEngine: 'api-key' });
+    await expect(api.extractFacts({ kind: 'link', value: 'https://jane.dev' })).rejects.toThrow('Claude Code');
+    expect(complete).not.toHaveBeenCalled();
+  });
+});
+
 describe('createBackend discovery', () => {
   const searchingBackend = async (folder?: string) => {
     const b = backendIn(folder);
@@ -1159,7 +1201,7 @@ describe('createBackend discovery', () => {
     const { api, job, deps } = await draftedBackend();
     await api.saveSettings({ dailyTokenBudget: 1000, monthlyTokenBudget: 3_000_000 });
     deps.engines['claude-code'] = { complete: async () => ({ text: '{"told":[],"likelyQuestions":["Q"],"askThem":[]}', inputTokens: 10, outputTokens: 10 }), check: async () => ({ ready: true, message: 'ok' }) };
-    await expect(api.getInterviewPrep(job.id)).rejects.toThrow(/budget is used up/);
+    await expect(api.getInterviewPrep(job.id)).rejects.toThrow(/Claude token budget/);
     await api.saveSettings({ dailyTokenBudget: 100_000 });
     expect((await api.getInterviewPrep(job.id)).likelyQuestions).toEqual(['Q']);
   });

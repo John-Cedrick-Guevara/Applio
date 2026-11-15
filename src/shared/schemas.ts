@@ -151,6 +151,7 @@ export const API_ARGS = {
     context: short.optional(), link: z.union([z.literal(''), webUrl]).optional(),
   })]),
   saveSkills: z.tuple([z.array(z.string().max(80, 'is too long (80 characters max)')).max(200, 'has too many skills (200 max)')]),
+  extractFacts: z.tuple([z.strictObject({ kind: z.enum(['text', 'link']), value: z.string().max(60_000, 'is too long (60,000 characters max)') })]),
   importResume: none,
 
   listSources: none,

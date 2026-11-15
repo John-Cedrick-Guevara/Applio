@@ -44,7 +44,7 @@ describe('buildUsage', () => {
 
   it('splits tokens by step, every step listed', () => {
     expect(buildUsage('today', input()).tokensByStep).toEqual([
-      { step: 'tailor', tokens: 4000 }, { step: 'score', tokens: 1000 }, { step: 'answers', tokens: 0 }, { step: 'prep', tokens: 0 }, { step: 'follow-up', tokens: 0 },
+      { step: 'tailor', tokens: 4000 }, { step: 'score', tokens: 1000 }, { step: 'answers', tokens: 0 }, { step: 'prep', tokens: 0 }, { step: 'follow-up', tokens: 0 }, { step: 'facts', tokens: 0 },
     ]);
   });
 

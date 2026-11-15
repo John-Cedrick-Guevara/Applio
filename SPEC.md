@@ -33,6 +33,7 @@ Status: personal tool first, open source once polished.
 
 ### F1. Profile, fact bank, answer bank
 - Upload a **reference resume** (PDF/DOCX): it fills the fact bank on first run and sets the style reference.
+- **Paste import:** paste résumé or portfolio text, or a portfolio link; Claude suggests facts quoted from it, and each joins the fact bank only when the operator accepts it. A link is read by Claude Code itself (that site only); text is checked against the source.
 - **Fact bank:** roles, dates, metrics, skills, projects, links. Editable. It is the only source the AI may draw facts from.
 - **Answer bank:** saved answers to form questions (salary, notice period, work authorization, "why us" patterns). Reused before calling the AI.
 - **Preferences:** target roles, seniority, min salary, timezones, remote-only, full-time / contract / freelance.

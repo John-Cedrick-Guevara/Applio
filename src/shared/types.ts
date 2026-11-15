@@ -247,6 +247,24 @@ export interface ReferenceResume {
 export interface FactSuggestion {
   group: string;
   text: string;
+  /** What the section is (a role, a project, skills); set by pasted-text extraction, not by résumé-file import. */
+  kind?: FactGroupKind;
+}
+
+/** Where pasted material comes from: text the operator pasted, or one public page Claude reads. */
+export interface FactSource {
+  kind: 'text' | 'link';
+  value: string;
+}
+
+/** What reading a source found: facts waiting for the operator, and what was left out and why. */
+export interface FactExtraction {
+  suggestions: FactSuggestion[];
+  /** Suggestions not found in the pasted text (so not trusted); always 0 for a link, which Applio can't check. */
+  dropped: number;
+  /** Suggestions already in the bank, left out. */
+  alreadyInBank: number;
+  tokensUsed: number;
 }
 
 /** Result of importing a résumé: the reference card, plus facts waiting for the operator to accept. */
@@ -300,7 +318,7 @@ export interface Quota {
 
 export type UsagePeriod = 'today' | 'month';
 
-export type UsageStep = 'tailor' | 'score' | 'answers' | 'prep' | 'follow-up';
+export type UsageStep = 'tailor' | 'score' | 'answers' | 'prep' | 'follow-up' | 'facts';
 
 /** Headline numbers for the usage tiles. */
 export interface UsageSummary {

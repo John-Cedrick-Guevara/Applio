@@ -84,6 +84,12 @@ describe('API argument schemas', () => {
       expect(rejects('saveSkills', [['x'.repeat(81)]])).toThrow(InvalidRequestError);
     });
 
+    it('accepts a text or link source and rejects any other kind', () => {
+      expect(parseApiArgs('extractFacts', [{ kind: 'text', value: 'Built X' }])).toHaveLength(1);
+      expect(parseApiArgs('extractFacts', [{ kind: 'link', value: 'https://jane.dev' }])).toHaveLength(1);
+      expect(rejects('extractFacts', [{ kind: 'file', value: '/etc/passwd' }])).toThrow(InvalidRequestError);
+    });
+
     it('accepts preferences and rejects an unknown employment type', () => {
       const prefs = { targetRoles: ['Backend'], seniority: 'Senior', employmentTypes: ['full-time'], remoteOnly: true, hoursOverlap: '4h', minimumPay: '$80k' };
       expect(parseApiArgs('savePreferences', [prefs])).toHaveLength(1);
