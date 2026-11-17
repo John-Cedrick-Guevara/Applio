@@ -51,11 +51,44 @@ describe('analyzePost', () => {
     expect((await analyzePost({ text: 'post', sourceName: 'x' }, ports)).preview.duplicate).toEqual({ jobId: 'j9', status: 'applied' });
   });
 
-  it('refuses an answer that cannot be read, or that has no company, title or score', async () => {
-    const refused = "Claude's reading of the post couldn't be used. Try again.";
-    await expect(analyzePost({ text: 'post', sourceName: 'x' }, setup('Sorry, no.').ports)).rejects.toThrow(refused);
-    await expect(analyzePost({ text: 'post', sourceName: 'x' }, setup(answer({ company: '' })).ports)).rejects.toThrow(refused);
-    await expect(analyzePost({ text: 'post', sourceName: 'x' }, setup(answer({ score: 'high' })).ports)).rejects.toThrow(refused);
+  it('keeps a post that names no company, as "Unknown company"', async () => {
+    const { ports } = setup(answer({ company: null }));
+    const { preview, job } = await analyzePost({ text: 'post', sourceName: 'x' }, ports);
+    expect(preview.company).toBe('Unknown company');
+    expect(job.company).toBe('Unknown company');
+  });
+
+  it('accepts an empty company as unknown too', async () => {
+    const { ports } = setup(answer({ company: '  ' }));
+    expect((await analyzePost({ text: 'post', sourceName: 'x' }, ports)).preview.company).toBe('Unknown company');
+  });
+
+  it('says the post has no job title, without suggesting a retry, when the title is missing', async () => {
+    const error = await analyzePost({ text: 'post', sourceName: 'x' }, setup(answer({ title: null })).ports).catch((e: Error) => e);
+    expect(error).toMatchObject({ code: 'analysis_unreadable', message: expect.stringMatching(/no job title.*whole post/i) });
+    expect((error as Error).message).not.toMatch(/try again/i);
+  });
+
+  it('does not blame a missing title when the title is merely too long', async () => {
+    const error = await analyzePost({ text: 'post', sourceName: 'x' }, setup(answer({ title: 'x'.repeat(250) })).ports).catch((e: Error) => e);
+    expect((error as Error).message).toMatch(/analyze again/i);
+  });
+
+  it.each([['prose', 'Sorry, no.'], ['a non-numeric score', answer({ score: 'high' })]])('says Claude\'s answer was unusable and Analyze can be retried for %s', async (_name, text) => {
+    const error = await analyzePost({ text: 'post', sourceName: 'x' }, setup(text).ports).catch((e: Error) => e);
+    expect((error as Error).message).toMatch(/answer.*couldn't be used.*analyze again/i);
+  });
+
+  it('names the failing fields, not their values, in the cause', async () => {
+    const error = await analyzePost({ text: 'post', sourceName: 'x' }, setup(answer({ title: '', score: 'secret-value' })).ports).catch((e: Error) => e);
+    expect((error as Error).cause).toBe('title: too_small, score: invalid_type');
+  });
+
+  it('refuses an answer that cannot be read, or that has no title or score', async () => {
+    const refused = { code: 'analysis_unreadable' };
+    await expect(analyzePost({ text: 'post', sourceName: 'x' }, setup('Sorry, no.').ports)).rejects.toMatchObject(refused);
+    await expect(analyzePost({ text: 'post', sourceName: 'x' }, setup(answer({ title: '' })).ports)).rejects.toMatchObject(refused);
+    await expect(analyzePost({ text: 'post', sourceName: 'x' }, setup(answer({ score: 'high' })).ports)).rejects.toMatchObject(refused);
   });
 
   it('drops a strength citing a fact not in the bank, keeping the rest of the job', async () => {

@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, powerMonitor, safeStorage, shell } from 'el
 import { delimiter, join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { createApiEngine } from '../infra/ai/api-engine';
+import { appendErrorLog } from '../infra/fs/error-log';
 import { createClaudeCodeEngine } from '../infra/ai/claude-code-engine';
 import { openDatabase } from '../infra/db';
 import { fillPlatformForm, submitAtsForm } from '../infra/browser/ats-window';
@@ -146,7 +147,7 @@ app.whenReady().then(() => {
       }),
     },
   });
-  registerApiHandlers(backend, DEV_SERVER_URL);
+  registerApiHandlers(backend, DEV_SERVER_URL, (method, err) => appendErrorLog(join(app.getPath('userData'), 'applio.log'), method, err));
   mainWindow = createWindow();
 
   const show = () => {
