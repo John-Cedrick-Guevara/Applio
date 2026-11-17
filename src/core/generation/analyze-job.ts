@@ -76,8 +76,8 @@ export async function analyzePost(
   if (!parsed.success) {
     // The cause names the failing fields (not values, which come from an untrusted post) for the log.
     const cause = parsed.error.issues.map((i) => `${i.path.join('.') || 'answer'}: ${i.code}`).join(', ');
-    // A missing title means the text isn't a job post, so retrying can't help; other failures are Claude's answer and can.
-    const noTitle = parsed.error.issues.some((i) => i.path[0] === 'title');
+    // A missing title means the text isn't a job post, so retrying can't help; other failures (including a too-long title) are Claude's answer and can.
+    const noTitle = parsed.error.issues.some((i) => i.path[0] === 'title' && i.code !== 'too_big');
     throw new AppError('analysis_unreadable', noTitle
       ? "Claude found no job title in this post. Paste the whole post, including its title."
       : "Claude's answer couldn't be used. Press Analyze again.", { cause });

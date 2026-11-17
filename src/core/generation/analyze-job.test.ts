@@ -69,6 +69,11 @@ describe('analyzePost', () => {
     expect((error as Error).message).not.toMatch(/try again/i);
   });
 
+  it('does not blame a missing title when the title is merely too long', async () => {
+    const error = await analyzePost({ text: 'post', sourceName: 'x' }, setup(answer({ title: 'x'.repeat(250) })).ports).catch((e: Error) => e);
+    expect((error as Error).message).toMatch(/analyze again/i);
+  });
+
   it.each([['prose', 'Sorry, no.'], ['a non-numeric score', answer({ score: 'high' })]])('says Claude\'s answer was unusable and Analyze can be retried for %s', async (_name, text) => {
     const error = await analyzePost({ text: 'post', sourceName: 'x' }, setup(text).ports).catch((e: Error) => e);
     expect((error as Error).message).toMatch(/answer.*couldn't be used.*analyze again/i);

@@ -79,10 +79,12 @@ describe('IPC handlers', () => {
     await expect(call('getJob', 'j1')).rejects.toThrow('Job j1 not found');
   });
 
-  it('does not log an untrusted sender as an API failure', async () => {
+  it('logs an untrusted sender to the file, without running the call', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    const evil = { senderFrame: { url: 'https://evil.example' } };
+    const getJob = vi.spyOn(api, 'getJob');
+    const evil = { senderFrame: { url: 'https://evil.example/x' } };
     await expect((handlers.get('applio:getJob') as Handler)(evil, 'j1')).rejects.toThrow('Request rejected');
-    expect(logged).not.toHaveBeenCalled();
+    expect(getJob).not.toHaveBeenCalled();
+    expect(logged).toHaveBeenCalledWith('getJob', expect.objectContaining({ message: expect.stringContaining('https://evil.example/x') }));
   });
 });
