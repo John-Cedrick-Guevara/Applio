@@ -26,11 +26,12 @@ const listOf = <T extends z.ZodType>(item: T, max: number) =>
   }).slice(0, max));
 
 /**
- * Company, title and score must be right; the rest falls back when loose, so one
+ * Title and score must be right; the rest falls back when loose, so one
  * odd field (a "Part-time" type, an "Easy Apply" link) doesn't lose the whole post.
  */
 const AnalysisSchema = z.object({
-  company: z.string().trim().min(1).max(200),
+  // A post that names no company is still worth scoring; blank or null becomes a placeholder, like location.
+  company: clipped(200).nullish().transform((v) => v?.trim() || 'Unknown company'),
   title: z.string().trim().min(1).max(200),
   location: clipped(200).nullish().transform((v) => v || 'Not stated'),
   employmentType: z.unknown().transform((v) => {
@@ -73,9 +74,13 @@ export async function analyzePost(
   const reply = await ports.ai({ step: 'score', system: ANALYZE_SYSTEM, prompt: `Analyze this job post.\n<post>\n${text}\n</post>`, jobIds: [] });
   const parsed = AnalysisSchema.safeParse(firstJsonObject(reply.text));
   if (!parsed.success) {
-    // The cause names the failing fields (not values, which come from an untrusted post) for the IPC log.
+    // The cause names the failing fields (not values, which come from an untrusted post) for the log.
     const cause = parsed.error.issues.map((i) => `${i.path.join('.') || 'answer'}: ${i.code}`).join(', ');
-    throw new AppError('analysis_unreadable', "Claude's reading of the post couldn't be used. Try again.", { cause });
+    // A missing title means the text isn't a job post, so retrying can't help; other failures are Claude's answer and can.
+    const noTitle = parsed.error.issues.some((i) => i.path[0] === 'title');
+    throw new AppError('analysis_unreadable', noTitle
+      ? "Claude found no job title in this post. Paste the whole post, including its title."
+      : "Claude's answer couldn't be used. Press Analyze again.", { cause });
   }
   // A strength must trace to a real fact (SPEC §1); one that doesn't is dropped, not trusted.
   const known = ports.factIds();
