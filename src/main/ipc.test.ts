@@ -6,6 +6,7 @@ const handlers = vi.hoisted(() => new Map<string, Handler>());
 vi.mock('electron', () => ({ ipcMain: { handle: (channel: string, fn: Handler) => handlers.set(channel, fn) } }));
 
 import type { ApplioApi } from '../shared/api';
+import { AppError } from '../shared/errors';
 import { createMockApi } from '../shared/mock/mock-api';
 import { registerApiHandlers } from './ipc';
 
@@ -13,10 +14,12 @@ const fromApp = { senderFrame: { url: 'file:///app/index.html' } };
 const call = (method: keyof ApplioApi, ...args: unknown[]) => (handlers.get(`applio:${method}`) as Handler)(fromApp, ...args);
 
 let api: ApplioApi;
+const logged = vi.fn();
 beforeEach(() => {
   handlers.clear();
+  logged.mockReset();
   api = createMockApi({ latencyMs: 0 });
-  registerApiHandlers(api, undefined);
+  registerApiHandlers(api, undefined, logged);
 });
 
 describe('IPC handlers', () => {
@@ -51,5 +54,35 @@ describe('IPC handlers', () => {
     await expect(call('setSecret', 'awsKey', secret)).rejects.toThrow();
     await expect(call('setSecret', 'gmailAppPassword', secret.repeat(300))).rejects.toThrow();
     expect(JSON.stringify(log.mock.calls)).not.toContain(secret);
+  });
+
+  it('writes a failed call to the log file with its error, and the operator sees only the message', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const failure = new AppError('analysis_unreadable', 'No title.', { cause: 'title: too_small' });
+    vi.spyOn(api, 'getJob').mockRejectedValue(failure);
+    const thrown = await call('getJob', 'j1').catch((e: Error) => e);
+    expect(logged).toHaveBeenCalledWith('getJob', failure);
+    expect((thrown as Error).message).toBe('No title.');
+  });
+
+  it('logs a rejected argument set by its issues, never its values', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    await expect(call('setSecret', 'gmailAppPassword', 'sk-ant-do-not-log-me'.repeat(300))).rejects.toThrow();
+    expect(JSON.stringify(logged.mock.calls)).not.toContain('sk-ant-do-not-log-me');
+    expect(logged).toHaveBeenCalledTimes(1);
+  });
+
+  it('still shows the original message when the logger itself throws', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    logged.mockImplementation(() => { throw new Error('disk full'); });
+    vi.spyOn(api, 'getJob').mockRejectedValue(new Error('Job j1 not found'));
+    await expect(call('getJob', 'j1')).rejects.toThrow('Job j1 not found');
+  });
+
+  it('does not log an untrusted sender as an API failure', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const evil = { senderFrame: { url: 'https://evil.example' } };
+    await expect((handlers.get('applio:getJob') as Handler)(evil, 'j1')).rejects.toThrow('Request rejected');
+    expect(logged).not.toHaveBeenCalled();
   });
 });
