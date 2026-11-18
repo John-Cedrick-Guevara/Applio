@@ -42,7 +42,9 @@ describe('draftJobs', () => {
       'resume strategist', 'past AI/ATS screening', '30-second read', 'Never invent skills, tools, metrics, titles, or dates',
       'strong action verb + what I built or changed + how (the mechanism) + result/scale', 'Mirror the job post', '3 lines max, one sentence each', 'Under 250 words',
       'Hook', 'Proof', 'Value', 'Close', 'get_profile', 'untrusted', 'Never tell me to skip a job',
-      'ask me before writing', 'Max 5 questions', 'about 18–22 bullets in total', 'Never fill a Gap with invented content', 'Never restate the context line', 'availability, start date, notice period, time zone',
+      'ask me before writing', 'Max 5 questions', 'Never fill a Gap with invented content', 'availability, start date, notice period, time zone',
+      // Fill floors (2026-11-18): an empty Projects section or a half page was the defect; 1,950+ characters spill to page 2.
+      'Projects are REQUIRED', 'always exactly 2 projects, 3 bullets each', '1,650–1,900 characters', 'Call save_draft ONCE', 'A retry is never shorter or thinner',
     ]) expect(DRAFT_SYSTEM).toContain(rule);
     // Personal facts come from get_profile at run time, never from text built into Applio.
     for (const personal of ['Guevara', 'Afterhours', 'Zentari', 'Octivia', '+63', 'guevix']) expect(DRAFT_SYSTEM).not.toContain(personal);
